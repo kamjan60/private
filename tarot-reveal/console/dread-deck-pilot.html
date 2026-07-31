@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>The Dread Deck — Draw Console (Pilot · 16)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /*
+    Table backdrop: table-bg2-upscaled.png (Real-ESRGAN 2x of table-bg2.png,
+    2896x2172, same folder). Same aspect ratio as the original background so
+    --bg-zoom/--bg-y carry over unchanged; nudge them if the crop needs adjusting.
+    Card art: cards/<NN>-<Name>.png + cards/CardBacks.png, local copies of
+    D:\OBS Store movies\Images\Tarot\Cards-png\.
+  */
+  :root{
+    --bg-zoom:145%;
+    --bg-y:34%;
+    --ink:#0d0a11;
+    --glass: rgba(13,10,17,0.58);
+    --glass-strong: rgba(13,10,17,0.78);
+    --line: rgba(201,162,39,0.22);
+    --violet:#6b2e86;
+    --gold:#c9a227;
+    --gold-soft: rgba(201,162,39,0.16);
+    --crimson:#a02334;
+    --crimson-soft: rgba(160,35,52,0.18);
+    --blue:#3d8bd6;
+    --parchment:#e9e0d0;
+    --parchment-dim: rgba(233,224,208,0.6);
+    --parchment-faint: rgba(233,224,208,0.32);
+    --shadow: 0 24px 60px rgba(0,0,0,0.6);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background-color:var(--ink);
+    background-image:
+      linear-gradient(180deg, transparent 0%, transparent 55%, var(--ink) 100%),
+      url("table-bg2-upscaled.png");
+    background-repeat:no-repeat, no-repeat;
+    background-attachment:fixed, fixed;
+    background-position:center var(--bg-y), center var(--bg-y);
+    background-size:var(--bg-zoom) auto, var(--bg-zoom) auto;
+    color:var(--parchment);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    display:flex;
+    justify-content:center;
+    padding: clamp(16px, 3vw, 40px);
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:radial-gradient(ellipse 70% 60% at 50% 45%, transparent 0%, rgba(6,4,8,0.35) 68%, rgba(6,4,8,0.72) 100%);
+    pointer-events:none;
+  }
+
+  .console{ position:relative; width:100%; max-width:1200px; display:flex; flex-direction:column; gap:14px; }
+
+  .top-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .data-io{ display:flex; gap:8px; }
+  .data-io button{
+    appearance:none; border:1px solid var(--line); background:var(--glass); color:var(--parchment-dim);
+    font:inherit; font-size:12.5px; letter-spacing:0.03em; padding:8px 16px; border-radius:8px; cursor:pointer;
+  }
+  .data-io button:hover{ border-color:var(--violet); color:var(--parchment); }
+  .view-tabs{ display:flex; gap:6px; }
+  .view-tabs button{
+    appearance:none; border:1px solid var(--line); border-bottom:none;
+    background:var(--glass); color:var(--parchment-dim);
+    font:inherit; font-size:14.5px; letter-spacing:0.05em; text-transform:uppercase;
+    padding:9px 18px; border-radius:10px 10px 0 0; cursor:pointer;
+  }
+  .view-tabs button.active{ background:var(--glass-strong); color:var(--gold); }
+  .view-tabs button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  .view[hidden]{ display:none; }
+  .view{ display:flex; flex-direction:column; gap:22px; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    background:var(--glass); backdrop-filter:blur(6px);
+    border:1px solid var(--line); border-radius:14px; padding:16px 20px;
+  }
+  .brand-eyebrow{ font-size:14.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin:0 0 6px; }
+  h1{ font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif; font-weight:400; font-size:clamp(26px, 3.6vw, 36px); margin:0; letter-spacing:0.01em; text-wrap:balance; }
+  .header-chips{ display:flex; gap:10px; flex-wrap:wrap; }
+  .remaining-chip, .cap-chip{ font-variant-numeric: tabular-nums; font-size:14.5px; color:var(--parchment-dim); border:1px solid var(--line); border-radius:999px; padding:8px 14px; white-space:nowrap; background:rgba(0,0,0,0.2); }
+  .remaining-chip b{color:var(--parchment); font-weight:600;}
+  .cap-chip{ font-size:14.5px; padding:4px 12px; margin-left:8px; }
+  .cap-chip.over{ color:var(--crimson); border-color:var(--crimson-soft); background:var(--crimson-soft); }
+
+  .floor-link{
+    display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px;
+    font-size:14.5px; color:var(--parchment-dim); background:rgba(0,0,0,0.2); border:1px solid var(--line);
+    border-radius:999px; padding:8px 18px;
+  }
+  .floor-link-select{
+    background:rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--parchment);
+    font:inherit; font-size:14.5px; padding:6px 10px; border-radius:8px;
+  }
+  .floor-link .hearts .heart{ font-size:19px; }
+  .floor-count-input{
+    width:60px; background:rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--parchment);
+    font:inherit; font-size:14.5px; padding:6px 8px; border-radius:8px;
+  }
+  .heart.bonus{ color:var(--blue); }
+  .heart-add{
+    appearance:none; border:1px dashed var(--parchment-faint); background:none; color:var(--parchment-faint);
+    cursor:pointer; width:20px; height:20px; border-radius:50%; font-size:14px; line-height:1; padding:0;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .heart-add:hover{ border-color:var(--gold); color:var(--gold); }
+
+  .stage{
+    position:relative; min-height:340px; border-radius:18px; border:1px solid var(--line);
+    background:rgba(13,10,17,0.22); box-shadow:var(--shadow); padding:28px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stage-idle{
+    text-align:center; color:var(--parchment-dim); font-size:17px; max-width:34ch; line-height:1.6;
+    background:var(--glass); border:1px solid var(--line); border-radius:12px; padding:20px 24px;
+  }
+  .stage-idle strong{ display:block; color:var(--parchment); font-family:Georgia, serif; font-size:19px; margin-bottom:8px; font-weight:400; }
+
+  .draw-row{ display:flex; gap:clamp(14px, 3vw, 28px); align-items:flex-start; justify-content:center; flex-wrap:wrap; }
+
+  .card-slot{ display:flex; flex-direction:column; align-items:center; gap:10px; perspective:1200px; width:190px; }
+  .card{
+    position:relative; width:190px; height:290px;
+    transform-style:preserve-3d; transition:transform 0.7s cubic-bezier(.4,.2,.15,1); cursor:pointer;
+  }
+  .card.flipped{transform:rotateY(180deg);}
+  .card.settled{cursor:default;}
+  .card-face{
+    position:absolute; inset:0; border-radius:12px; backface-visibility:hidden;
+    display:flex; flex-direction:column; overflow:hidden;
+    border:1px solid rgba(233,224,208,0.18); box-shadow:0 12px 30px rgba(0,0,0,0.6);
+  }
+  .card-back{
+    background: url("cards/CardBacks.png") center/cover no-repeat,
+                linear-gradient(160deg, #4a1f5c, #2a1033);
+  }
+  .card-front{ transform:rotateY(180deg); background:#1c1622; padding:8px; justify-content:flex-start; gap:6px; }
+  .card-front .thumb{
+    flex:1; border-radius:6px; background-size:cover; background-position:center top;
+    border:2px solid rgba(0,0,0,0.4); min-height:0;
+  }
+  .card-front .thumb.relic{ border-color:var(--gold); }
+  .card-front .thumb.curse{ border-color:var(--crimson); transform:rotate(180deg); }
+  .card-front .name{ font-family:Georgia, serif; font-size:17px; text-align:center; color:var(--parchment); line-height:1.25; }
+  .card-status{ font-size:14.5px; letter-spacing:0.1em; text-transform:uppercase; text-align:center; padding:3px 0; border-radius:4px; }
+  .card-status.relic{color:var(--gold); background:var(--gold-soft);}
+  .card-status.curse{color:var(--crimson); background:var(--crimson-soft);}
+
+  .keep-btn{
+    appearance:none; border:1px solid var(--gold); background:var(--gold-soft); color:var(--gold);
+    font:inherit; font-size:14.5px; letter-spacing:0.03em; padding:10px 20px; border-radius:999px; cursor:pointer;
+    transition:background .15s, color .15s; white-space:nowrap;
+  }
+  .keep-btn:hover{ background:var(--gold); color:#241a04; }
+  .keep-btn[hidden]{ visibility:hidden; }
+
+  .reveal-detail{ margin-top:4px; text-align:center; max-width:46ch; background:var(--glass); border:1px solid var(--line); border-radius:12px; padding:14px 20px; }
+  .reveal-detail .ability{ font-family:Georgia, serif; font-size:17px; margin:0 0 4px; }
+  .reveal-detail .ability.relic{color:var(--gold);}
+  .reveal-detail .ability.curse{color:var(--crimson);}
+  .reveal-detail p{ margin:0; font-size:17px; color:var(--parchment-dim); line-height:1.55; }
+  .reveal-detail .banked-note{ margin-top:8px; font-size:14.5px; color:var(--parchment-faint); font-style:italic; }
+
+  .stage-column{ display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; }
+  .stage-hint{ font-size:14.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--parchment-dim); background:rgba(0,0,0,0.3); padding:4px 10px; border-radius:999px;}
+
+  .actions{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
+  .actions button{
+    appearance:none; border:1px solid var(--line); background:var(--glass-strong); backdrop-filter:blur(6px);
+    color:var(--parchment); font:inherit; font-size:14.5px; padding:18px 16px; border-radius:12px;
+    cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:4px;
+    transition:border-color .15s, transform .15s;
+  }
+  .actions button:hover:not(:disabled){border-color:var(--violet); transform:translateY(-1px);}
+  .actions button:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+  .actions button:disabled{opacity:0.4; cursor:not-allowed;}
+  .actions button .label{font-family:Georgia, serif; font-size:17px; min-width:0;}
+  .actions button .sub{font-size:14.5px; color:var(--parchment-faint); min-width:0; overflow-wrap:break-word;}
+  .actions button.victory .label{color:var(--gold);}
+  .actions button.death .label{color:var(--crimson);}
+  .actions button.coin .label{color:#cfc3e0;}
+  .actions button.world .label{color:var(--parchment);}
+
+  .coin-stage{display:flex; flex-direction:column; align-items:center; gap:16px;}
+  .coin{ width:110px;height:110px;border-radius:50%; perspective:800px; }
+  .coin-inner{ width:100%;height:100%;border-radius:50%; transform-style:preserve-3d; transition:transform 1.1s cubic-bezier(.3,.1,.2,1); position:relative; }
+  .coin-face{ position:absolute;inset:0;border-radius:50%; backface-visibility:hidden; display:flex;align-items:center;justify-content:center; font-family:Georgia, serif; font-size:17px; letter-spacing:0.05em; border:2px solid rgba(233,224,208,0.4); }
+  .coin-face.heads{background:linear-gradient(160deg,#d8b84a,#8a6a15); color:#241a04;}
+  .coin-face.tails{background:linear-gradient(160deg,#5a2470,#2a1033); color:var(--parchment); transform:rotateY(180deg);}
+  .coin-result{font-family:Georgia, serif; font-size:17px; color:var(--parchment-dim); min-height:1.4em; background:rgba(0,0,0,0.3); padding:4px 14px; border-radius:999px;}
+
+  .ledger{ background:var(--glass); backdrop-filter:blur(6px); border:1px solid var(--line); border-radius:14px; padding:16px 20px; }
+  .ledger h2, .bank-col h2{ font-family:Georgia, serif; font-weight:400; font-size:17px; color:var(--parchment-dim); margin:0 0 12px; display:flex; align-items:center; gap:10px; }
+  .ledger h2::after, .bank-col h2::after{content:""; flex:1; height:1px; background:var(--line);}
+  .deck-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(104px,1fr)); gap:8px; }
+  .deck-tile{
+    border:1px solid var(--line); border-radius:8px; padding:10px 8px; font-size:14.5px; text-align:center;
+    color:var(--parchment-dim); background:rgba(0,0,0,0.25); line-height:1.3; cursor:pointer;
+    height:78px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  }
+  .deck-tile:hover{ border-color:var(--violet); }
+  .deck-tile.out{ opacity:0.32; text-decoration:line-through; cursor:not-allowed; }
+  .deck-tile.out:hover{ border-color:var(--line); }
+  .deck-tile .n{font-variant-numeric:tabular-nums; color:var(--parchment-faint); font-size:12.5px;}
+
+  .deck-assign-popup{
+    position:fixed; z-index:90; width:250px; background:var(--glass-strong); backdrop-filter:blur(8px);
+    border:1px solid var(--line); border-radius:10px; padding:12px; box-shadow:var(--shadow);
+  }
+  .deck-assign-close{
+    position:absolute; top:6px; right:8px; appearance:none; border:none; background:none;
+    color:var(--parchment-faint); font-size:17px; cursor:pointer; line-height:1; padding:2px 4px;
+  }
+  .deck-assign-name{ margin:0 0 8px; font-family:Georgia,serif; font-size:17px; color:var(--parchment); padding-right:20px; }
+  .deck-assign-row{ display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
+  .deck-assign-row:last-child{ margin-bottom:0; }
+  .deck-assign-floor{
+    flex:1; min-width:90px; background:rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--parchment);
+    font:inherit; font-size:12.5px; padding:6px; border-radius:8px;
+  }
+  .deck-assign-btn{
+    flex:1; appearance:none; border:1px solid var(--line); background:rgba(0,0,0,0.25); font:inherit;
+    font-size:12.5px; padding:6px 8px; border-radius:8px; cursor:pointer; white-space:nowrap;
+  }
+  .deck-assign-btn.relic{ color:var(--gold); border-color:rgba(215,178,85,0.4); }
+  .deck-assign-btn.curse{ color:var(--crimson); border-color:rgba(198,60,80,0.4); }
+  .deck-assign-btn:hover{ background:rgba(255,255,255,0.06); }
+
+  .world-choice{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; width:100%; }
+  .world-option{
+    flex:1; min-width:230px; max-width:340px; background:var(--glass); border:1px solid var(--line);
+    border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:10px; align-items:center; text-align:center;
+  }
+  .world-option h3{ font-family:Georgia, serif; font-weight:400; font-size:19px; margin:0; letter-spacing:0.03em; text-transform:uppercase; }
+  .world-option.keep h3{ color:var(--parchment); }
+  .world-option.close h3{ color:var(--crimson); }
+  .world-option p{ margin:0; font-size:14.5px; color:var(--parchment-dim); line-height:1.5; }
+  .world-relic-pick{ display:flex; flex-direction:column; gap:5px; width:100%; text-align:left; max-height:130px; overflow-y:auto; }
+  .world-relic-option{ font-size:12.5px; color:var(--parchment-dim); display:flex; gap:7px; align-items:center; }
+  .world-relic-option span{ color:var(--parchment-faint); }
+  .world-relic-option input{ accent-color:var(--crimson); flex:none; }
+  .world-curse-select{ width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--parchment); font:inherit; font-size:14.5px; padding:8px 10px; border-radius:8px; }
+  .world-btn{
+    appearance:none; border:1px solid var(--gold); background:var(--gold-soft); color:var(--gold);
+    font:inherit; font-size:14.5px; padding:10px 18px; border-radius:999px; cursor:pointer; width:100%;
+    transition:background .15s, color .15s;
+  }
+  .world-option.close .world-btn{ border-color:var(--crimson); background:var(--crimson-soft); color:var(--crimson); }
+  .world-btn:hover:not(:disabled){ background:var(--gold); color:#241a04; }
+  .world-option.close .world-btn:hover:not(:disabled){ background:var(--crimson); color:#2a0a0f; }
+  .world-btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .world-warning{ color:var(--crimson) !important; font-size:12.5px !important; }
+  .world-result{ margin-top:6px; font-size:14.5px; color:var(--gold); text-align:center; min-height:1.4em; }
+
+  .card-tooltip{
+    position:fixed; z-index:80; max-width:250px; background:var(--glass-strong); backdrop-filter:blur(8px);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14.5px; line-height:1.45;
+    box-shadow:var(--shadow); pointer-events:none;
+  }
+  .card-tooltip .tt-name{ margin:0 0 6px; font-family:Georgia, serif; font-size:17px; color:var(--parchment); }
+  .card-tooltip .tt-line{ margin:0 0 6px; }
+  .card-tooltip .tt-line:last-child{ margin-bottom:0; }
+  .card-tooltip b.gold{ color:var(--gold); }
+  .card-tooltip b.crimson{ color:var(--crimson); }
+
+  /* ---- map view ---- */
+  .floor-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:16px; }
+  .floor-grid[hidden], .map-poster[hidden], .map-toolbar[hidden]{ display:none; }
+  .floor-tile{ background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px; backdrop-filter:blur(6px); }
+  .floor-tile-body{ display:flex; flex-direction:column; gap:8px; transition:filter .2s; }
+  .floor-tile.future .floor-tile-body{ filter:blur(10px); pointer-events:none; user-select:none; }
+  .floor-active-picker{ margin-bottom:2px; }
+  .floor-active-option{ display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+  .floor-active-option input{ accent-color:var(--gold); cursor:pointer; }
+  .floor-banner{
+    height:110px; border-radius:10px; background:rgba(0,0,0,0.3) center/cover no-repeat;
+    border:1px dashed var(--line); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:14.5px; color:var(--parchment-faint); text-align:center; padding:8px;
+  }
+  .floor-banner:hover{ border-color:var(--violet); color:var(--parchment-dim); }
+  .floor-label{ font-family:Georgia, serif; font-size:17px; color:var(--gold); text-align:center; }
+  .floor-boss-items{
+    display:flex; flex-direction:column; gap:4px; max-height:130px; overflow-y:auto; text-align:center;
+    background:rgba(0,0,0,0.2); border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+  }
+  .floor-boss-item{ font-size:13px; line-height:1.35; }
+  .floor-boss-item .reward-remove, .floor-boss-item .entered-remove{
+    appearance:none; border:none; background:none; color:var(--parchment-faint); cursor:pointer;
+    font-size:13px; line-height:1; padding:0 0 0 6px;
+  }
+  .floor-boss-item .reward-remove:hover, .floor-boss-item .entered-remove:hover{ color:var(--crimson); }
+  .floor-boss-item.relic{ color:var(--gold); }
+  .floor-boss-item.curse{ color:var(--crimson); }
+  .floor-boss-item em{ color:var(--parchment-faint); font-style:normal; }
+  .floor-entered-label{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--parchment-faint); text-align:center; }
+  .floor-lives-label{ font-size:12.5px; color:var(--parchment-faint); text-align:center; letter-spacing:0.04em; text-transform:uppercase; }
+  .hearts{ display:flex; gap:5px; justify-content:center; }
+  .heart{ font-size:22px; line-height:1; color:#5c5560; cursor:pointer; user-select:none; transition:color .15s, transform .1s; }
+  .heart:hover{ transform:scale(1.18); }
+  .heart.filled{ color:var(--crimson); }
+  .poster-floor .heart{ font-size:19px; cursor:default; }
+  .poster-floor .heart:hover{ transform:none; }
+  .map-hint, .bank-hint{ font-size:14.5px; color:var(--parchment-faint); text-align:center; }
+
+  .map-toolbar{ display:flex; justify-content:center; }
+  .map-generate-btn, .map-back-btn{
+    appearance:none; border:1px solid var(--gold); background:var(--gold-soft); color:var(--gold);
+    font:inherit; font-size:14.5px; letter-spacing:0.04em; text-transform:uppercase;
+    padding:11px 26px; border-radius:999px; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .map-generate-btn:hover, .map-back-btn:hover{ background:var(--gold); color:#241a04; }
+
+  /* Rectangular route banners, not card-shaped — a horizontal path like the
+     rulebook's ONE-RUN MAP diagram (Floor 0 › Floor 1 › Floor 2 › Floor 3 › Boss).
+     Fixed size (not flex-grow) so every tile is identical regardless of how
+     many share a wrapped row — that's what kept throwing the arrows out of
+     alignment when tiles stretched to different widths/heights.
+     Content wrapper auto-sizes to its own text so the label never pokes out
+     above the gradient/blur. Floors after the active one stay blurred. */
+  .map-poster{ display:flex; align-items:flex-start; justify-content:center; flex-wrap:wrap; gap:18px; }
+  .poster-floor{
+    position:relative; flex:0 0 520px; width:520px; aspect-ratio:16/9; border-radius:14px; overflow:hidden;
+    border:1px solid var(--line); box-shadow:var(--shadow); background:#1c1622 center/cover no-repeat;
+    display:flex; flex-direction:column; justify-content:flex-end; transition:filter .2s;
+  }
+  .poster-floor.future{ filter:blur(16px); }
+  .poster-floor-content{
+    position:relative; z-index:1; backdrop-filter:blur(3px); padding:10px 12px 12px;
+    background:linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 40%, rgba(0,0,0,0.92) 100%);
+  }
+  .poster-boss-icon{ font-size:18px; color:var(--gold); opacity:.9; vertical-align:middle; margin:0 6px; }
+  .poster-floor-label{
+    text-align:center; font-family:Georgia,serif; font-size:17px;
+    letter-spacing:0.12em; text-transform:uppercase; color:var(--gold);
+  }
+  .poster-section-label{
+    font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--parchment-faint);
+    text-align:center; margin:6px 0 3px;
+  }
+  .poster-chip-row{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
+  .poster-chip{
+    display:flex; align-items:center; gap:6px; background:rgba(0,0,0,0.4); border-radius:8px; padding:3px 9px 3px 3px;
+  }
+  .poster-chip .thumb{
+    width:24px; height:36px; border-radius:3px; background-size:cover; background-position:center top;
+    flex:none; border:2px solid var(--gold);
+  }
+  .poster-chip.curse .thumb{ border-color:var(--crimson); transform:rotate(180deg); }
+  .poster-chip .name{ font-size:13px; font-family:Georgia,serif; }
+  .poster-chip.relic .name{ color:var(--gold); }
+  .poster-chip.curse .name{ color:var(--crimson); }
+  .poster-chip-empty{ font-size:13px; color:var(--parchment-faint); font-style:italic; text-align:center; }
+  .poster-arrow{ align-self:center; flex:none; color:var(--gold); font-size:32px; padding:0 4px; opacity:.85; line-height:1; }
+  .poster-empty{ font-size:14.5px; color:var(--parchment-faint); font-style:italic; }
+
+  /* ---- bank view ---- */
+  .bank-columns{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:640px){ .bank-columns{ grid-template-columns:1fr; } }
+  .bank-col{ background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:16px 18px; backdrop-filter:blur(6px); }
+  .item-list{ display:flex; flex-direction:column; gap:8px; }
+  .item-list:empty::after{ content:"— empty —"; font-size:14.5px; color:var(--parchment-faint); font-style:italic; }
+  .item-card{
+    display:flex; gap:10px; align-items:center; background:rgba(0,0,0,0.25); border:1px solid var(--line);
+    border-radius:10px; padding:8px 10px;
+  }
+  .item-card .item-thumb{ width:42px; height:64px; border-radius:4px; background-size:cover; background-position:center top; flex:none; border:1px solid rgba(0,0,0,0.4); }
+  .item-card.curse .item-thumb{ transform:rotate(180deg); }
+  .item-card .item-body{ flex:1; min-width:0; }
+  .item-card .item-name{ font-family:Georgia, serif; font-size:17px; margin:0; }
+  .item-card.relic .item-name{ color:var(--gold); }
+  .item-card.curse .item-name{ color:var(--crimson); }
+  .item-card .item-text{ font-size:14.5px; color:var(--parchment-dim); margin:2px 0 0; line-height:1.35; }
+  .item-card .item-remove{
+    appearance:none; border:1px solid var(--line); background:transparent; color:var(--parchment-faint);
+    font:inherit; font-size:14.5px; padding:5px 9px; border-radius:8px; cursor:pointer; flex:none;
+  }
+  .item-card .item-remove:hover{ border-color:var(--crimson); color:var(--crimson); }
+
+  footer{ text-align:center; font-size:14.5px; color:var(--parchment-faint); padding-top:2px; }
+  footer button{ background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;opacity:.7; }
+
+  @media (prefers-reduced-motion: reduce){ .card, .coin-inner{transition:none;} }
+</style>
+</head>
+<body>
+<div class="console">
+  <div class="top-row">
+    <nav class="view-tabs" role="tablist" aria-label="Console view">
+      <button data-view="draw" class="active" role="tab" aria-selected="true">Draw</button>
+      <button data-view="bank" role="tab" aria-selected="false">Bank &amp; Curses</button>
+      <button data-view="map" role="tab" aria-selected="false">Map</button>
+    </nav>
+    <div class="data-io">
+      <button type="button" id="btn-export">Export save</button>
+      <button type="button" id="btn-import">Import save</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+    </div>
+  </div>
+
+  <div class="view" id="view-draw">
+    <header>
+      <div>
+        <p class="brand-eyebrow">The Dread Deck — Pilot Deck</p>
+        <h1>Draw Console</h1>
+      </div>
+      <div class="remaining-chip"><b id="remaining-count">16</b>&nbsp;left in deck</div>
+    </header>
+
+    <div class="floor-link">
+      <span class="floor-link-label">Link this draw to</span>
+      <select class="floor-link-select" id="floor-link-select">
+        <option value="">— none —</option>
+        <option value="active">Active Floor</option>
+      </select>
+      <span class="floor-link-label">finished with</span>
+      <span class="hearts" id="floor-link-hearts">
+        <span class="heart" data-i="1">♥</span>
+        <span class="heart" data-i="2">♥</span>
+        <span class="heart" data-i="3">♥</span>
+      </span>
+      <span class="hearts" id="floor-link-bonus-hearts"></span>
+      <button type="button" class="heart-add" id="floor-link-heart-add" title="Add temporary life">+</button>
+    </div>
+
+    <div class="floor-link">
+      <span class="floor-link-label">Victory shows</span>
+      <input type="number" id="victory-count-input" class="floor-count-input" min="1" max="10" value="3">
+      <span class="floor-link-label">Death forces</span>
+      <input type="number" id="death-count-input" class="floor-count-input" min="1" max="10" value="1">
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="stage-idle" id="stage-idle">
+        <strong>The board is clear.</strong>
+        Victory Draw lays cards face-down — peek any of them, then keep one. Death Draw forces the rest, reversed. The World waits for the Boss Floor.
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="victory" id="btn-victory">
+        <span class="label">Victory Draw</span>
+        <span class="sub" id="btn-victory-sub">3 face-down → peek, keep 1 upright</span>
+      </button>
+      <button class="death" id="btn-death">
+        <span class="label">Death Draw</span>
+        <span class="sub" id="btn-death-sub">1 forced, reversed</span>
+      </button>
+      <button class="coin" id="btn-coin">
+        <span class="label">Coin Toss</span>
+        <span class="sub">Heads or Tails</span>
+      </button>
+      <button class="world" id="btn-world">
+        <span class="label">Reveal The World</span>
+        <span class="sub" id="btn-world-sub">Boss Floor gate</span>
+      </button>
+    </div>
+
+    <div class="ledger">
+      <h2>Deck</h2>
+      <div class="deck-grid" id="deck-grid"></div>
+    </div>
+
+    <footer>
+      <button id="btn-reset">reset run — return every card to the deck, clear bank &amp; curses</button>
+    </footer>
+  </div>
+
+  <div class="view" id="view-bank" hidden>
+    <header>
+      <div>
+        <p class="brand-eyebrow">The Dread Deck — Pilot Deck</p>
+        <h1>Bank &amp; Curses</h1>
+      </div>
+      <div class="header-chips">
+        <div class="remaining-chip cap-chip" id="relic-chip">Relics <b id="relic-count">0</b> / <span id="relic-cap">3</span></div>
+        <div class="remaining-chip cap-chip" id="curse-chip">Curses <b id="curse-count">0</b> / <span id="curse-cap">3</span></div>
+      </div>
+    </header>
+    <p class="bank-hint">Fills in automatically as you draw. Base Relic Bank limit is 3 — Lovers reversed (Separation) drops it to 2, tracked live below.</p>
+    <div class="bank-columns">
+      <section class="bank-col">
+        <h2>Relic Bank</h2>
+        <div class="item-list" id="relic-list"></div>
+      </section>
+      <section class="bank-col">
+        <h2>Active Curses</h2>
+        <div class="item-list" id="curse-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="view" id="view-map" hidden>
+    <header>
+      <div>
+        <p class="brand-eyebrow">The Dread Deck — Pilot Deck</p>
+        <h1>Run Map</h1>
+      </div>
+    </header>
+    <p class="map-hint" id="map-hint">Click a banner to drop in the game you're playing on that floor. Rewards write themselves in from the Draw tab or the Deck — set the lives you finished with by hand. Floors past the one you're on stay blurred.</p>
+    <div class="floor-link">
+      <span class="floor-link-label">Floors</span>
+      <input type="number" id="floor-count-input" class="floor-count-input" min="1" max="12" value="4">
+      <label class="floor-active-option"><input type="checkbox" id="floor0-toggle" checked> include Floor 0</label>
+    </div>
+    <div class="floor-link floor-active-picker" id="floor-active-picker"></div>
+    <div class="map-toolbar" id="map-toolbar"><button type="button" class="map-generate-btn" id="btn-map-toggle">Generate Map</button></div>
+    <div class="floor-grid" id="floor-grid"></div>
+    <div class="map-poster" id="map-poster" hidden></div>
+  </div>
+</div>
+
+<div class="card-tooltip" id="tooltip" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CARDS = [
+    {n:0,name:"The Fool",img:"cards/00-TheFool.png",relicName:"Fool's Escape",relicText:"Reroll a fresh Curse",curseName:"No Turning Back",curseText:"No manual resets or save rewinds"},
+    {n:1,name:"The Magician",img:"cards/01-TheMagician.png",relicName:"Ace in the Sleeve",relicText:"Silence 1 Curse for a scene / 90 s",curseName:"Power Leak",curseText:"Maximum 1 Relic per floor"},
+    {n:2,name:"The High Priestess",img:"cards/02-TheHighPriestess.png",relicName:"Premonition",relicText:"Inspect and reorder the top 2 cards",curseName:"Blind Choice",curseText:"Victory Draws are chosen blind"},
+    {n:3,name:"The Empress",img:"cards/03-TheEmpress.png",relicName:"Abundance",relicText:"+1 life on a chosen floor (max 4)",curseName:"Barrenness",curseText:"No healing or regeneration"},
+    {n:4,name:"The Emperor",img:"cards/04-TheEmperor.png",relicName:"Decree",relicText:"Silence 1 Curse for a whole floor",curseName:"March",curseText:"No sprint for the rest of the run"},
+    {n:5,name:"The Hierophant",img:"cards/05-TheHierophant.png",relicName:"Protective Rite",relicText:"Gain a blue life at 0 lives",curseName:"Heresy",curseText:"Permanent anti-habit on every floor"},
+    {n:6,name:"The Lovers",img:"cards/06-TheLovers.png",relicName:"Bond",relicText:"Give one Relic 2 uses",curseName:"Separation",curseText:"Relic bank limit: 2"},
+    {n:7,name:"The Chariot",img:"cards/07-TheChariot.png",relicName:"Momentum",relicText:"Ignore a movement/timer Curse for 90 s",curseName:"Broken Chariot",curseText:"Every attempt has a time limit"},
+    {n:8,name:"Strength",img:"cards/08-Strength.png",relicName:"Buffer",relicText:"Cancel one life loss",curseName:"Cracked Strength",curseText:"First fail on each floor costs 2 lives"},
+    {n:9,name:"The Hermit",img:"cards/09-TheHermit.png",relicName:"Solitude",relicText:"Silence a Curse; a clean win removes it",curseName:"Exile",curseText:"No map, journal, or objective markers"},
+    {n:11,name:"Justice",img:"cards/11-Justice.png",relicName:"Balance",relicText:"Remove a fresh Curse or accept it for +1 life",curseName:"Full Penalty",curseText:"No protection from life loss"},
+    {n:12,name:"The Hanged Man",img:"cards/12-TheHangedMan.png",relicName:"Sacrifice",relicText:"Sacrifice 2 Relics to cancel a fresh Curse",curseName:"Binding",curseText:"1 random Relic locked each floor"},
+    {n:14,name:"Temperance",img:"cards/14-Temperance.png",relicName:"Balance",relicText:"Soften one Curse by half",curseName:"Excess",curseText:"Victory Draws show only 2 cards"},
+    {n:17,name:"The Star",img:"cards/17-TheStar.png",relicName:"Hope",relicText:"Remove a light Curse and gain +1 life",curseName:"Extinguishing",curseText:"New Relics wake after the next floor's 1st attempt"},
+    {n:18,name:"The Moon",img:"cards/18-TheMoon.png",relicName:"Shadow of the Future",relicText:"Delay a fresh Curse by one floor",curseName:"Eclipse",curseText:"Permanent safe shadow over 20% of the image"},
+    {n:19,name:"The Sun",img:"cards/19-TheSun.png",relicName:"Full Light",relicText:"Silence all Curses for one floor",curseName:"Glare",curseText:"Permanent safe bright preset"}
+  ];
+  var THE_WORLD = {n:21,name:"The World",img:"cards/21-TheWorld.png",relicName:"Closing the Cycle",relicText:"Fixed gate to the Boss Floor",curseName:null,curseText:null};
+
+  // Map/Bank views reference every card regardless of pilot/full deck mode —
+  // they're a record of the run, not the live draw pool.
+  var ALL_CARDS = [
+    {n:0,name:"The Fool",img:"cards/00-TheFool.png",relicName:"Fool's Escape",relicText:"Reroll a fresh Curse",curseName:"No Turning Back",curseText:"No manual resets or save rewinds"},
+    {n:1,name:"The Magician",img:"cards/01-TheMagician.png",relicName:"Ace in the Sleeve",relicText:"Silence 1 Curse for a scene / 90 s",curseName:"Power Leak",curseText:"Maximum 1 Relic per floor"},
+    {n:2,name:"The High Priestess",img:"cards/02-TheHighPriestess.png",relicName:"Premonition",relicText:"Inspect and reorder the top 2 cards",curseName:"Blind Choice",curseText:"Victory Draws are chosen blind"},
+    {n:3,name:"The Empress",img:"cards/03-TheEmpress.png",relicName:"Abundance",relicText:"+1 life on a chosen floor (max 4)",curseName:"Barrenness",curseText:"No healing or regeneration"},
+    {n:4,name:"The Emperor",img:"cards/04-TheEmperor.png",relicName:"Decree",relicText:"Silence 1 Curse for a whole floor",curseName:"March",curseText:"No sprint for the rest of the run"},
+    {n:5,name:"The Hierophant",img:"cards/05-TheHierophant.png",relicName:"Protective Rite",relicText:"Gain a blue life at 0 lives",curseName:"Heresy",curseText:"Permanent anti-habit on every floor"},
+    {n:6,name:"The Lovers",img:"cards/06-TheLovers.png",relicName:"Bond",relicText:"Give one Relic 2 uses",curseName:"Separation",curseText:"Relic bank limit: 2"},
+    {n:7,name:"The Chariot",img:"cards/07-TheChariot.png",relicName:"Momentum",relicText:"Ignore a movement/timer Curse for 90 s",curseName:"Broken Chariot",curseText:"Every attempt has a time limit"},
+    {n:8,name:"Strength",img:"cards/08-Strength.png",relicName:"Buffer",relicText:"Cancel one life loss",curseName:"Cracked Strength",curseText:"First fail on each floor costs 2 lives"},
+    {n:9,name:"The Hermit",img:"cards/09-TheHermit.png",relicName:"Solitude",relicText:"Silence a Curse; a clean win removes it",curseName:"Exile",curseText:"No map, journal, or objective markers"},
+    {n:10,name:"Wheel of Fortune",img:"cards/10-WheelOfFortune.png",relicName:"Better Fortune",relicText:"Choose 1 of 2 replacement Curses",curseName:"Bad Turn",curseText:"Relics risk a 50% blank use"},
+    {n:11,name:"Justice",img:"cards/11-Justice.png",relicName:"Balance",relicText:"Remove a fresh Curse or accept it for +1 life",curseName:"Full Penalty",curseText:"No protection from life loss"},
+    {n:12,name:"The Hanged Man",img:"cards/12-TheHangedMan.png",relicName:"Sacrifice",relicText:"Sacrifice 2 Relics to cancel a fresh Curse",curseName:"Binding",curseText:"1 random Relic locked each floor"},
+    {n:13,name:"Death",img:"cards/13-Death.png",relicName:"Transformation",relicText:"Remove any active Curse",curseName:"Mark of the End",curseText:"One Curse becomes unremovable"},
+    {n:14,name:"Temperance",img:"cards/14-Temperance.png",relicName:"Balance",relicText:"Soften one Curse by half",curseName:"Excess",curseText:"Victory Draws show only 2 cards"},
+    {n:15,name:"The Devil",img:"cards/15-TheDevil.png",relicName:"Pact",relicText:"Bonus Relic now, extra Curse before Boss",curseName:"Temptation",curseText:"Bonus Relic plus a bound Curse"},
+    {n:16,name:"The Tower",img:"cards/16-TheTower.png",relicName:"Disaster Reset",relicText:"Replay a lost floor and cancel its Curse",curseName:"Collapse",curseText:"First life loss each floor destroys a Relic"},
+    {n:17,name:"The Star",img:"cards/17-TheStar.png",relicName:"Hope",relicText:"Remove a light Curse and gain +1 life",curseName:"Extinguishing",curseText:"New Relics wake after the next floor's 1st attempt"},
+    {n:18,name:"The Moon",img:"cards/18-TheMoon.png",relicName:"Shadow of the Future",relicText:"Delay a fresh Curse by one floor",curseName:"Eclipse",curseText:"Permanent safe shadow over 20% of the image"},
+    {n:19,name:"The Sun",img:"cards/19-TheSun.png",relicName:"Full Light",relicText:"Silence all Curses for one floor",curseName:"Glare",curseText:"Permanent safe bright preset"},
+    {n:20,name:"Judgement",img:"cards/20-Judgement.png",relicName:"Rebirth",relicText:"Gain a blue life at 0 lives on the Boss Floor",curseName:"Condemnation",curseText:"Extra Curse before the Boss Floor"},
+    THE_WORLD
+  ];
+
+  var BASE_RELIC_CAP = 3;
+  var CURSE_CAP = 3;
+  var SEPARATION_CAP = 2;
+  var LOVERS_N = 6;
+
+  var STORAGE_PREFIX = "dreadDeck_pilot_";
+
+  var state = { drawn:{} };
+
+  var stage = document.getElementById("stage");
+  var stageIdle = document.getElementById("stage-idle");
+  var remainingCount = document.getElementById("remaining-count");
+  var deckGrid = document.getElementById("deck-grid");
+  var btnVictory = document.getElementById("btn-victory");
+  var btnDeath = document.getElementById("btn-death");
+  var btnCoin = document.getElementById("btn-coin");
+  var btnWorld = document.getElementById("btn-world");
+  var btnReset = document.getElementById("btn-reset");
+  var tooltipEl = document.getElementById("tooltip");
+  var tooltipTimer = null;
+
+  var floorLinkSelect = document.getElementById("floor-link-select");
+  var floorLinkHearts = document.getElementById("floor-link-hearts");
+  var floorLinkBonusHearts = document.getElementById("floor-link-bonus-hearts");
+  var floorLinkHeartAdd = document.getElementById("floor-link-heart-add");
+  var pendingLives = 0;
+  var pendingBonusLives = 0;
+  function renderPendingHearts(){
+    floorLinkHearts.querySelectorAll(".heart").forEach(function(h){
+      var i = parseInt(h.dataset.i, 10);
+      h.classList.toggle("filled", i <= pendingLives);
+    });
+  }
+  floorLinkHearts.querySelectorAll(".heart").forEach(function(h){
+    h.addEventListener("click", function(){
+      var i = parseInt(h.dataset.i, 10);
+      pendingLives = (pendingLives === i) ? i - 1 : i;
+      renderPendingHearts();
+    });
+  });
+  function renderPendingBonusHearts(){
+    floorLinkBonusHearts.innerHTML = "";
+    for (var i = 0; i < pendingBonusLives; i++){
+      var h = document.createElement("span");
+      h.className = "heart bonus";
+      h.textContent = "♥";
+      h.addEventListener("click", function(){
+        pendingBonusLives = Math.max(0, pendingBonusLives - 1);
+        renderPendingBonusHearts();
+      });
+      floorLinkBonusHearts.appendChild(h);
+    }
+  }
+  floorLinkHeartAdd.addEventListener("click", function(){
+    pendingBonusLives++;
+    renderPendingBonusHearts();
+  });
+
+  function resolveFloorKey(val){ return val === "active" ? mapState.active : val; }
+
+  function renderFloorLinkOptions(){
+    var prevVal = floorLinkSelect.value;
+    floorLinkSelect.innerHTML = '<option value="">— none —</option><option value="active">Active Floor</option>' +
+      FLOORS.filter(function(f){ return f.key !== "boss"; }).map(function(f){
+        return '<option value="'+f.key+'">'+f.label+'</option>';
+      }).join("");
+    var stillValid = Array.prototype.some.call(floorLinkSelect.options, function(o){ return o.value === prevVal; });
+    floorLinkSelect.value = stillValid ? prevVal : "";
+  }
+
+  var floorCountInput = document.getElementById("floor-count-input");
+  var floor0Toggle = document.getElementById("floor0-toggle");
+  function applyFloorSettings(){
+    floorSettings.count = Math.max(1, parseInt(floorCountInput.value, 10) || 4);
+    floorSettings.includeFloor0 = floor0Toggle.checked;
+    FLOORS = buildFloorsArray();
+    mapState.floorSettings = { count: floorSettings.count, includeFloor0: floorSettings.includeFloor0 };
+    ensureFloorStates();
+    saveMapState();
+    renderFloorLinkOptions();
+    renderActiveFloorPicker();
+    renderFloorGrid();
+    renderDrawButtonSubs();
+    if (mapGenerated) renderPoster();
+  }
+  floorCountInput.addEventListener("change", applyFloorSettings);
+  floor0Toggle.addEventListener("change", applyFloorSettings);
+
+  var victoryCount = 3;
+  var deathCount = 1;
+  var victoryCountInput = document.getElementById("victory-count-input");
+  var deathCountInput = document.getElementById("death-count-input");
+  function renderDrawButtonSubs(){
+    document.getElementById("btn-victory-sub").textContent =
+      victoryCount + " face-down → peek, keep 1 upright";
+    document.getElementById("btn-death-sub").textContent =
+      deathCount + (deathCount === 1 ? " forced, reversed" : " forced, reversed each");
+    var lastRegular = FLOORS[FLOORS.length - 2];
+    document.getElementById("btn-world-sub").textContent = "Boss Floor gate · after "+lastRegular.label;
+  }
+  function applyDrawSettings(){
+    victoryCount = Math.max(1, parseInt(victoryCountInput.value, 10) || 3);
+    deathCount = Math.max(1, parseInt(deathCountInput.value, 10) || 1);
+    mapState.drawSettings = { victoryCount: victoryCount, deathCount: deathCount };
+    saveMapState();
+    renderDrawButtonSubs();
+  }
+  victoryCountInput.addEventListener("change", applyDrawSettings);
+  deathCountInput.addEventListener("change", applyDrawSettings);
+
+  floorLinkSelect.addEventListener("change", function(){
+    var key = resolveFloorKey(floorLinkSelect.value);
+    if (!key) return;
+    mapState[key].enteredWith = snapshotBank();
+    saveMapState();
+  });
+
+  function linkDrawToFloor(n, status){
+    var key = resolveFloorKey(floorLinkSelect.value);
+    if (!key) return;
+    mapState[key].rewards.push({n:n, status:status.toLowerCase()});
+    mapState[key].lives = pendingLives;
+    mapState[key].bonusLives = pendingBonusLives;
+    saveMapState();
+    renderFloorGrid();
+  }
+
+  function poolNumbers(){ return CARDS.map(function(c){return c.n;}).filter(function(n){ return !state.drawn[n]; }); }
+  function cardByNumber(n){ for (var i=0;i<CARDS.length;i++){ if (CARDS[i].n===n) return CARDS[i]; } return null; }
+  function anyCardByNumber(n){ for (var i=0;i<ALL_CARDS.length;i++){ if (ALL_CARDS[i].n===n) return ALL_CARDS[i]; } return null; }
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for (var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+    return a;
+  }
+
+  // ---------------- persistent bank / curse state ----------------
+  function loadBank(){
+    try {
+      var raw = localStorage.getItem(STORAGE_PREFIX+"bank");
+      if (raw) return JSON.parse(raw);
+    } catch(e){}
+    return { relics:[], curses:[] };
+  }
+  var bank = loadBank();
+  function saveBank(){ try{ localStorage.setItem(STORAGE_PREFIX+"bank", JSON.stringify(bank)); }catch(e){} }
+
+  function relicCap(){
+    var separationActive = bank.curses.some(function(c){ return c.n === LOVERS_N; });
+    return separationActive ? SEPARATION_CAP : BASE_RELIC_CAP;
+  }
+
+  function addToBank(n, status){
+    var entry = { n:n, addedAt:Date.now() };
+    if (status === "RELIC") bank.relics.push(entry); else bank.curses.push(entry);
+    saveBank();
+  }
+
+  function renderBank(){
+    var relicList = document.getElementById("relic-list");
+    var curseList = document.getElementById("curse-list");
+    var cap = relicCap();
+    document.getElementById("relic-count").textContent = bank.relics.length;
+    document.getElementById("relic-cap").textContent = cap;
+    document.getElementById("relic-chip").classList.toggle("over", bank.relics.length > cap);
+    document.getElementById("curse-count").textContent = bank.curses.length;
+    document.getElementById("curse-cap").textContent = CURSE_CAP;
+    document.getElementById("curse-chip").classList.toggle("over", bank.curses.length > CURSE_CAP);
+
+    relicList.innerHTML = "";
+    bank.relics.forEach(function(entry, idx){
+      var c = anyCardByNumber(entry.n);
+      var row = document.createElement("div");
+      row.className = "item-card relic";
+      row.innerHTML =
+        '<div class="item-thumb" style="background-image:url(\''+c.img+'\')"></div>' +
+        '<div class="item-body"><p class="item-name">'+c.relicName+'</p><p class="item-text">'+c.name+' · '+c.relicText+'</p></div>' +
+        '<button class="item-remove" type="button">Use / Archive</button>';
+      row.querySelector(".item-remove").addEventListener("click", function(){
+        bank.relics.splice(idx,1); saveBank(); renderBank();
+      });
+      relicList.appendChild(row);
+    });
+
+    curseList.innerHTML = "";
+    bank.curses.forEach(function(entry, idx){
+      var c = anyCardByNumber(entry.n);
+      var row = document.createElement("div");
+      row.className = "item-card curse";
+      row.innerHTML =
+        '<div class="item-thumb" style="background-image:url(\''+c.img+'\')"></div>' +
+        '<div class="item-body"><p class="item-name">'+c.curseName+'</p><p class="item-text">'+c.name+' · '+c.curseText+'</p></div>' +
+        '<button class="item-remove" type="button">Remove</button>';
+      row.querySelector(".item-remove").addEventListener("click", function(){
+        bank.curses.splice(idx,1); saveBank(); renderBank();
+      });
+      curseList.appendChild(row);
+    });
+  }
+
+  // ---------------- tooltip ----------------
+  function showTooltip(tile, card){
+    var rect = tile.getBoundingClientRect();
+    tooltipEl.innerHTML =
+      '<p class="tt-name">'+card.name+'</p>' +
+      '<p class="tt-line"><b class="gold">RELIC — '+card.relicName+'</b><br>'+card.relicText+'</p>' +
+      '<p class="tt-line"><b class="crimson">CURSE — '+card.curseName+'</b><br>'+card.curseText+'</p>';
+    tooltipEl.hidden = false;
+    var top = rect.bottom + 8;
+    var left = Math.min(rect.left, window.innerWidth - 266);
+    if (top + 140 > window.innerHeight) top = rect.top - 148;
+    tooltipEl.style.top = top + "px";
+    tooltipEl.style.left = Math.max(8, left) + "px";
+  }
+  function hideTooltip(){ clearTimeout(tooltipTimer); tooltipEl.hidden = true; }
+
+  var deckAssignEl = null;
+  function closeDeckAssign(){
+    if (deckAssignEl){
+      if (deckAssignEl._onDocClick) document.removeEventListener("click", deckAssignEl._onDocClick);
+      deckAssignEl.remove();
+      deckAssignEl = null;
+    }
+  }
+  function openDeckAssign(tile, c){
+    closeDeckAssign();
+    var pop = document.createElement("div");
+    pop.className = "deck-assign-popup";
+    var floorOptions = FLOORS.filter(function(f){ return f.key !== "boss"; })
+      .map(function(f){ return '<option value="'+f.key+'">'+f.label+'</option>'; }).join("");
+    pop.innerHTML =
+      '<button type="button" class="deck-assign-close">×</button>' +
+      '<p class="deck-assign-name">'+c.name+'</p>' +
+      '<div class="deck-assign-row">' +
+        '<button type="button" class="deck-assign-btn relic" data-action="bank-relic">+ Bank (Relic)</button>' +
+        '<button type="button" class="deck-assign-btn curse" data-action="bank-curse">+ Bank (Curse)</button>' +
+      '</div>' +
+      '<div class="deck-assign-row">' +
+        '<select class="deck-assign-floor">'+floorOptions+'</select>' +
+        '<button type="button" class="deck-assign-btn relic" data-action="reward-relic">+ Reward</button>' +
+        '<button type="button" class="deck-assign-btn curse" data-action="reward-curse">+ Reward</button>' +
+      '</div>';
+    document.body.appendChild(pop);
+    var rect = tile.getBoundingClientRect();
+    var top = rect.bottom + 8;
+    var left = Math.min(rect.left, window.innerWidth - 266);
+    if (top + 150 > window.innerHeight) top = rect.top - 158;
+    pop.style.top = top + "px";
+    pop.style.left = Math.max(8, left) + "px";
+
+    function markDrawn(){
+      state.drawn[c.n] = true;
+      renderLedger();
+    }
+    pop.querySelector(".deck-assign-close").addEventListener("click", closeDeckAssign);
+    pop.querySelector('[data-action="bank-relic"]').addEventListener("click", function(){
+      addToBank(c.n, "RELIC"); renderBank(); markDrawn(); closeDeckAssign();
+    });
+    pop.querySelector('[data-action="bank-curse"]').addEventListener("click", function(){
+      addToBank(c.n, "CURSE"); renderBank(); markDrawn(); closeDeckAssign();
+    });
+    pop.querySelector('[data-action="reward-relic"]').addEventListener("click", function(){
+      var key = pop.querySelector(".deck-assign-floor").value;
+      mapState[key].rewards.push({n:c.n, status:"relic"});
+      saveMapState(); renderFloorGrid(); markDrawn(); closeDeckAssign();
+    });
+    pop.querySelector('[data-action="reward-curse"]').addEventListener("click", function(){
+      var key = pop.querySelector(".deck-assign-floor").value;
+      mapState[key].rewards.push({n:c.n, status:"curse"});
+      saveMapState(); renderFloorGrid(); markDrawn(); closeDeckAssign();
+    });
+
+    deckAssignEl = pop;
+    var onDocClick = function(e){
+      if (pop.contains(e.target)) return;
+      closeDeckAssign();
+    };
+    pop._onDocClick = onDocClick;
+    setTimeout(function(){ document.addEventListener("click", onDocClick); }, 0);
+  }
+
+  function renderLedger(){
+    remainingCount.textContent = poolNumbers().length;
+    deckGrid.innerHTML = "";
+    CARDS.forEach(function(c){
+      var tile = document.createElement("div");
+      tile.className = "deck-tile" + (state.drawn[c.n] ? " out" : "");
+      tile.innerHTML = '<div class="n">'+String(c.n).padStart(2,"0")+'</div>'+c.name;
+      tile.addEventListener("mouseenter", function(){
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(function(){ showTooltip(tile, c); }, 450);
+      });
+      tile.addEventListener("mouseleave", hideTooltip);
+      tile.addEventListener("click", function(e){
+        e.stopPropagation();
+        if (state.drawn[c.n]) return;
+        hideTooltip();
+        openDeckAssign(tile, c);
+      });
+      deckGrid.appendChild(tile);
+    });
+  }
+
+  function buttonsEnabled(v){ btnVictory.disabled = !v; btnDeath.disabled = !v; }
+
+  function makeCardEl(){
+    var slot = document.createElement("div");
+    slot.className = "card-slot";
+    slot.innerHTML =
+      '<div class="card">' +
+        '<div class="card-face card-back"></div>' +
+        '<div class="card-face card-front">' +
+          '<div class="thumb"></div>' +
+          '<div class="card-status"></div>' +
+          '<div class="name"></div>' +
+        '</div>' +
+      '</div>';
+    return slot;
+  }
+
+  function fillFront(slot, card, status){
+    var front = slot.querySelector(".card-front");
+    front.querySelector(".name").textContent = card.name;
+    var statusEl = front.querySelector(".card-status");
+    statusEl.textContent = status;
+    statusEl.className = "card-status " + status.toLowerCase();
+    var thumb = front.querySelector(".thumb");
+    thumb.style.backgroundImage = "url('" + card.img + "')";
+    thumb.className = "thumb " + status.toLowerCase();
+  }
+
+  function showDetail(card, status){
+    var wrap = document.createElement("div");
+    wrap.className = "reveal-detail";
+    var ability = status === "RELIC" ? card.relicName : card.curseName;
+    var text = status === "RELIC" ? card.relicText : card.curseText;
+    wrap.innerHTML = '<p class="ability ' + status.toLowerCase() + '">' + ability + '</p><p>' + text + '</p>' +
+      '<p class="banked-note">Added to ' + (status === "RELIC" ? "the Relic Bank" : "Active Curses") + '.</p>';
+    return wrap;
+  }
+
+  function runVictoryDraw(){
+    if (pendingLives === 0 && !confirm("Lives are set to 0 — sure this is a Victory Draw?")) return;
+    var pool = poolNumbers();
+    if (pool.length < 1) return;
+    var picks = shuffle(pool).slice(0, Math.min(victoryCount, pool.length));
+    stage.innerHTML = "";
+    var col = document.createElement("div");
+    col.className = "stage-column";
+    col.innerHTML = '<div class="stage-hint">peek any card, then keep one — the rest return to the deck</div>';
+    var row = document.createElement("div");
+    row.className = "draw-row";
+    col.appendChild(row);
+    stage.appendChild(col);
+    buttonsEnabled(false);
+
+    var resolved = false;
+    var entries = [];
+
+    picks.forEach(function(n){
+      var card = cardByNumber(n);
+      var slot = makeCardEl();
+      row.appendChild(slot);
+      var cardEl = slot.querySelector(".card");
+      fillFront(slot, card, "RELIC");
+      slot.addEventListener("mouseenter", function(){
+        if (!cardEl.classList.contains("flipped")) return;
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(function(){ showTooltip(slot, card); }, 450);
+      });
+      slot.addEventListener("mouseleave", hideTooltip);
+
+      var keepBtn = document.createElement("button");
+      keepBtn.type = "button";
+      keepBtn.className = "keep-btn";
+      keepBtn.textContent = "Keep this card";
+      keepBtn.hidden = true;
+      slot.appendChild(keepBtn);
+
+      var entry = {n:n, card:card, cardEl:cardEl, keepBtn:keepBtn};
+      entries.push(entry);
+
+      cardEl.addEventListener("click", function(){
+        if (resolved) return;
+        var flipping = !cardEl.classList.contains("flipped");
+        cardEl.classList.toggle("flipped");
+        keepBtn.hidden = !flipping;
+      });
+
+      keepBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        if (resolved) return;
+        resolved = true;
+        entries.forEach(function(en){
+          en.keepBtn.hidden = true;
+          if (en.n === n) return;
+          en.cardEl.style.transition = "opacity .4s";
+          en.cardEl.style.opacity = "0.15";
+          en.cardEl.style.pointerEvents = "none";
+        });
+        if (!cardEl.classList.contains("flipped")) cardEl.classList.add("flipped");
+        cardEl.classList.add("settled");
+        state.drawn[n] = true;
+        addToBank(n, "RELIC");
+        linkDrawToFloor(n, "RELIC");
+        renderLedger();
+        renderBank();
+        col.appendChild(showDetail(card, "RELIC"));
+        buttonsEnabled(poolNumbers().length > 0);
+      });
+    });
+  }
+
+  function runDeathDraw(){
+    if (pendingLives > 0 && !confirm("Lives are set to "+pendingLives+" — sure this is a Death Draw?")) return;
+    var pool = poolNumbers();
+    if (pool.length < 1) return;
+    var picks = shuffle(pool).slice(0, Math.min(deathCount, pool.length));
+    stage.innerHTML = "";
+    var col = document.createElement("div");
+    col.className = "stage-column";
+    col.innerHTML = '<div class="stage-hint">'+(picks.length > 1 ? picks.length+" forced curses, reversed" : "a forced curse, reversed")+'</div>';
+    var row = document.createElement("div");
+    row.className = "draw-row";
+    col.appendChild(row);
+    stage.appendChild(col);
+    buttonsEnabled(false);
+
+    var cards = [];
+    var cardEls = [];
+    picks.forEach(function(n){
+      var card = cardByNumber(n);
+      cards.push(card);
+      var slot = makeCardEl();
+      row.appendChild(slot);
+      var cardEl = slot.querySelector(".card");
+      cardEls.push(cardEl);
+      fillFront(slot, card, "CURSE");
+      slot.addEventListener("mouseenter", function(){
+        if (!cardEl.classList.contains("reversed")) return;
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(function(){ showTooltip(slot, card); }, 450);
+      });
+      slot.addEventListener("mouseleave", hideTooltip);
+      state.drawn[n] = true;
+      addToBank(n, "CURSE");
+      linkDrawToFloor(n, "CURSE");
+    });
+    renderLedger();
+    renderBank();
+
+    var settledCount = 0;
+    cardEls.forEach(function(cardEl, idx){
+      requestAnimationFrame(function(){
+        setTimeout(function(){
+          cardEl.classList.add("flipped", "reversed");
+          setTimeout(function(){
+            cardEl.classList.add("settled");
+            settledCount++;
+            if (settledCount === cardEls.length){
+              cards.forEach(function(c){ col.appendChild(showDetail(c, "CURSE")); });
+              buttonsEnabled(poolNumbers().length > 0);
+            }
+          }, 720);
+        }, 150 + idx * 120);
+      });
+    });
+  }
+
+  function runWorldReveal(){
+    var lastRegular = FLOORS[FLOORS.length - 2];
+    if (mapState.active !== lastRegular.key){
+      alert("Reveal The World is available once you're on "+lastRegular.label+" — the floor right before the Boss Floor.");
+      return;
+    }
+    btnWorld.disabled = true;
+    btnCoin.disabled = true;
+    buttonsEnabled(false);
+    mapState.worldUsed = true;
+    saveMapState();
+    stage.innerHTML = "";
+    var col = document.createElement("div");
+    col.className = "stage-column";
+    col.innerHTML = '<div class="stage-hint">the last decision before the Boss Floor</div>';
+    var row = document.createElement("div");
+    row.className = "draw-row";
+    col.appendChild(row);
+    stage.appendChild(col);
+
+    var slot = makeCardEl();
+    row.appendChild(slot);
+    var cardEl = slot.querySelector(".card");
+    fillFront(slot, THE_WORLD, "RELIC");
+    requestAnimationFrame(function(){
+      setTimeout(function(){
+        cardEl.classList.add("flipped", "settled");
+        col.appendChild(buildWorldChoice());
+      }, 150);
+    });
+  }
+
+  function buildWorldChoice(){
+    var wrap = document.createElement("div");
+    wrap.className = "world-choice";
+
+    var keepPanel = document.createElement("div");
+    keepPanel.className = "world-option keep";
+    keepPanel.innerHTML =
+      "<h3>Keep the Build</h3>" +
+      "<p>Enter the Boss Floor with every unspent Relic and every active Curse.</p>" +
+      '<button type="button" class="world-btn keep-build">Keep the Build</button>';
+
+    var closePanel = document.createElement("div");
+    closePanel.className = "world-option close";
+    var enoughRelics = bank.relics.length >= 2;
+    var hasCurse = bank.curses.length >= 1;
+    var relicOptionsHtml = bank.relics.map(function(entry, idx){
+      var c = anyCardByNumber(entry.n);
+      return '<label class="world-relic-option"><input type="checkbox" class="world-relic-check" value="'+idx+'"> '+c.relicName+' <span>('+c.name+')</span></label>';
+    }).join("");
+    var curseOptionsHtml = bank.curses.map(function(entry, idx){
+      var c = anyCardByNumber(entry.n);
+      return '<option value="'+idx+'">'+c.curseName+' ('+c.name+')</option>';
+    }).join("");
+    closePanel.innerHTML =
+      "<h3>Close the Wound</h3>" +
+      "<p>Pick 2 unspent Relics to archive, and the Curse they remove.</p>" +
+      (enoughRelics
+        ? '<div class="world-relic-pick">'+relicOptionsHtml+'</div>'
+        : '<p class="world-warning">Needs 2 unspent Relics — you have '+bank.relics.length+'.</p>') +
+      (hasCurse
+        ? '<select class="world-curse-select">'+curseOptionsHtml+'</select>'
+        : '<p class="poster-empty">no active Curses to remove</p>') +
+      '<button type="button" class="world-btn close-wound" disabled>Close the Wound</button>';
+
+    wrap.appendChild(keepPanel);
+    wrap.appendChild(closePanel);
+
+    var resultEl = document.createElement("p");
+    resultEl.className = "world-result";
+    wrap.appendChild(resultEl);
+
+    keepPanel.querySelector(".keep-build").addEventListener("click", function(){
+      wrap.querySelectorAll(".world-btn").forEach(function(b){ b.disabled = true; });
+      resultEl.textContent = "The build stays whole — every Relic and every Curse carries into the Boss Floor.";
+      btnCoin.disabled = false;
+      buttonsEnabled(poolNumbers().length > 0);
+    });
+
+    var closeBtn = closePanel.querySelector(".close-wound");
+    var relicChecks = closePanel.querySelectorAll(".world-relic-check");
+    function refreshCloseBtn(){
+      var checked = closePanel.querySelectorAll(".world-relic-check:checked").length;
+      relicChecks.forEach(function(chk){
+        chk.disabled = !chk.checked && checked >= 2;
+      });
+      closeBtn.disabled = !(checked === 2 && hasCurse);
+    }
+    relicChecks.forEach(function(chk){ chk.addEventListener("change", refreshCloseBtn); });
+    refreshCloseBtn();
+
+    if (hasCurse && enoughRelics){
+      closeBtn.addEventListener("click", function(){
+        var checkedIdx = Array.prototype.slice.call(closePanel.querySelectorAll(".world-relic-check:checked"))
+          .map(function(chk){ return parseInt(chk.value, 10); })
+          .sort(function(a,b){ return b - a; }); // descending, so splice-by-index doesn't shift earlier picks
+        if (checkedIdx.length !== 2) return;
+        var select = closePanel.querySelector(".world-curse-select");
+        var curseIdx = parseInt(select.value, 10);
+        var removedCurse = bank.curses.splice(curseIdx, 1)[0];
+        var removedRelicNames = checkedIdx.map(function(i){
+          var c = anyCardByNumber(bank.relics[i].n);
+          bank.relics.splice(i, 1);
+          return c.relicName;
+        }).reverse();
+        saveBank();
+        renderBank();
+        wrap.querySelectorAll(".world-btn, .world-relic-check, .world-curse-select").forEach(function(el){ el.disabled = true; });
+        var cc = anyCardByNumber(removedCurse.n);
+        resultEl.textContent = "Archived "+removedRelicNames.join(" and ")+" to remove "+cc.curseName+" — the wound closes before the Boss Floor.";
+        btnCoin.disabled = false;
+        buttonsEnabled(poolNumbers().length > 0);
+      });
+    }
+
+    return wrap;
+  }
+
+  function runCoinToss(){
+    stage.innerHTML = "";
+    var col = document.createElement("div");
+    col.className = "stage-column coin-stage";
+    var heads = Math.random() < 0.5;
+    col.innerHTML =
+      '<div class="stage-hint">coin toss</div>' +
+      '<div class="coin"><div class="coin-inner">' +
+        '<div class="coin-face heads">HEADS</div>' +
+        '<div class="coin-face tails">TAILS</div>' +
+      '</div></div>' +
+      '<div class="coin-result">…</div>';
+    stage.appendChild(col);
+    var inner = col.querySelector(".coin-inner");
+    var result = col.querySelector(".coin-result");
+    var spins = 4 + Math.floor(Math.random()*2);
+    var target = heads ? spins*360 : spins*360 + 180;
+    requestAnimationFrame(function(){ inner.style.transform = "rotateY(" + target + "deg)"; });
+    setTimeout(function(){ result.textContent = heads ? "Heads." : "Tails."; }, 1150);
+  }
+
+  function resetRun(){
+    state.drawn = {};
+    bank = { relics:[], curses:[] };
+    saveBank();
+    stage.innerHTML = "";
+    stage.appendChild(stageIdle);
+    buttonsEnabled(true);
+    btnWorld.disabled = false;
+    btnCoin.disabled = false;
+    mapState.worldUsed = false;
+    renderLedger();
+    renderBank();
+
+    floorLinkSelect.value = "";
+    pendingLives = 0;
+    pendingBonusLives = 0;
+    renderPendingHearts();
+    renderPendingBonusHearts();
+
+    FLOORS.forEach(function(f){ mapState[f.key] = {image:null, rewards:[], lives:"", enteredWith:null, bonusLives:0}; });
+    mapState.active = FLOORS[0].key;
+    saveMapState();
+    renderActiveFloorPicker();
+    renderFloorGrid();
+    mapPoster.innerHTML = "";
+    setMapView(false);
+  }
+
+  btnVictory.addEventListener("click", runVictoryDraw);
+  btnDeath.addEventListener("click", runDeathDraw);
+  btnCoin.addEventListener("click", runCoinToss);
+  btnWorld.addEventListener("click", runWorldReveal);
+  btnReset.addEventListener("click", resetRun);
+
+  renderLedger();
+  renderBank();
+
+  // ---------------- tab switching ----------------
+  var tabs = document.querySelectorAll(".view-tabs button");
+  tabs.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      tabs.forEach(function(b){ b.classList.remove("active"); b.setAttribute("aria-selected","false"); });
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected","true");
+      document.querySelectorAll(".view").forEach(function(v){ v.hidden = true; });
+      document.getElementById("view-"+btn.dataset.view).hidden = false;
+      hideTooltip();
+      if (btn.dataset.view === "bank") renderBank();
+      if (btn.dataset.view === "map") renderFloorGrid();
+    });
+  });
+
+  // ---------------- run map ----------------
+  var floorSettings = { count:4, includeFloor0:true };
+  function buildFloorsArray(){
+    var arr = [];
+    if (floorSettings.includeFloor0) arr.push({key:"floor0", label:"Floor 0"});
+    for (var i = 1; i <= floorSettings.count; i++) arr.push({key:"floor"+i, label:"Floor "+i});
+    arr.push({key:"boss", label:"Boss Floor"});
+    return arr;
+  }
+  var FLOORS = buildFloorsArray();
+
+  function ensureFloorStates(){
+    FLOORS.forEach(function(f){
+      if (!mapState[f.key]) mapState[f.key] = {image:null, rewards:[], lives:"", enteredWith:null, bonusLives:0};
+      if (!mapState[f.key].rewards) mapState[f.key].rewards = [];
+      if (!mapState[f.key].bonusLives) mapState[f.key].bonusLives = 0;
+    });
+    if (!mapState.active || !FLOORS.some(function(f){ return f.key === mapState.active; })) mapState.active = FLOORS[0].key;
+  }
+
+  function loadMapState(){
+    var s = null;
+    try {
+      var raw = localStorage.getItem(STORAGE_PREFIX+"map");
+      if (raw) s = JSON.parse(raw);
+    } catch(e){}
+    if (!s) s = {};
+    if (s.floorSettings){
+      floorSettings.count = s.floorSettings.count || 4;
+      floorSettings.includeFloor0 = s.floorSettings.includeFloor0 !== false;
+    }
+    FLOORS = buildFloorsArray();
+    s.floorSettings = { count: floorSettings.count, includeFloor0: floorSettings.includeFloor0 };
+    return s;
+  }
+  var mapState = loadMapState();
+  ensureFloorStates();
+  floorCountInput.value = floorSettings.count;
+  floor0Toggle.checked = floorSettings.includeFloor0;
+  renderFloorLinkOptions();
+  if (mapState.drawSettings){
+    victoryCount = mapState.drawSettings.victoryCount || 3;
+    deathCount = mapState.drawSettings.deathCount || 1;
+  }
+  mapState.drawSettings = { victoryCount: victoryCount, deathCount: deathCount };
+  victoryCountInput.value = victoryCount;
+  deathCountInput.value = deathCount;
+  renderDrawButtonSubs();
+  if (mapState.worldUsed) btnWorld.disabled = true;
+  function saveMapState(){ try{ localStorage.setItem(STORAGE_PREFIX+"map", JSON.stringify(mapState)); }catch(e){} }
+
+  function heartsHtml(lives, bonusLives, editable){
+    lives = parseInt(lives, 10) || 0;
+    bonusLives = parseInt(bonusLives, 10) || 0;
+    var html = '<div class="floor-lives-label">Finished with</div><div class="hearts">';
+    for (var i = 1; i <= 3; i++){
+      html += '<span class="heart'+(i <= lives ? " filled" : "")+'" data-i="'+i+'">♥</span>';
+    }
+    for (var b = 0; b < bonusLives; b++){
+      html += '<span class="heart bonus">♥</span>';
+    }
+    if (editable) html += '<button type="button" class="heart-add" title="Add temporary life">+</button>';
+    html += "</div>";
+    return html;
+  }
+
+  function itemsListHtml(list, kind){
+    return list.map(function(entry){
+      var c = anyCardByNumber(entry.n);
+      var name = kind === "relic" ? c.relicName : c.curseName;
+      return '<div class="floor-boss-item '+kind+'" data-n="'+entry.n+'">'+name+' <em>('+c.name+')</em></div>';
+    }).join("");
+  }
+  function bankItemsHtml(){
+    return (itemsListHtml(bank.relics, "relic") + itemsListHtml(bank.curses, "curse")) || '<p class="poster-empty">bank empty</p>';
+  }
+  function enteredWithHtml(snapshot){
+    if (!snapshot) return '<p class="poster-empty">not set yet</p>';
+    function row(entry, idx, kind){
+      var c = anyCardByNumber(entry.n);
+      var name = kind === "relic" ? c.relicName : c.curseName;
+      return '<div class="floor-boss-item '+kind+'" data-n="'+entry.n+'">'+name+' <em>('+c.name+')</em>' +
+        '<button type="button" class="entered-remove" data-kind="'+kind+'" data-idx="'+idx+'">×</button></div>';
+    }
+    var relics = snapshot.relics.map(function(e, idx){ return row(e, idx, "relic"); }).join("");
+    var curses = snapshot.curses.map(function(e, idx){ return row(e, idx, "curse"); }).join("");
+    return (relics + curses) || '<p class="poster-empty">empty</p>';
+  }
+  function rewardsListHtml(rewards){
+    var html = rewards.map(function(r, idx){
+      var c = anyCardByNumber(r.n);
+      var name = r.status === "relic" ? c.relicName : c.curseName;
+      return '<div class="floor-boss-item '+r.status+'" data-n="'+r.n+'">'+name+' <em>('+c.name+')</em>' +
+        '<button type="button" class="reward-remove" data-idx="'+idx+'">×</button></div>';
+    }).join("");
+    return html || '<p class="poster-empty">no rewards yet</p>';
+  }
+  function snapshotBank(){
+    return {
+      relics: bank.relics.map(function(e){ return {n:e.n}; }),
+      curses: bank.curses.map(function(e){ return {n:e.n}; })
+    };
+  }
+
+  function renderActiveFloorPicker(){
+    var el = document.getElementById("floor-active-picker");
+    el.innerHTML = '<span class="floor-link-label">Currently on</span>' + FLOORS.map(function(f){
+      var checked = mapState.active === f.key ? " checked" : "";
+      return '<label class="floor-active-option"><input type="radio" name="floor-active" value="'+f.key+'"'+checked+'> '+f.label+'</label>';
+    }).join("") +
+    '<label class="floor-active-option floor-active-overwrite"><input type="checkbox" id="floor-active-overwrite" checked> overwrite entered-with</label>';
+    el.querySelectorAll('input[name="floor-active"]').forEach(function(r){
+      r.addEventListener("change", function(){
+        var key = r.value;
+        if (key === "boss" && !btnWorld.disabled){
+          alert("Reveal The World first — the Boss Floor is locked until that decision is made.");
+          renderActiveFloorPicker();
+          return;
+        }
+        var s = mapState[key];
+        if (document.getElementById("floor-active-overwrite").checked){
+          var overCap = bank.relics.length > relicCap() || bank.curses.length > CURSE_CAP;
+          if (overCap){
+            alert("Bank is over its cap right now — archive or remove the extra Relic/Curse before the map can capture what you're entering with. The floor still switches; entered-with stays as it was.");
+          } else {
+            s.enteredWith = snapshotBank();
+          }
+        }
+        mapState.active = key;
+        saveMapState();
+        renderFloorGrid();
+        if (mapGenerated) renderPoster();
+      });
+    });
+  }
+  renderActiveFloorPicker();
+
+  function renderFloorGrid(){
+    var grid = document.getElementById("floor-grid");
+    grid.innerHTML = "";
+    var activeIndex = FLOORS.findIndex(function(f){ return f.key === mapState.active; });
+    FLOORS.forEach(function(f, idx){
+      var s = mapState[f.key];
+      var isBoss = f.key === "boss";
+      var tile = document.createElement("div");
+      tile.className = "floor-tile" + (idx > activeIndex ? " future" : "");
+      tile.innerHTML =
+        '<div class="floor-tile-body">' +
+          '<div class="floor-banner">' + (s.image ? "" : "<span>Click to add a banner for this floor's game</span>") + '</div>' +
+          '<input type="file" accept="image/*" class="floor-file-input" hidden>' +
+          '<div class="floor-label">'+f.label+'</div>' +
+          (isBoss
+            ? '<div class="floor-entered-label">Current Bank</div><div class="floor-boss-items">'+bankItemsHtml()+'</div>'
+            : '<div class="floor-entered-label">Entered with</div><div class="floor-boss-items">'+enteredWithHtml(s.enteredWith)+'</div>' +
+              '<div class="floor-entered-label">Rewards</div><div class="floor-boss-items">'+rewardsListHtml(s.rewards)+'</div>') +
+          heartsHtml(s.lives, s.bonusLives, true) +
+        '</div>';
+      grid.appendChild(tile);
+
+      var banner = tile.querySelector(".floor-banner");
+      if (s.image) banner.style.backgroundImage = "url(" + s.image + ")";
+      var fileInput = tile.querySelector(".floor-file-input");
+      banner.addEventListener("click", function(){ fileInput.click(); });
+      fileInput.addEventListener("change", function(){
+        var file = fileInput.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(){
+          mapState[f.key].image = reader.result;
+          saveMapState();
+          renderFloorGrid();
+        };
+        reader.readAsDataURL(file);
+      });
+
+      if (!isBoss){
+        tile.querySelectorAll(".reward-remove").forEach(function(btn){
+          btn.addEventListener("click", function(e){
+            e.stopPropagation();
+            var idx = parseInt(btn.dataset.idx, 10);
+            mapState[f.key].rewards.splice(idx, 1);
+            saveMapState();
+            renderFloorGrid();
+          });
+        });
+        tile.querySelectorAll(".entered-remove").forEach(function(btn){
+          btn.addEventListener("click", function(e){
+            e.stopPropagation();
+            var kind = btn.dataset.kind;
+            var idx = parseInt(btn.dataset.idx, 10);
+            mapState[f.key].enteredWith[kind === "relic" ? "relics" : "curses"].splice(idx, 1);
+            saveMapState();
+            renderFloorGrid();
+          });
+        });
+      }
+
+      tile.querySelectorAll(".floor-boss-item[data-n]").forEach(function(item){
+        var c = anyCardByNumber(parseInt(item.dataset.n, 10));
+        item.addEventListener("mouseenter", function(){
+          clearTimeout(tooltipTimer);
+          tooltipTimer = setTimeout(function(){ showTooltip(item, c); }, 450);
+        });
+        item.addEventListener("mouseleave", hideTooltip);
+      });
+
+      tile.querySelectorAll(".heart[data-i]").forEach(function(h){
+        h.addEventListener("click", function(){
+          var i = parseInt(h.dataset.i, 10);
+          var cur = parseInt(mapState[f.key].lives, 10) || 0;
+          mapState[f.key].lives = (cur === i) ? i - 1 : i;
+          saveMapState();
+          renderFloorGrid();
+        });
+      });
+      tile.querySelectorAll(".heart.bonus").forEach(function(h){
+        h.addEventListener("click", function(){
+          mapState[f.key].bonusLives = Math.max(0, (parseInt(mapState[f.key].bonusLives, 10) || 0) - 1);
+          saveMapState();
+          renderFloorGrid();
+        });
+      });
+      var heartAddBtn = tile.querySelector(".heart-add");
+      if (heartAddBtn){
+        heartAddBtn.addEventListener("click", function(){
+          mapState[f.key].bonusLives = (parseInt(mapState[f.key].bonusLives, 10) || 0) + 1;
+          saveMapState();
+          renderFloorGrid();
+        });
+      }
+    });
+  }
+  renderFloorGrid();
+
+  // ---------------- generated map poster ----------------
+  var btnMapToggle = document.getElementById("btn-map-toggle");
+  var mapPoster = document.getElementById("map-poster");
+  var floorGridEl = document.getElementById("floor-grid");
+  var mapHintEl = document.getElementById("map-hint");
+  var mapGenerated = false;
+
+  function chipsHtml(list, kind){
+    return list.map(function(entry){
+      var c = anyCardByNumber(entry.n);
+      var name = kind === "relic" ? c.relicName : c.curseName;
+      return '<div class="poster-chip '+kind+'" data-n="'+entry.n+'"><div class="thumb" style="background-image:url(\''+c.img+'\')"></div>' +
+        '<span class="name">'+name+'</span></div>';
+    }).join("");
+  }
+  function bankChipsHtml(){
+    return (chipsHtml(bank.relics, "relic") + chipsHtml(bank.curses, "curse")) || '<p class="poster-chip-empty">bank empty</p>';
+  }
+  function enteredWithChipsHtml(snapshot){
+    if (!snapshot) return '<p class="poster-chip-empty">not set yet</p>';
+    return (chipsHtml(snapshot.relics, "relic") + chipsHtml(snapshot.curses, "curse")) || '<p class="poster-chip-empty">empty</p>';
+  }
+  function rewardChipsHtml(rewards){
+    if (!rewards.length) return '<p class="poster-chip-empty">no rewards yet</p>';
+    return chipsHtml(rewards.filter(function(r){ return r.status==="relic"; }), "relic") +
+      chipsHtml(rewards.filter(function(r){ return r.status==="curse"; }), "curse");
+  }
+
+  function renderPoster(){
+    mapPoster.innerHTML = "";
+    var activeIndex = FLOORS.findIndex(function(f){ return f.key === mapState.active; });
+    FLOORS.forEach(function(f, idx){
+      var s = mapState[f.key];
+      var isBoss = f.key === "boss";
+      var tile = document.createElement("div");
+      tile.className = "poster-floor" + (idx > activeIndex ? " future" : "");
+      if (s.image) tile.style.backgroundImage = "url(" + s.image + ")";
+      var label = isBoss
+        ? '<span class="poster-boss-icon">☠</span>'+f.label+'<span class="poster-boss-icon">☠</span>'
+        : f.label;
+      var sections =
+        '<div class="poster-section-label">'+(isBoss ? "Current Bank" : "Entered with")+'</div>' +
+        '<div class="poster-chip-row">'+(isBoss ? bankChipsHtml() : enteredWithChipsHtml(s.enteredWith))+'</div>';
+      if (!isBoss){
+        sections +=
+          '<div class="poster-section-label">Rewards</div>' +
+          '<div class="poster-chip-row">'+rewardChipsHtml(s.rewards)+'</div>';
+      }
+      var body =
+        '<div class="poster-floor-content">' +
+          '<div class="poster-floor-label">'+label+'</div>' +
+          sections +
+          heartsHtml(s.lives, s.bonusLives) +
+        '</div>';
+      tile.innerHTML = body;
+      mapPoster.appendChild(tile);
+      tile.querySelectorAll(".poster-chip[data-n]").forEach(function(chip){
+        var c = anyCardByNumber(parseInt(chip.dataset.n, 10));
+        chip.addEventListener("mouseenter", function(){
+          clearTimeout(tooltipTimer);
+          tooltipTimer = setTimeout(function(){ showTooltip(chip, c); }, 450);
+        });
+        chip.addEventListener("mouseleave", hideTooltip);
+      });
+      if (idx < FLOORS.length - 1){
+        var arrow = document.createElement("div");
+        arrow.className = "poster-arrow";
+        arrow.textContent = "›";
+        mapPoster.appendChild(arrow);
+      }
+    });
+  }
+
+  function setMapView(generated){
+    mapGenerated = generated;
+    if (generated){
+      renderPoster();
+      floorGridEl.hidden = true;
+      mapHintEl.hidden = true;
+      mapPoster.hidden = false;
+      btnMapToggle.textContent = "Back to Edit";
+    } else {
+      mapPoster.hidden = true;
+      floorGridEl.hidden = false;
+      mapHintEl.hidden = false;
+      btnMapToggle.textContent = "Generate Map";
+    }
+  }
+  btnMapToggle.addEventListener("click", function(){ setMapView(!mapGenerated); });
+
+  // ---------------- export / import everything ----------------
+  document.getElementById("btn-export").addEventListener("click", function(){
+    var data = { version: 1, deck: "pilot", drawn: state.drawn, bank: bank, map: mapState };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "dread-deck-pilot-save.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+  var importFile = document.getElementById("import-file");
+  document.getElementById("btn-import").addEventListener("click", function(){ importFile.click(); });
+  importFile.addEventListener("change", function(){
+    var file = importFile.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var data = JSON.parse(reader.result);
+        state.drawn = data.drawn || {};
+        bank = data.bank || { relics:[], curses:[] };
+        mapState = data.map || mapState;
+        if (mapState.floorSettings){
+          floorSettings.count = mapState.floorSettings.count || 4;
+          floorSettings.includeFloor0 = mapState.floorSettings.includeFloor0 !== false;
+        }
+        FLOORS = buildFloorsArray();
+        ensureFloorStates();
+        floorCountInput.value = floorSettings.count;
+        floor0Toggle.checked = floorSettings.includeFloor0;
+        if (mapState.drawSettings){
+          victoryCount = mapState.drawSettings.victoryCount || 3;
+          deathCount = mapState.drawSettings.deathCount || 1;
+        }
+        victoryCountInput.value = victoryCount;
+        deathCountInput.value = deathCount;
+        renderDrawButtonSubs();
+        btnWorld.disabled = !!mapState.worldUsed;
+        btnCoin.disabled = false;
+        saveBank();
+        saveMapState();
+        stage.innerHTML = "";
+        stage.appendChild(stageIdle);
+        buttonsEnabled(true);
+        renderLedger();
+        renderBank();
+        renderFloorLinkOptions();
+        renderActiveFloorPicker();
+        renderFloorGrid();
+        mapPoster.innerHTML = "";
+        setMapView(false);
+      } catch(e){
+        window.alert("Could not read that save file.");
+      }
+    };
+    reader.readAsText(file);
+    importFile.value = "";
+  });
+})();
+</script>
+</body>
+</html>
