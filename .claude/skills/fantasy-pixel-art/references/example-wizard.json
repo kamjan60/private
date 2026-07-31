@@ -1,0 +1,61 @@
+{
+  "name": "elder_wizard",
+  "size": [64, 64],
+  "supersample": 8,
+  "outline": "outline",
+  "auto_outline": true,
+  "stroke_width": 1.15,
+  "palette": {
+    "outline": "#1a1614",
+    "hat": "#5a5450",
+    "hat_dark": "#38332f",
+    "hat_light": "#8a8078",
+    "face_shadow": "#2e2a28",
+    "robe": "#786f66",
+    "robe_shadow": "#544c45",
+    "beard": "#eee8dc",
+    "beard_shade": "#c7bfaf",
+    "staff": "#7a5a3a",
+    "staff_dark": "#5a4028",
+    "skin": "#c9ab8c",
+    "boot": "#282420"
+  },
+  "shapes": [
+    {"type": "rect", "box": [24.5, 52, 30.5, 58.5], "fill": "boot"},
+    {"type": "rect", "box": [33.5, 52, 39.5, 58.5], "fill": "boot"},
+
+    {"type": "bulged", "x_top": [22, 42], "x_bottom": [17, 47],
+     "y_top": 26, "y_bottom": 55.5, "bulge": 1.6, "fill": "robe"},
+    {"type": "polygon", "outline": false, "fill": "robe_shadow",
+     "points": [[17.4, 45], [46.6, 45], [47, 55.3], [17, 55.3]]},
+
+    {"type": "line", "from": [14, 13], "to": [14, 59], "width": 2.3, "fill": "staff"},
+    {"type": "arc", "center": [14, 9], "radius": 4.6, "start": 90, "end": 0,
+     "width": 2.3, "fill": "staff"},
+    {"type": "arc", "center": [14, 9], "radius": 4.6, "start": 200, "end": 310,
+     "width": 1.0, "fill": "staff_dark"},
+
+    {"type": "rect", "box": [25.5, 17, 38.5, 27], "fill": "face_shadow"},
+
+    {"type": "band", "x_top": [26.6, 37.4], "x_bottom": [27.2, 36.8],
+     "y_top": 23.5, "y_flat": 35.5, "bulge": 3.0, "fill": "beard"},
+    {"type": "rect", "outline": false, "box": [31.2, 25, 32.8, 36.5], "fill": "beard_shade"},
+
+    {"type": "taper", "fill": "hat", "spine": [
+      [31.5, 17.5, 10.5], [32.5, 13.5, 9.0], [34.5, 9.5, 7.2],
+      [37.5, 6.3, 5.4], [41.5, 4.6, 3.9], [45.0, 5.6, 2.8],
+      [46.4, 8.4, 2.0], [44.6, 10.2, 1.4]
+    ]},
+    {"type": "polygon", "fill": "hat", "points": [
+      [10, 17.4], [20, 14.4], [44, 14.4], [54, 17.4], [44, 20.2], [20, 20.2]
+    ]},
+    {"type": "polygon", "outline": false, "fill": "hat_dark",
+     "points": [[13, 18.4], [51, 18.4], [43, 20.0], [21, 20.0]]},
+    {"type": "line", "from": [15, 15.6], "to": [26, 14.9], "width": 1.1, "fill": "hat_light"},
+
+    {"type": "polygon", "fill": "robe", "points": [[38, 30], [43.5, 32.5], [42, 37], [37, 34]]},
+    {"type": "ellipse", "center": [14, 31], "radius": [2.9, 2.5], "fill": "skin"},
+    {"type": "ellipse", "center": [44.2, 36.4], "radius": [3.2, 2.9], "fill": "skin"},
+    {"type": "line", "from": [44.6, 34.6], "to": [44.4, 38.2], "width": 0.9, "fill": "outline"}
+  ]
+}
