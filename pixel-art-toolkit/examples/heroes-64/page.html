@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Heroes 64×64</title>
+<style>
+  :root{
+    --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+           --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+  }
+  :root[data-theme="dark"]{ --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c; }
+  :root[data-theme="light"]{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+    --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:radial-gradient(ellipse 80% 55% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:980px; display:flex; flex-direction:column; gap:24px; }
+  header h1{ font-size:clamp(22px,3vw,28px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:74ch; line-height:1.5; }
+
+  .grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px; display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .card img{ image-rendering:pixelated; image-rendering:crisp-edges; width:160px; height:160px;
+    background:repeating-conic-gradient(#00000018 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:6px;
+  }
+  .card h2{ font-size:14px; margin:0; letter-spacing:0.02em; text-align:center; }
+  .card p{ margin:0; font-size:11.5px; color:var(--ink-dim); text-align:center; line-height:1.4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Heroes — 64×64</h1>
+    <p>8 postaci, jeden generator (pixel_lib.py). 6 czarodziejów — zawsze stary, broda, długie włosy, ale różny kapelusz, różna paleta i różna szerokość szaty (nie każdy na całą szerokość canvasu) — plus wojownik i elf łucznik z zupełnie innym szkieletem ciała (widoczne ręce/nogi, zbroja/tunika).</p>
+  </header>
+  <div class="grid">
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADL0lEQVR4nO1bv4sTQRT+oiJZGVaL4wgHGhBBOPCQ4wypxE4RsUgjpNZUkiJV/oRUKQ6rRCyDWqQUtZBgdSyHxQkBGzGnSDgszrCYFMLYOPESd5P5Pae7X3PZ3Zk3b79575t5e7tACncgnk+J51OXPpxyNTDxfJo7ewEAMMQ+DcejjAs/nAwaN+suSLA+IPF8upHfiry2N9i1ToLVwXjz3SYJ1gZaNPPzsBkJVgaRVXobJBgfQGTm52EjEowZ172+myLCiFHi+fT2tRK+HOxrs2kqGhIfAUZ3gg/vXdRi59Gzj1rsRMGowOiKApNCaLwWYPt9WQy/69ORKFhZBlX6m14GjUbA0YpPFqYrxcRHQOLxX+0DZJ4zGNEA4vn05avuzLnJ5z0hG9nzGzPHt26WFmoB8Xy6+uAGtu5fnzm/+/gt0O7F9rX+SIxcyQIAwvcTrvO8CMejDNo9+qLdi74WA2sEsBn9eciOZ6/HnRdBOB5liOfTwuVVAEDw4WBp6igToJLrOzsBAKBYLEiPpbpKSBPAnFnPRztfqzSmv5uturD9o/0XjdMfBBSQJ+KETCfi+XQ9X4h1ah7zN6OzPfNDNhKlIiAcjzKMeV4STKE/CKY+yfSXigAG1zfPoKIDSgSIgDesRdNFFdYIOK5QWgaH374KtS+Xquh0t7XaVIUUAWwV0I1apYHcyppQn9zKGvqDQLpkTnwKWCcgTuRsix9D4iNAWgR1i5Vt8WMQFg5dAths1afF0PMnb5Tt9QeBVDWY+BRwRkCt0kCxWOAuhU3ByUtSrDx+2ns9c+xiJZAiQEWw2E6wXKribvXO9Henu41mq45yqSptWwZCIqgqgPMzXShvAgCCzrvI66JgpbHVR2IiWHZjLlIgXQVcO+Aawimgd8e2acCmGLgJMFUCAxAugRfZYULIi8SnQEqAawdcQ0gE9YvVPyKCJgUQ0CeCf2x94m6f+BRICXDtgGtwVYPE8+npkwQkew7h5PDY/7166QwAvmqQuxx2/XmbCIyUw6L/efn9TWCcrb/sibZfNK6In4nXAKMPRH5MQqPtdcDJ6/Jx4azrg0pmJ33NNkWKpfgFM06d7XycDw4AAAAASUVORK5CYII=" /><h2>Elder Sorcerer</h2><p>stożkowy kapelusz, laska z klejnotem</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADfElEQVR4nO1bzWsTQRR/KR7cuMwhF9sQgkjx4qUfQaR4aKEn6bHEu+QoGlDEP0FEoUqP4lFQeiw9FcxBSpHUehFEgoQQTHMJEsOmeHA9hAnZzX7Mx5uZxM3vku509r3Z9/F78yYbgIQjZUqxbRF39LrX7xpZywUTSm2LuOnLV7yD7bprwghaFfq9HgadhtCmyLaIm71+k2nuz6/H2oygVAmrx+Og0hjKBPN4PA4qIwJNKJa3WYFlEBQhmN5mBVZUzCIAQwiFbRH32YsdTJFjePywjMoH6MSiOhKwyVAJswbu9CThtOtKKoHSMogpT1UZVNoLYEWB066jyAlC4neCyrtB2ShQ6X0ADc2QbBTwep/qY73P2IGICtgWca89eAUAAN9f3mcywn9VBUROmZTtA45OvnjGGp8OuGTkb9z2XK+tLkU+kG0R996HhmdsdyMfawTtR2LOrTsAAJD++I5pnBW9fje1u5HnjgBtBhh69M/vwafPw6HjnFhbvQoAAEcnP5jmoxhANN+r1c8AAFAorAjpwdgfSBmALii3vD72v2KpPPz7/esdbtmj94fpaJ5WuEpeEOZEb7Qt4uaW1wMX5of/YbDmU/0yFUc4Anr9bop6gMUIKtA8rQzXIipDOAIoTD08hSwPSBuAFaxhzZsuspDmAJOQzX8AySrQOWtyzd/c2obD/T1UmbKQMkBmPoe1DgAYhD+vTKdVk9IplAKTEP4UsmmgjQQpwkhON/lRcBtgkrxPIRMFQhyggqh0kx+FkAFkya9YKnv6AxHy80OUDLlSYBLDn0J0XdpJkKJYKkOhsMLcCquCkZekaPi/rVQ91yYqAXMjYVvETS8sSiukO8HNrW24++gJAAC8ef7UMy6DpexfABicCKEfickS1ainR2Vl5nNDYjzc35OMhEb8lBEwGQCL/OIezEQKGCPBSUHiDRCbApT8VO7UMGXns3zzmTgAu+1VK5+PBBOfApEGmOStbxxYO8TER0AoB+ggPwoVJNg5a0J6YRGgVYv8HUIkCaomPzV6Gh6ZcW1y4lMg0ADTTH5+xJFh4iMgkBxsi7hzlzJwkWTgvNuZqk/aDh9/++UZd1q1wPY48p0bNDNrRNgbImGVILQKyH7ralvEtS0SJntMPu/8MJ2++2LvSTwHKD0TdM57SudjwMjL0mGhyTs/Soapn+LOMMOU4R+kna80BWbASgAAAABJRU5ErkJggg==" /><h2>Storm Warden</h2><p>szeroki kapelusz, kryształ</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACiklEQVR4nO2bQUsCQRTHX+HBpWWIkFBPfQLFEOnkSUL8CLIH6aP0STyEhz6ASHjyGJG0nyEqIiJEykOwHWo2d3PbmZ03M5nvd0mneW9m37z3n91lBCCIjWbLxCCuw4IsdvO3mfb5aR/AdVjg31xksq1Uj7UHwUgAVOzXOgAqq8/RnQWUATqdUwbA38+AnE7nHJVdQDfaoqu68nF0ZYIWp6tq/+56IuWjfNiMfNelBdvYDtPwD27BP7gVbhfFdViQJeuMaADA94qWecNe7P8J7SK4Dgua1U/DyQ0EMpmCGgDZFbi8vAIAgEajLuUfsxRQAsAnVqkVwjav1w0/n/UH0j6X7eO+/SmgBUJZA1yHBZVaITLBOPGLSSOtPx8PY6dRzoD522yLr8hvQcDEnz6FY6v6QtsFTF08B0sHjG2DomUgWy6qGL8P+GugbYMPDy+pfVrtDoxHQ2U/mKAFoFjcVfbh9bpCfh7vn5TH4mx8CRgPQJLImRY/zsZngFER1GmfFSsi6PW6kecDUfHjkAgiYi0AXq8LjUZd+FFYF8ZeiCzD079/fhr5bmMnMC6C/E6w1e6Ad3IUfh6PhnDWH0Cr3cGakhBGRXB5pZf7F4u7oTCOR8PUTMAUQaMlkHZhNkqAdgHbE7CNcgm4Dgv2SzmlOzlZ2/1SDuCeSb3+TgJFA1QfhbPYYwnhxpcABcD2BGyDogHr+igMQCJIJUABsD0B25AIYjghEVxjKAC2J2AbEkEMJySCawxaCcxmC2AsL/U3qx1jecjvvAOA+lshlING2AejReEXHz0p+ix1gAolA1YN+HV2N6n/DxvZ/liQBuh0/rqYa+2PgfbfDK1qT0pn2f6rbE382JIg/hEfGRg+jlgYX90AAAAASUVORK5CYII=" /><h2>Hermit Druid</h2><p>bez kapelusza, szczupły</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADUElEQVR4nO1bMW8TMRh9aRLUQ5ZpIyEiFGVAiKlCaakEysaSBYmiTF2y8Bsywx/gN7CwMCFAYsnCFoFEy6nqhBBD1AFElcIpaiIaMANx1Qt3F9tn++6avCWJz/7se37fZ3/OHZAyEIcy4lBmq78lWx2JgDiUlfNLKOeXYIuEnI1ORBB2w4OhZ3SMBZPGRUEcymqXVgKvuQAzSUJiCpCRuEkCElFA1IwHwTWoAmsKiBvUTBFgRQGyMx4E15AKjCpA51KWOQXomHUO9+cPLXaCkAkFZHIVIA5l9y+vaLH1+ntGV4G5VgBHOR8v3fj6+4+mkQTD+D4gres/R6qywSRgPAbocIFMJ0O2XWC6v1ntU3MeoAPEocy9ddNXVtvZiyTBGAG6T3RElKByqGKEAOJQ1n37xld2sP9eykZl7bbvd/3uvcgbCZp9jigVWD8PqH1+CQBwrz8QKhfFYOjlajt70gqwRgCf0cPJZ2Xqeli5DAZDL0ccym5coQCAT9+8ma4Tm4A4vv5h9yMAYHNjXbmvuEukMgF8MPXVUuD1drN1+v3Ji2fS9s+2j+qnCzBAnQilXQpxKKuvlkIHNY3pm9FZn49DVYlKChgMvRxnXpQEU+ge9U/HpNI+1j416ZvniBMHrCVDorKWdZe4mPtsUCkGEIeyarGAg4En1W67sYXnnVeRdWRtVosF9ECVj8yUl8EKoapNQ9FutpTs9iaBUAVz7wLWCQgLcraDH4c0AXwTlCZY3wjJBqqkbIpAiYC4AbDdbPnyA9XgdxaqgVDKBdIofw5VN0hsFWg3W9jcWBdOhU0hkSdEuPw7jx77fiexEkgfOVeL8TjjO8HtxhYe3qkBAJ6+c33lquidjAEAMidCwgTo8P/pmW6sXQMAdPa/BF5XQfeoL0WAVReYdWNJuMBiK5z0AJKGkAuopr+i0GlXNkgL1zaR/pqyfYixcN25d4GZBKR5+6sDc68AoRhgOlXVbX+5dFG4rhABJgOgCfvaguB5939gEQMWBERmSsShjLAxSheW0f81yszn1fI/tx31j9E7Gcd7RsjmO3y6oDUdVv3LafICZJjN/+zK1o/qV2accx8DjB6IHI8GRuvrQCLvC4TJWdfbo9yO6SfNF1jgHOAvkMOcB34XnQwAAAAASUVORK5CYII=" /><h2>Blood Magus</h2><p>krzywy kapelusz, czaszka</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACpUlEQVR4nO2bMWvbQBTH/y5dBEIFzcKFru3UGhVCsnQqxln8IYyHoA+TKeRDeDImUykkBCraTu3aNkazB2Pqbup0xnIidKf33imK7rfYEnd/nd69+9+dkACHo9P0pC/ge0FOqb/ZrkXbKCrue0EeveyTNLK7pWgQxISpPX+IVBBERH0vyAfvY1bNr19SkSCIBUBCtxUBkOh9hUQWuAzgFnQZgHZlwHNuQQV1/j8ku1uy6ik6vw4QywCALwukeh9wGSBngj9+fi+c+5VeGWm8ij8Wjt+8fisShGfcglX0B6foD061z5vge0FumnnWMoBKVQb4XpB/eBcBAD59y7Szhc0E64z5NE0BAHGst3DavwbXcCAHQDXq6OS4cH4yTXb/Ly/OjXX36z+kf3t9kwP0QJA8wPeC/Ojk+F7jDjm8mSp0yqvrUmcbUgZstuue6omqIHBze32zawNFh2UWsH3zCg4fsDYN6g4D0+FCxfo64LHBMg1mWaZVbjgaYzGfsWhxwRKAKIo4ZDCZJtpay99/WK7Z+SFgPQBlJmfb/BSdzwCrJiitUYdGTHAyTQr7AxPzU3TeBDn2AQDTZqgOk2mCOI61t8JSiD4ULUOl/+Lqc+G4iZmAHABT81IrweFojLOzZPd/MZ/h8uIcw9GY2iQjyAEwMa/9nt6vF0XRzhgX85l2JnAYodUhUHVjTQyB1s4CXHQ+ANZNUEqjLlZNkFuDwwQ7PwRaHQCO5XDtAFCWwY8JkgdwmVdrTZDrWSBFh2qErfYADlwAmm5A0zgTpFR2JvgE6HwAyB6wWq0QhmGtX2r9MAzhvwgAoPZymPSCgdRL0aZstuteI2+JVb225ntBWb17dU3Lc+E8QFL877+NaHkOxL8bfOh8WTqbli+rL/2xpcPxhPgPkTxQ2KQm7X0AAAAASUVORK5CYII=" /><h2>Grey Pilgrim</h2><p>kaptur, szary, bez ozdób</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADSUlEQVR4nO1bPWjbQBR+Lh2qIo4MmULplMFTcUWWgpOpeGiguEvw1KmGIkLGbO2QbhmNMQV3LiZLTKEdQqak0E0x7WJKKKWUTh6MEHaGwnUw50qOZd3Pu1OM9C22zqf37r5777t3SgSQI9somHZoW4Qu+j0Y+0bHdNukM9si9PHDuwv7nF4ANUmCdkdJK54E3WRojQDbInT32ZqSjeax3ojQyq7q6jMsJQG2RWjnzQMUW7VXX7WRsBQRwKCDBG0agJH/YfR/DrXsENoICMZ+oXkMKBGASeQstNcB6rvAH6SRzIdWAjCjgBdMd3hTxUglmFT9xeH0YiTU37YIvVN3JxftFpdeaBVB9l10Iiq4areE+mshwLYI/f7tJNJ21nkrZGOr9jJy7T6vJvosfYz67G1XEqPA6GEIAKB57wkAAOz+/sTVzotg7Bd62xU625Z0nzEC2IpuTVuiKxzXLoqnjya7zocvfLsHCgGyFZ/n9QAAwHFKUr4wiiIlAthgDuvr137rNtzp9+qemDDN3g8AUNlYg8pGtM9++1Joy5uHW7I32hahh/X1uZOfxexksPoz/ypnDukICMZ+ga0ADwk6sN++nI5F1oZ0BDCkNXkGVR1QJoAXvGEtmi6qMEbATYXyNuj1B/x93R04aB2h2cOAMgFOcRVjHAAwCX8Re53zobLPzKeAch0gijiRkxE/1RoAII8ANQ2QFawqoi1VKBEgK4Ddhhs5H4iKXxiqQpj5FEiNgG7DBccpCR2FdcD4EyGA/8fjgdeIXJsugwEk/zRmW4TWNlekHLJK8LW7A3svygAA0Hj3OdIuis75EIKxX7AtQsNPhLQ+EpMRrfBKh+93iqtTYTxoHQlHgooQGk2BpImlkQL5LpD2ANKGdApgVG7lMp4tWRgVQV22VERQOAVkT4E6oXIqzLwGZJ4AKQ3AEq2lFUFMAcSyJyuEmU+BnACRzjdxC2SQHZewBmAK1lKKILYAYtqUEcJcA9IeQNrIPAHCGvD+5AcU7xPo//KVP73+AMUO+6xtrsDor9h8hB+KYr8DgA3tD0V5/yXFtgi1LRJn45od0f5xPnnGFkauATqNj64Crf0xkMo7Q3HhLNp/kQ3Tb6DmyLGk+AdxnofaXKcfWgAAAABJRU5ErkJggg==" /><h2>Desert Seer</h2><p>turban, złota paleta</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAC6klEQVR4nO2aMYsUMRTH38gh5gjBQkEsPNAvIKM2y4IgV8sWlpZiIacgyJV+gGNgQKcQsRRLkS2sZGFhmUZvuOKKK+6Eu0rQQobhBmxioVln17mZvEyyuZnNr5uZ5OXln+S9JLsADntQwjgljNv0YcVWw5Qw/mntMgAArB8Cz/LUs+WLNdwMOAUzYGGNYkd6UYIspBFKGO/dvoOqE49HCxHBeANN17hpEYwap4TxjafPGtmIwgAlAiUMFU86NQMoYTz+/AV6t25K1zOaBapmwKVfX2eev529WlouCgOjGcKoAFmeelEYnOoYYG0GyOJmQJtngAC7BxDE45FmT/7HuABZnnrxeMQBAD683JSqM3i8Na1rzrM/aBNAJt3t7u1rs6lLHC0CyG51P+7+lLInYysej7QER2UBiqPTNNKr4Ps+NA2wAIoC6EhvOpj3IQoDtA1tMSAKA+Voj0VkBx2DoDULFNOWjHP9fh8mkwmqDXE40nWTdEaHEUGWp17b7vZQAsje4f3dAap7dQLYo7EM0kuAEsa3Lp6fPh/JVHr9ovLzpOb7lIdP5MopICXAfOcBAK68fQNH9x9UV6xxXCUG6KZ2CZR1vkugg6C/umrCD2ugBUiOj034YY3aGJDlqbf5HVDLgBLGe9coJMNXleUG79/BAACer6S1NuODzMjpUCoIlolQFQCzPPXiA+AAJ2+IojCAdchm3lWVne+8jssWAEQaFCKI5w2J8nV7hmKnVHZ286Ko2EDFgDbu9Oqw9uOoTspGXryrGzAlAcrWn62ZQQnj19fOTZ8f3etD8Xmn5pdn5Rkg2+EkSaRtYsoW/dg5/Beb7t64AMPtHzPfq+obXwK+75e+L7vxxZQtIjpZXAqyA6T1ONxGnAC2HbDN0gtgPAiazgJN6UQWaMLSLwEngG0HbNOJw5Agy1NvuI3712nnsgD2UOaygDHLLcEJYNsB23QuCGJZ+hlg7c/SZekKU9bhcDgcDofD0ZDfLMVp0s78VqAAAAAASUVORK5CYII=" /><h2>Ironclad Warrior</h2><p>zbroja, miecz + tarcza</p></div>
+    <div class="card"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACyUlEQVR4nO2bPWvbQBjH/ypdBOIIoRTToUOghUBrTDrFeMyWpYHQjN0zdM6UsfQT9DvUBDx162icyca4pTYuiGBCSEsJRYioQ+E62GererPse3FUP7/F1j26l+d/99xzEjZAEASxxlgmO3NsxvPc5weesXEZ68ixGe9+fJXr3sp+3ZgIWjtxbMaFI3lnXxCulyRGWvmi3JdtIA3HZrz14R2qRyccAPLOvqCyX+cAINoIO+vYjB/ulnB2DmkRlAkQnRE/8Kzq0YkQAbf+zoIt1oXzWsPhnopGHJvxTy/KsWU+ESF2//GwieNhM/VakOS8YzPe/dzE2fk1DndLC4dWFOkVIJzfa/cw+YythOgg3z+tIes6XDerbyGCTChICeDYjFefbODUG0F8Ru3i+9fBcKn2Ab1pUesmuHUwi/u33e5C9cN13UZHyY6fhJI9IErUeVm2DnakYz0NLSvADzzLbXQ48O9MRnlWK+NLs5fZltvoTNtUOMQpWlYAoHbAaW35gWfJZgNtAgDTlbB0fbfR0X4k1rYJhrkZ/VjKZgLtAviBZ6F9mbopbj5+mFhuYvYBzSFQBNZeACN7AJAe6//9HiBIi/W08l/tS53DmSIlgB94VusbYk+A4WuZE5yqlx5ZSK+ArAE6NuPV7Y3xxcCN2d+8/IPTwShWDgClSb1WX/6lRxZaQ8APPKvVH6+Q8vajmH3v9ewYnGTv9a+0p0LtWWCeAzIOzl6NXS/dDqVBUx39vPGk7LowJsCDTRYru/ru57brYu1DoNACyG6AQIEFUOE8UGABVEFZwFRHqrOAiuUPFCwExMmv8rym7IhcKAF0YCwEVDB+Da726bBwK0D10yFlAVMd0bPAHYUEWPUAVs3aC0BZwFRHlAXuKCTAqgewaoztAe5FdjzPs+vCmAC3v7MdnGfXhdH/C0TLor8Az7ITBEEQBEEQivkLqHp04/6j/NMAAAAASUVORK5CYII=" /><h2>Elf Archer</h2><p>łuk, kołczan, spiczaste uszy</p></div>
+  </div>
+</div>
+</body>
+</html>
