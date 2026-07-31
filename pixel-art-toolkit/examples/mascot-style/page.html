@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Flat Mascot Style — Validation</title>
+<style>
+  :root{ --bg:#efeae3; --panel:#ffffff; --ink:#241c17; --ink-dim:#6b6058; --line:rgba(38,30,24,0.14); }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#181410; --panel:#221c17; --ink:#efe9e2; --ink-dim:#a89e93; --line:rgba(255,255,255,0.1);} }
+  :root[data-theme="dark"]{ --bg:#181410; --panel:#221c17; --ink:#efe9e2; --ink-dim:#a89e93; --line:rgba(255,255,255,0.1); }
+  :root[data-theme="light"]{ --bg:#efeae3; --panel:#ffffff; --ink:#241c17; --ink-dim:#6b6058; --line:rgba(38,30,24,0.14); }
+  *{box-sizing:border-box;}
+  body{ margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; display:flex; justify-content:center; padding:40px; }
+  .wrap{ max-width:520px; display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; }
+  h1{ font-size:20px; margin:0; }
+  p{ color:var(--ink-dim); font-size:14px; max-width:50ch; line-height:1.5; margin:0; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px; }
+  img{ image-rendering:pixelated; width:288px; height:288px;
+    background:repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%) 0 0/16px 16px; border-radius:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Flat Mascot Style — walidacja</h1>
+  <p>64×64. Zakrzywiony czubek kapelusza, falista broda (per-kolumna, nie taper do punktu), pastorał-laska, gestykulująca wolna ręka, wewnętrzny outline (szew kapelusz→twarz, broda→szata), płaskie 2-tonowe cieniowanie, stonowana paleta bez akcentu.</p>
+  <div class="panel"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACz0lEQVR4nO2av4sTQRTHvxErETlk2GKrE+WOE0+wERE5rvAfSFKENMFmq/wDdrYpbbS6QtKki42lSBCxsLEIJORQvCrFsVwhYrsWYc/dzdz+mHnzZkPm02x2Jjvz3ve9mZ3Z3QZqhO+JKHm+PA8bpvu8brqDMsSOHx89uyybfP7C0rdxhfOQOQ6snOeIPmBJgKscB3idBwgESI7bIsPzHAf4nQc05wDfE9Hx/dsAgF1f4N1HRDIHihy3ibLasfMrx0+R/J2liuNlJz+qTNFqJJn+3NGlGi7KQ8D3RPTi+R4ArKIezrDrC+zsHenaVMjrtydkGUC2DpjMLoDZBSAZAtRQTpQkAiTHf9K45BARQlRqMwzDy98m7wzaApwtQ6nzwH/Ds0vcsmzEUvgq57NMPn2o1O6Dh0+07CqL0b1AUeQX8ykAYP/gMPf6Wg8BGbHhvW5LuY3ktcPR2JgQ5AL4noh0HJcRtzccjaUrTR2uUTa2iZAKYCL6pnEZwNVRPONT/1cXNgHancDIf3VhE6DXbZWK7GI+1bp9VoV1DshGtt0JpGWcsD4VjrNg/+AwFWlZGRfsd4F2J8BiPk1FWlbGBbsAvW4L7U6QirSsjAsr6wCZo7YWUEpzgGyXp7rn1+mbYl9QuQHfE9H7Ny+ldc3+gDWSw9FYWwTSuwCH88PROHWu+8xA6aK409RTYfAJIMvAZn+gJILSJMj9+sokG7sbDF6dpI6q1OL7gKo0+4O1o2pWbqQAlENwY4cAFU4A2wbYZusFIJ0Ef/z8lVt/7+4dyu5I2PoMcAJQNfT08aPceqr073VbpFtvlwG2DbCNE8C2AbZxAtg2wDZOANsG2MYJYNsA22y9AGTb4a/fvmvVV8X3BMknc2wPRW/dvLFW9vvP39L1WWr3uXyeQXm7t+V52Ciq17UtD5YMWDmx7mTsXFF9bfE9EXG9Fnc4HA6HAf4Btp4q4ORcUCIAAAAASUVORK5CYII=" /></div>
+</div>
+</body>
+</html>
