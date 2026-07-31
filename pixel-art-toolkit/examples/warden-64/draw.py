@@ -122,7 +122,7 @@ for x0, end in ((24, 45), (29, 43), (34, 46), (38, 42)):
 for y in range(26, 40):
     c.span(y, 19, 23, PLATE_D if y % 5 == 4 else PLATE)
     c.put(19, y, PLATE_HI)
-for y in range(22, 32):
+for y in range(17, 32):
     c.span(y, 41, 45, PLATE_D if y % 5 == 4 else PLATE)
     c.put(41, y, PLATE_HI)
 
@@ -142,23 +142,23 @@ for x0, depth in ((16, 3), (20, 1), (23, 4), (27, 2), (36, 2), (40, 4), (44, 1))
 # Level across both shoulders, behind the neck. Drawn after the mantle so it
 # visibly bears on the shoulders, and before the helm so it passes behind
 # the head.
-for y, tone in ((20, BLADE_HI), (21, BLADE), (22, BLADE_HI), (23, BLADE), (24, BLADE_D)):
+for y, tone in ((12, BLADE_HI), (13, BLADE), (14, BLADE_HI), (15, BLADE), (16, BLADE_D)):
     c.span(y, 5, 44, tone)
-c.spans([(21, 3, 5), (22, 2, 5), (23, 3, 5)], BLADE)     # point
-c.put(2, 22, BLADE_HI)
+c.spans([(13, 3, 5), (14, 2, 5), (15, 3, 5)], BLADE)     # point
+c.put(2, 14, BLADE_HI)
 
 # crossguard: vertical, square to the blade - the whole reason for this pose
-for y in range(15, 29):
+for y in range(7, 22):
     c.span(y, 45, 47, BLADE_D)
     c.put(45, y, BLADE_HI)
 
 # grip and pommel continue past the guard, clear of the shoulder
-for y in range(20, 25):
+for y in range(12, 17):
     c.span(y, 48, 56, LEATHER)
-c.span(24, 48, 56, LEATHER_D)
-c.spans([(19, 57, 60), (20, 57, 61), (21, 57, 61),
-         (22, 57, 61), (23, 57, 61), (24, 57, 60)], BLADE_D)
-c.spans([(20, 57, 58), (21, 57, 58)], BLADE_HI)
+c.span(16, 48, 56, LEATHER_D)
+c.spans([(11, 57, 60), (12, 57, 61), (13, 57, 61),
+         (14, 57, 61), (15, 57, 61), (16, 57, 60)], BLADE_D)
+c.spans([(12, 57, 58), (13, 57, 58)], BLADE_HI)
 
 # =============================================================== wolf helm
 # Drawn over the blade: the sword passes behind the head.
@@ -197,10 +197,10 @@ c.spans([(12, 26, 27), (12, 36, 37)], ACCENT_D)
 c.spans([(21, 27, 36), (22, 28, 35)], PLATE_D)
 
 # ================================================ hand draped over the blade
-c.spans([(17, 39, 44), (18, 39, 44), (19, 39, 44)], PLATE_D)
-for y in range(17, 20):
-    c.put(39, y, PLATE_HI)
-c.put(41, 18, PLATE_DEEP); c.put(43, 18, PLATE_DEEP)
+c.spans([(12, 41, 46), (13, 41, 46), (14, 41, 46), (15, 41, 46)], PLATE_D)
+for y in range(12, 16):
+    c.put(41, y, PLATE_HI)
+c.put(43, 13, PLATE_DEEP); c.put(45, 13, PLATE_DEEP)
 
 c.outline(OUTLINE)
 
