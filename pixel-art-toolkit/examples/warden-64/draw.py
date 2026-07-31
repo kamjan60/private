@@ -1,16 +1,17 @@
-"""64x64 primal warden - black plate, wolf helm, greatsword slung across
-the back.
+"""64x64 primal warden - black plate, wolf helm, greatsword carried
+horizontally across both shoulders.
 
-Two things drive the construction:
+Pose note: an earlier pass slung the sword diagonally down the back. That
+forces the crossguard to sit at an angle to match the blade, and any guard
+drawn as a level bar then reads as broken off-axis. Carrying the sword
+level across the shoulders removes the problem instead of solving it - the
+blade is horizontal, so the guard is simply vertical and everything is
+square to everything else. It also gives a far stronger silhouette: the
+weapon spans nearly the full canvas and breaks the outline on both sides.
 
-* The sword is drawn *first*, so the torso and legs occlude its middle
-  run. Only the hilt above the right shoulder and the blade emerging past
-  the left hip stay visible, which is what actually reads as "carried on
-  the back" - a fully visible blade just looks held out behind.
-* Black armour cannot be painted black. At near-zero value there is no
-  room left to shade, so the plate sits at a dark slate and the *outline*
-  is the true black; the silhouette still reads, and cool rim light does
-  the modelling.
+Black armour cannot be painted black. At near-zero value there is no room
+left to shade, so the plate sits at a dark slate, the outline carries the
+true black, and cool rim light does the modelling.
 
 One saturated accent, as with the other sprites: ember amber, in the
 wolf's eyes and nowhere else.
@@ -74,22 +75,6 @@ class Canvas:
 
 c = Canvas()
 
-# ============================================================== greatsword
-# Drawn before the body so the torso occludes its middle run.
-# Blade descends from the guard down-left across the back.
-# The angle matters more than the length: shallow, and the whole blade
-# hides behind the torso; steep, and it emerges clear of the left hip.
-for y in range(22, 58):
-    x0 = int(42 - (y - 22) * 0.85)
-    c.span(y, x0, x0 + 5, BLADE)
-    c.put(x0, y, BLADE_HI)                 # lit long edge
-    c.put(x0 + 5, y, BLADE_D)
-    c.put(x0 + 2, y, BLADE_HI)             # fuller down the centre
-c.spans([(58, 9, 12), (59, 10, 11)], BLADE_D)   # tip
-# NOTE: only the blade goes behind the body. The hilt is drawn near the end
-# of this file, on top of everything, because it stands clear above the
-# shoulder - buried under the fur mantle it read as a shapeless lump.
-
 # ==================================================================== legs
 for y in range(45, 57):
     tone = PLATE_D if y % 5 == 4 else PLATE
@@ -131,34 +116,52 @@ for x0, end in ((24, 45), (29, 43), (34, 46), (38, 42)):
         c.span(y, x0, x0 + 3, LEATHER if y % 4 != 3 else LEATHER_D)
     c.span(end - 1, x0, x0 + 3, LEATHER_D)
 
+# ==================================================================== arms
+# Left arm hangs; the right forearm comes up so the hand can rest over the
+# blade lying on the shoulder.
+for y in range(26, 40):
+    c.span(y, 19, 23, PLATE_D if y % 5 == 4 else PLATE)
+    c.put(19, y, PLATE_HI)
+for y in range(22, 32):
+    c.span(y, 41, 45, PLATE_D if y % 5 == 4 else PLATE)
+    c.put(41, y, PLATE_HI)
+
 # ============================================================= fur mantle
-# Ragged lower edge - the silhouette break that separates this from the
-# clean plate knight.
 FUR_ROWS = [
-    (21, 18, 46), (22, 16, 47), (23, 15, 48), (24, 15, 48),
+    (22, 18, 46), (23, 16, 47), (24, 15, 48),
     (25, 15, 48), (26, 16, 47),
 ]
 c.spans(FUR_ROWS, FUR)
-c.spans([(21, 18, 21), (22, 16, 20), (23, 15, 19), (24, 15, 18)], FUR_HI)
+c.spans([(22, 18, 21), (23, 16, 20), (24, 15, 19)], FUR_HI)
 c.spans([(24, 43, 48), (25, 42, 48), (26, 41, 47)], FUR_D)
-# ragged tufts hanging off the bottom, uneven lengths
 for x0, depth in ((16, 3), (20, 1), (23, 4), (27, 2), (36, 2), (40, 4), (44, 1)):
     for d in range(depth):
         c.span(27 + d, x0, x0 + 2, FUR_D if d else FUR)
 
-# ==================================================================== arms
-for y in range(26, 40):
-    c.span(y, 19, 23, PLATE_D if y % 5 == 4 else PLATE)
-    c.put(19, y, PLATE_HI)
-# right arm is raised, reaching back over the shoulder for the grip
-for y in range(18, 31):
-    x0 = 41 + (30 - y) // 4
-    c.span(y, x0, x0 + 4, PLATE_D if y % 5 == 4 else PLATE)
-    c.put(x0, y, PLATE_HI)
+# =============================================================== greatsword
+# Level across both shoulders, behind the neck. Drawn after the mantle so it
+# visibly bears on the shoulders, and before the helm so it passes behind
+# the head.
+for y, tone in ((20, BLADE_HI), (21, BLADE), (22, BLADE_HI), (23, BLADE), (24, BLADE_D)):
+    c.span(y, 5, 44, tone)
+c.spans([(21, 3, 5), (22, 2, 5), (23, 3, 5)], BLADE)     # point
+c.put(2, 22, BLADE_HI)
+
+# crossguard: vertical, square to the blade - the whole reason for this pose
+for y in range(15, 29):
+    c.span(y, 45, 47, BLADE_D)
+    c.put(45, y, BLADE_HI)
+
+# grip and pommel continue past the guard, clear of the shoulder
+for y in range(20, 25):
+    c.span(y, 48, 56, LEATHER)
+c.span(24, 48, 56, LEATHER_D)
+c.spans([(19, 57, 60), (20, 57, 61), (21, 57, 61),
+         (22, 57, 61), (23, 57, 61), (24, 57, 60)], BLADE_D)
+c.spans([(20, 57, 58), (21, 57, 58)], BLADE_HI)
 
 # =============================================================== wolf helm
-# Ears on top, muzzle pushed forward and down, eyes the only saturated
-# colour on the whole sprite.
+# Drawn over the blade: the sword passes behind the head.
 c.spans([(3, 23, 25), (4, 23, 26), (5, 23, 27), (6, 23, 28)], PLATE)
 c.spans([(3, 38, 40), (4, 37, 40), (5, 36, 40), (6, 35, 40)], PLATE)
 c.spans([(4, 24, 25), (5, 24, 26), (6, 24, 27)], PLATE_D)   # inner ear
@@ -183,7 +186,6 @@ c.spans(MUZZLE, PLATE_D)
 c.spans([(15, 27, 28), (16, 27, 28), (17, 27, 28)], PLATE)
 c.spans([(19, 29, 34), (20, 29, 34)], VOID)                 # muzzle shadow / mouth
 c.spans([(19, 29, 30), (19, 33, 34)], BONE)                 # fangs
-c.put(31, 21, VOID); c.put(32, 21, VOID)
 
 # brow ridge over the eyes, then the ember glow
 c.spans([(10, 24, 29), (10, 34, 39)], PLATE_DEEP)
@@ -194,26 +196,11 @@ c.spans([(12, 26, 27), (12, 36, 37)], ACCENT_D)
 # gorget filling the neck gap so the helm does not float
 c.spans([(21, 27, 36), (22, 28, 35)], PLATE_D)
 
-# ====================================== hilt, on top of everything else
-# crossguard - long and straight, the giveaway that this is a two-hander
-# Steel tones, not plate tones: against black armour a dark guard vanishes
-# into the arm behind it.
-c.spans([(19, 37, 55), (20, 38, 54)], BLADE_D)
-c.spans([(19, 37, 39), (19, 52, 55)], BLADE_HI)
-
-# grip, long enough for two hands
-for y in range(12, 19):
-    c.span(y, 44, 47, LEATHER)
-    c.put(44, y, LEATHER_D)
-# pommel
-c.spans([(9, 43, 48), (10, 43, 48), (11, 44, 47)], PLATE_D)
-c.spans([(9, 43, 44)], PLATE_HI)
-
-# ================================================ hand closed on the grip
-c.spans([(13, 42, 49), (14, 42, 49), (15, 42, 49), (16, 43, 49)], PLATE_D)
-for y in range(13, 17):
-    c.put(42, y, PLATE_HI)
-c.spans([(14, 45, 46)], PLATE_DEEP)
+# ================================================ hand draped over the blade
+c.spans([(17, 39, 44), (18, 39, 44), (19, 39, 44)], PLATE_D)
+for y in range(17, 20):
+    c.put(39, y, PLATE_HI)
+c.put(41, 18, PLATE_DEEP); c.put(43, 18, PLATE_DEEP)
 
 c.outline(OUTLINE)
 
