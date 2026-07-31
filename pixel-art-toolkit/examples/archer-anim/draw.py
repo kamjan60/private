@@ -299,9 +299,22 @@ sheet.save(os.path.join(OUT, "archer_sheet.png"))
 sheet.resize((sheet.width * SCALE, sheet.height * SCALE), Image.NEAREST).save(
     os.path.join(OUT, "archer_sheet_preview.png"))
 
-# walk-cycle GIF, front facing, at classic pixel-art speed
-frames = [build("front", "walk", s).resize((SIZE * 4, SIZE * 4), Image.NEAREST)
-          for s in (0, 1, 2, 1)]
-frames[0].save(os.path.join(OUT, "walk_down.gif"), save_all=True,
-               append_images=frames[1:], duration=120, loop=0, disposal=2)
+# Walk-only sheet: 4 rows, 3 columns. Easier to read than the combined
+# sheet when checking the cycle itself.
+walk_sheet = Image.new("RGBA", (SIZE * 3, SIZE * 4), (0, 0, 0, 0))
+for r, facing in enumerate(ROWS):
+    for step in range(3):
+        f = build(facing, "walk", step)
+        walk_sheet.paste(f, (step * SIZE, r * SIZE), f)
+walk_sheet.save(os.path.join(OUT, "walk_sheet.png"))
+walk_sheet.resize((walk_sheet.width * SCALE, walk_sheet.height * SCALE),
+                  Image.NEAREST).save(os.path.join(OUT, "walk_sheet_preview.png"))
+
+# One GIF per direction. Frame order 0-1-2-1 so the passing pose is hit on
+# both halves of the stride instead of the cycle snapping back.
+for facing in ROWS:
+    frames = [build(facing, "walk", s).resize((SIZE * 4, SIZE * 4), Image.NEAREST)
+              for s in (0, 1, 2, 1)]
+    frames[0].save(os.path.join(OUT, f"walk_{LABEL[facing]}.gif"), save_all=True,
+                   append_images=frames[1:], duration=120, loop=0, disposal=2)
 print("done")
