@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Classic Wizards — 16×32 &amp; 32×64</title>
+<style>
+  :root{
+    --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+           --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+  }
+  :root[data-theme="dark"]{ --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c; }
+  :root[data-theme="light"]{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+    --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:radial-gradient(ellipse 80% 55% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:920px; display:flex; flex-direction:column; gap:24px; }
+  header h1{ font-size:clamp(22px,3vw,28px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:70ch; line-height:1.5; }
+
+  .grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px; display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .card img{ image-rendering:pixelated; image-rendering:crisp-edges;
+    background:repeating-conic-gradient(#00000018 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:6px;
+  }
+  .card img.small{ width:96px; height:192px; }
+  .card img.large{ width:128px; height:256px; }
+  .card h2{ font-size:14px; margin:0; letter-spacing:0.02em; text-align:center; }
+  .size-label{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Classic Wizards — 16×32 &amp; 32×64</h1>
+    <p>4 warianty tego samego archetypu (stary dziad, długa broda, długie włosy) — różni się kapelusz, paleta, laska. Ten sam layout renderowany w dwóch rozdzielczościach z jednego skalowalnego generatora (parametr U w pixel_lib-based draw.py).</p>
+  </header>
+
+  <div>
+    <p class="size-label">16×32</p>
+    <div class="grid">
+      <div class="card"><img class="small" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAgCAYAAAAbifjMAAABlElEQVR4nO2VP0vDUBTFfykdEgjRoUgR2oiDQ8AOUksncVNEHLr4BbSTOHTyI3RyKE7qLLh0EAfdpFMRpw6Ci2gVKaVDW4LNIMShJKTpe6l2cvAsuTnvnvPuH0gUJNA1w03OpAFo9ZrYg74iyhOSuma4GTM7wjVeH4QmI4SuGS5AWBw0AUaM/EDXDHdrtcB7uykUy6oZq+BgdzFSfHL5LK4g2II3vDBavWZ0Cze3VQCct4bQQE1lANjcKPgmMVmp+rIqjMOIyw6+ukuoKS8GGK3Ka1do4JVar98DkM/nfA5gbn+d7N4aD+c1eQVRaJ/d0ak90n5qD2ega4ZrmTlKxfJEcalYxjJz/nvMEwcTosRhSLcwCbazMDQI3h51k4izzBzxVufjRzfK8uLJxPwYeXx6BMCL0wUgD1xUK7+bQTA5arBKOmG5ssOdw20ArirXUgNhC2FE5Uy9Rr+C6C2sAPINwH8L8BdaUNIJy7WdLro6yzRPxfs4etA1w4/tQV/K+S0EfxJhMxmCmrGP6qdjjwlEnIdvOBmwGMlWwmUAAAAASUVORK5CYII=" /><h2>Elder Sorcerer</h2></div>
+      <div class="card"><img class="small" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAgCAYAAAAbifjMAAABeklEQVR4nO1VP0vDQBx9KR08OW7ooCIhiIMUXIxKEHHIIA7FoYPUL9DdguKHEITi7CcQR3FyFpFYXFycpBSpS4c2tKVDz0FyvVwu19jJwbfk7t3vvd+fg5wFDShhfH5xJcb1vz4QDrqWGhsjKGEcAJbXd3S++Hx7AoCYkZVFaDKyKGE8q1BnFKvg4rKeSXh+WptUIB/ohqdCHaZYUML448srAKD5fK8VO14JALC7tSFMcqmZ9o61azmh0aA46sHxSnC8EoqjXuJ87eQKlDCuNYhKDYIGgqAR4yIclMswVjANjTN/YkAJ47bro1KtTRVWqjXYri/2uUgsB5jEKmZuoTl2fgzk7KZMOs52feQ77VamjGlx+cKSnSBvrusAgPdwDADYBvBwd/u7GcjBpsFqW9g/PIrtO+1WghMGuhZUmGJmvkZRQZZbMMX8t/AXWrAWVjf5sNvBHCtglq8V/V0jUMLEOhx0UznRgvxIqGZpkDV59bA/DBMCHRfhG70iqi3uE2gjAAAAAElFTkSuQmCC" /><h2>Storm Warden</h2></div>
+      <div class="card"><img class="small" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAgCAYAAAAbifjMAAABKklEQVR4nO2Vv0rDUBTGf7lkMBAuEjIUJ+kDpESkYyeR4iOEDn00B/ERikinjqEIdnDuICVjCMF2i4PeS5rcpDGb0G/JOV/Od/7d4cC/h1V2XEcWXUT5PtM6bbiOLDbvrwDs3lZG4dXNBIBgdK+TiKYqm+tPo12F3fRj6kXg/VYGdltzV8YOVKtxvCaO10ecgtpX4winMBl5uI4shMoWhD6zeXRSOJtHBKGvfaHE5YA2cRW9R0jFj1SUq7dVMnFB6GMnSdqpYlOcPRhc1sinx2cAPrYLAMbjW5Yvi7/toBzctljjCHfThyM/SdIapxOYRqiiLab3M+oOurxCW8x5hPMIANZw6BVZdkDKC/p8reo1ch2p7XyfNXIKdvlM9TlttcPydchrAhOn8A2o4YC6wFTbsQAAAABJRU5ErkJggg==" /><h2>Hermit Druid</h2></div>
+      <div class="card"><img class="small" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAgCAYAAAAbifjMAAABfklEQVR4nO2VP0vDUBTFf2lLMRCiDYIdiqNDKRJ1qGRzdpHuXfwM/Q4ufgYXFyepgouLmyj0TyiOjh0KStESbCnYONTU9OW9pHZy8Cx5ue+ec899F97TSIChm34+naL3OcEbDjRxPxNHBLBX1wDIAy74okhEUSSKcN/f5pzMCRi66auIKpFIC5vZePL1S4IDgHw6JSX3PicAcgFDN/37uxsAuk+PUoFCqQyAc3A4E5GXAuznunQtulWO8fXohEKwLpVBcOXubWM3O77UQWC10WrTaLXnYgE5gNJBHOxmh60NE/g+A0M3fSdnUatUE8m1ShUnZ83+UwE5nBBHFqGcQhLWx9PuU+HqcZVkMSdnkel6g4UqqvIyBcOMBE8vzwHo1+vTwO4OF7dXvzuDcHLcwWpF0/JVm8f7NgBnD65SQNqCiLicpcc4c7DIFOJy/lv4Cy1oRdPy++MRVnaFZb5acLsGMPSffr3hQBmbtRB+JEQxFcKcyKX6MfIiBFkswBcGPaecAEFhTwAAAABJRU5ErkJggg==" /><h2>Blood Magus</h2></div>
+    </div>
+  </div>
+
+  <div>
+    <p class="size-label">32×64</p>
+    <div class="grid">
+      <div class="card"><img class="large" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAAChUlEQVR4nO1ZMUgcQRT9K1fcwrCmOESEnGKTcBAL0cMqRRAUyysURFIESRUsUgS7xE4sLMRKJJVIFLE2KSSkkkMsFAQb8YwEkRR6LNxVTopllpvvzs6fOXU17muOP/fmz/tv/9+DOQcswFyPt7fmpbXzq1Pwa1XHNJfxBuZ6PO57UxFGZOZ6vKezL5azX9k1EkEm6irHoIogkSiVY1CdUBJMK9ZBJSZykbkeH+kvAQDA2cXprQhQOfIwHWgU8WGsu6mDF9eOY3tB2yTNOqFrRPIU4DefDtQ348PsAeZ6fOv7prRW/71vdGD2eY8UDw+VHtEUxDnAXmWDhAd1eQ9a/38dwJVhqHiJO6AC2QGMnZ2yFA8MFGP5bzcWAACgb/I1AADsLv9SCxAi4hJ+mZmW48+zsQJUuDcHhoeCX9fiizYoH12E/ZCJOrxxgwrYAR1fBUkAcz1e6JQrmV+SDxLADqgc+/geP5oTKQofgWnX2/YAfgSOOBxXjoGd0PXAzcoDsOwJ+PUuOKyUwa9VnafngEDogKhcJwBj9N0bKV7/um20/7ASFOAUXw4aWS+cUDmgqxzDWIBAsw6EAvK5gpGA1c3gna5yYLw0dbcCBKY+TUjxwtyKTRrItOc6SEQ8Bd9+/pBi4YwAtRese6A43ivF5dU9mzTQQiXOL00rfxdseAKJO5A5//vHaiOALMA2D/kR3BXIU6CDbZ7EHUgFpFOQTkEqIJ2CdApSAekUOPlcgfv1S2DZZ5DEp3Nf94EC4n4gdCCOzFyPM9eL/M6vVcNLBipPcBtj639M8LUrlYdx45oOJ1VVBgCc4kAjLwqJO6DtgRYnelKv+bXUAxSesQCRPGr9thz4B6tzlvp+RfyqAAAAAElFTkSuQmCC" /><h2>Elder Sorcerer</h2></div>
+      <div class="card"><img class="large" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAACpklEQVR4nO1ZMWgTURj+LmTwynFDhypSgmQQwSUmRSQ4KDgVkQ5Sl+Iggg5SC0IHJ0cpCLE4KBQHKYKlg4M4FcxQikhqXVwcRI4gunQIpXXKc9D/yHt5797/LmcT4b4l/H++e+/7v/z/S3LnwQGBH4qxoycSOfs/v2HvoONx12QTAz8UXC4AtggWKfBDcfz0OZf98f3ze5YII8G1YhtMYrTJNBXbYHIkTmRdsQ0kxqPNs67YBnJkNBxQEfihWHrUyHTDxXsLyT2gE5GlAKcp6BVhO/lssJ2Mo+lA4Idia/uTlIs+vHXasHR2Worrtcp/1ANJDuyfvwYAGNt8Jb2v5kfWAVrXeg6YHFArU2Hi1WsVAMDJu8sAgC+P5+WTUCcicSdHDOyAilbroxRPTVUT+eTAnXcRAODJxdJgDiw/ey7F87duJAowOVA0be7qgI1fr1XEn9cytra/xvk+AaSQLDNBdcDGN0ESEPihmDxzQSKsrTS0F3IdmL25oGQivQCqvL3TlAimytI6UKqVpThuDLVyFaoTtinor/yvgEKEqFtCe6c52C8i1ykgUBP2/SY8LAcIsQNUuU2AisXb16V46ekLp+up17xT9StO1pMTJgdslatwFkAY1IFYwES56iRg4806ALMDly5fdRKgPYqTQBs8fHBfm3dFcfzYJIuoTsHLZkuKyRkCtxdS98DM3JwUv15dTbMMClzi2krD+L2Qhkdg9wDXUtcxLO7+aDtdYELaddgfwb8CewpsSLvO0B3IBeRTkE9BLiCfgnwKcgH5FHgT5ar41dnFkXAcw3j1DvtJiXqTyvq8IPBD7Xt7Bx3p1huHR9ze2Ppg0eSQeuOZy1OR+MckqTIAguNAL0+HoTtg7YGCp5/UruhKPcDhOQugxXX5rBz4Df84pTwCFGr6AAAAAElFTkSuQmCC" /><h2>Storm Warden</h2></div>
+      <div class="card"><img class="large" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAACHklEQVR4nO1YMUvDQBj9UjoYCKEEhyIOkskpQZEOHTqVIv0J4uCgi4ODo2OHjg4OLjp0KB38AUXEqWMRSzM5Ooh0KFJCoU6Jg17sXe8udzEaKveWcnfv7t73+r0WDkBBQSFjaKwFQzfDNC+aznzqXdRJQzdDb3iHzb0+9qQuXNuuYGPHrVFFLJ8D3sYLAAA4z+vYOjn/fx0gKyPB4i2/AyT6/QdsXCrtcPmpO3B91cTGh0dnXAHockM3w3khedblsg7E8R23FgIAVFwLekOIRCwIQJU7bo17IOlAHJ8FTIChm6GztYoR2q0OdaOoA/sHe/hEENAFoMq9wRgjsCpL6kDFtbBx1Bhk5SRIJ+JSsFD5FwpBAJNcDrzBGKYzX4u6UTb3silA+GzCtygVf+4AQuRA1PUxAkicHJ9i44vLc6n9qNe0ctmWsh45wXIgrnIS0gIQfupAJMC2LSkB97ddAGA7UN2tSwmg/hTzgC5oNhrUeVnki8WCEJFMQesGF4CcQRDthcQ9UK1v4gK6T0mOgZwosd3qMP8XkvAQMncgPxpNEm0kkfQc4a/gtyCcgjgkPSdzB5QAlQKVAiVApUClQAlQKVApUAI027ZC338H01yBLD61tN+E44DeiCIHeGRDN0NDN6lr05mPPb+K8BB3fswVgDYwDtaS8EhwHyh4lQF8v/eK8mjI3IHYHshp9KQGYYD1gAhPWgA6nDaflgMf55BfbmhTS1wAAAAASUVORK5CYII=" /><h2>Hermit Druid</h2></div>
+      <div class="card"><img class="large" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAACiElEQVR4nO2ZPWsUURSG34lLcGS4xkVRJIWIWIQg6wcI26XZJqBilca/YKFbKARNkcJitfAvpEkVYiBNGrsFIdFBUolYpVAMGxkWVkLcsTrD3uO9cz92N6M4bxPO7Ll33vPMObObmQAjUBSK9MKJCQDA1199dHtJYLvWOjHv5KrjtiYqw568dnpK+VkMpDYmnAnoKtbJZMKJQF7FOsUGEkYCrhXrpDORS8CnYp1iDYnCCeQaiEKR3jk3NdSJN77/yG3EsRMwTYHVGA7e6Wxle0fUJozq2pOceiAKRdp+uykd29t953TC6dnbUlyfm1ea+PcI1D6vAwDiK/ekz/nxv5YA7UuxMwFeGZcurz43DwCIb14DANR2PqLbS4JjI8DlTIBr+/0HKb5143pu/qnmUykemsDrl8tS/PDxYq4BrmMnQD1w9bzAp29JZuCPr2OqnBboxAmY8nWSDEShSOtnqlJCa21FuZAT0BFr3n8gxfs4kuLsErh2vW8P8EuQ3Rx45VychKkHeOWk/ckjnD2soH3QkafgvyFAyghkXW8wwLWw+EiKV5dfOa1vH3QAAEHj4iUn9ERCR8BUOZezAdKwBDIDM6LqZGB16w0APYGFxt3xGiA1XyxJcevJkjLPpMp0JKwS+RRsPXsuxUSGZNsL3j3QmL0sG9r94rMNrH/st9ZWtN8LPnmkwglU9rqJ10Iu333c/t8ag6ynwCTffQonUBoop6CcgtJAOQXlFJQGyikIZkQ17Rz+RHXyJIr4G4z7eSAXPR/ICOQlR6FIo1A9391eIj1+tcmj3MHY+40Jf/Ds+wbV+NZMVxkG3oLZ5qlUOAFjD0wE6kntp32pB2zynA3Q5qrjoyLwG7ghn4TVDq8iAAAAAElFTkSuQmCC" /><h2>Blood Magus</h2></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
