@@ -122,43 +122,45 @@ for x0, end in ((24, 45), (29, 43), (34, 46), (38, 42)):
 for y in range(26, 40):
     c.span(y, 19, 23, PLATE_D if y % 5 == 4 else PLATE)
     c.put(19, y, PLATE_HI)
-for y in range(17, 32):
-    c.span(y, 41, 45, PLATE_D if y % 5 == 4 else PLATE)
-    c.put(41, y, PLATE_HI)
+# right arm runs up on the diagonal so the hand can sit on the crossguard
+for y in range(22, 32):
+    x0 = 46 - (y - 22) * 5 // 9
+    c.span(y, x0, x0 + 3, PLATE_D if y % 5 == 4 else PLATE)
+    c.put(x0, y, PLATE_HI)
 
 # ============================================================= fur mantle
 FUR_ROWS = [
-    (22, 18, 46), (23, 16, 47), (24, 15, 48),
-    (25, 15, 48), (26, 16, 47),
+    (25, 18, 46), (26, 16, 47), (27, 15, 48),
+    (28, 15, 48), (29, 16, 47),
 ]
 c.spans(FUR_ROWS, FUR)
-c.spans([(22, 18, 21), (23, 16, 20), (24, 15, 19)], FUR_HI)
-c.spans([(24, 43, 48), (25, 42, 48), (26, 41, 47)], FUR_D)
+c.spans([(25, 18, 21), (26, 16, 20), (27, 15, 19)], FUR_HI)
+c.spans([(27, 43, 48), (28, 42, 48), (29, 41, 47)], FUR_D)
 for x0, depth in ((16, 3), (20, 1), (23, 4), (27, 2), (36, 2), (40, 4), (44, 1)):
     for d in range(depth):
-        c.span(27 + d, x0, x0 + 2, FUR_D if d else FUR)
+        c.span(30 + d, x0, x0 + 2, FUR_D if d else FUR)
 
 # =============================================================== greatsword
 # Level across both shoulders, behind the neck. Drawn after the mantle so it
 # visibly bears on the shoulders, and before the helm so it passes behind
 # the head.
-for y, tone in ((12, BLADE_HI), (13, BLADE), (14, BLADE_HI), (15, BLADE), (16, BLADE_D)):
+for y, tone in ((21, BLADE_HI), (22, BLADE), (23, BLADE_HI), (24, BLADE), (25, BLADE_D)):
     c.span(y, 5, 44, tone)
-c.spans([(13, 3, 5), (14, 2, 5), (15, 3, 5)], BLADE)     # point
-c.put(2, 14, BLADE_HI)
+c.spans([(22, 3, 5), (23, 2, 5), (24, 3, 5)], BLADE)     # point
+c.put(2, 23, BLADE_HI)
 
 # crossguard: vertical, square to the blade - the whole reason for this pose
-for y in range(7, 22):
+for y in range(16, 31):
     c.span(y, 45, 47, BLADE_D)
     c.put(45, y, BLADE_HI)
 
 # grip and pommel continue past the guard, clear of the shoulder
-for y in range(12, 17):
+for y in range(21, 26):
     c.span(y, 48, 56, LEATHER)
-c.span(16, 48, 56, LEATHER_D)
-c.spans([(11, 57, 60), (12, 57, 61), (13, 57, 61),
-         (14, 57, 61), (15, 57, 61), (16, 57, 60)], BLADE_D)
-c.spans([(12, 57, 58), (13, 57, 58)], BLADE_HI)
+c.span(25, 48, 56, LEATHER_D)
+c.spans([(20, 57, 60), (21, 57, 61), (22, 57, 61),
+         (23, 57, 61), (24, 57, 61), (25, 57, 60)], BLADE_D)
+c.spans([(21, 57, 58), (22, 57, 58)], BLADE_HI)
 
 # =============================================================== wolf helm
 # Drawn over the blade: the sword passes behind the head.
@@ -193,14 +195,21 @@ c.spans([(11, 25, 28), (11, 35, 38)], ACCENT_D)
 c.spans([(11, 26, 27), (11, 36, 37)], ACCENT)
 c.spans([(12, 26, 27), (12, 36, 37)], ACCENT_D)
 
-# gorget filling the neck gap so the helm does not float
-c.spans([(21, 27, 36), (22, 28, 35)], PLATE_D)
+# Gorget: this is what makes the sword read as being *behind* the warden
+# rather than laid across his chest. The blade sits at shoulder height, so
+# the head never covers it - the neck does, and it has to run the full
+# depth of the blade to do that.
+for y in range(21, 27):
+    c.span(y, 27, 36, PLATE_D)
+    c.put(27, y, PLATE)
+    c.put(36, y, PLATE_DEEP)
 
-# ================================================ hand draped over the blade
-c.spans([(12, 41, 46), (13, 41, 46), (14, 41, 46), (15, 41, 46)], PLATE_D)
-for y in range(12, 16):
-    c.put(41, y, PLATE_HI)
-c.put(43, 13, PLATE_DEEP); c.put(45, 13, PLATE_DEEP)
+# ================================================ hand closed on the crossguard
+# Set on the diagonal, following the forearm, so it reads as a grip rather
+# than a block parked next to the guard.
+c.spans([(19, 44, 49), (20, 43, 49), (21, 43, 48), (22, 42, 48)], PLATE_D)
+c.put(44, 19, PLATE_HI); c.put(43, 20, PLATE_HI); c.put(43, 21, PLATE_HI)
+c.put(46, 20, PLATE_DEEP); c.put(46, 22, PLATE_DEEP)
 
 c.outline(OUTLINE)
 
