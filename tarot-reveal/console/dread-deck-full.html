@@ -446,6 +446,27 @@
   footer button:hover{ background:var(--crimson); color:var(--parchment); border-color:var(--crimson); }
 
   @media (prefers-reduced-motion: reduce){ .card, .coin-inner{transition:none;} }
+
+  /* In-page stand-in for window.confirm/alert: some embedding contexts (OBS Browser
+     Source, sandboxed previews) silently block native dialogs, so a click on Victory
+     Draw etc. would appear to do nothing. This renders the same prompt in-DOM instead. */
+  .cd-modal-overlay{
+    position:fixed; inset:0; background:rgba(6,4,8,0.72); display:flex; align-items:center;
+    justify-content:center; z-index:1000; padding:20px;
+  }
+  .cd-modal-box{
+    max-width:420px; width:100%; background:var(--glass-strong); border:1px solid var(--line);
+    border-radius:14px; padding:22px 24px; box-shadow:var(--shadow);
+  }
+  .cd-modal-msg{ margin:0 0 18px; font-size:15px; line-height:1.45; color:var(--parchment); }
+  .cd-modal-btns{ display:flex; justify-content:flex-end; gap:10px; }
+  .cd-modal-btn{
+    appearance:none; border:1px solid var(--line); background:transparent; color:var(--parchment-dim);
+    font:inherit; font-size:14px; letter-spacing:0.02em; padding:9px 18px; border-radius:8px; cursor:pointer;
+  }
+  .cd-modal-btn:hover, .cd-modal-btn:focus-visible{ border-color:var(--violet); color:var(--parchment); outline:none; }
+  .cd-modal-btn.cd-modal-ok{ border-color:var(--gold-soft); color:var(--gold); }
+  .cd-modal-btn.cd-modal-ok:hover, .cd-modal-btn.cd-modal-ok:focus-visible{ border-color:var(--gold); }
 </style>
 </head>
 <body>
@@ -583,6 +604,56 @@
 (function(){
   "use strict";
 
+  // Native confirm()/alert() are blocked (silently, no dialog, no error) in some
+  // embedding contexts — OBS Browser Source, sandboxed previews. Every call site
+  // below goes through these instead so the console keeps working there.
+  function showModal(message, opts){
+    opts = opts || {};
+    var overlay = document.createElement("div");
+    overlay.className = "cd-modal-overlay";
+    var box = document.createElement("div");
+    box.className = "cd-modal-box";
+    var p = document.createElement("p");
+    p.className = "cd-modal-msg";
+    p.textContent = message;
+    box.appendChild(p);
+    var btnRow = document.createElement("div");
+    btnRow.className = "cd-modal-btns";
+
+    function close(){
+      overlay.remove();
+      document.removeEventListener("keydown", onKey);
+    }
+    function onKey(e){
+      if (e.key === "Escape"){ close(); if (opts.onCancel) opts.onCancel(); }
+    }
+
+    if (opts.cancelText){
+      var cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "cd-modal-btn cd-modal-cancel";
+      cancelBtn.textContent = opts.cancelText;
+      cancelBtn.addEventListener("click", function(){ close(); if (opts.onCancel) opts.onCancel(); });
+      btnRow.appendChild(cancelBtn);
+    }
+    var okBtn = document.createElement("button");
+    okBtn.type = "button";
+    okBtn.className = "cd-modal-btn cd-modal-ok";
+    okBtn.textContent = opts.okText || "OK";
+    okBtn.addEventListener("click", function(){ close(); if (opts.onConfirm) opts.onConfirm(); });
+    btnRow.appendChild(okBtn);
+
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    document.addEventListener("keydown", onKey);
+    okBtn.focus();
+  }
+  function customAlert(message){ showModal(message, {okText:"OK"}); }
+  function customConfirm(message, onConfirm, onCancel){
+    showModal(message, {okText:"Confirm", cancelText:"Cancel", onConfirm:onConfirm, onCancel:onCancel});
+  }
+
   // Card text follows docs/superpowers/specs/2026-07-29-dread-deck-system-effects-design.md
   // — every Curse acts on the system (display, audio, input, body) or on the deck's
   // own economy, never on an in-game verb, so the same deck runs on any game.
@@ -658,15 +729,16 @@
   var deckGrid = document.getElementById("deck-grid");
 
   function removeCustomCard(n, name){
-    if (!confirm('Remove custom card "'+name+'"? It leaves the draw pool — anything already banked or on the map stays put.')) return;
-    var idx1 = CARDS.findIndex(function(x){ return x.n === n; });
-    if (idx1 >= 0) CARDS.splice(idx1, 1);
-    var idx2 = ALL_CARDS.findIndex(function(x){ return x.n === n; });
-    if (idx2 >= 0) ALL_CARDS.splice(idx2, 1);
-    var idx3 = customData.cards.findIndex(function(x){ return x.n === n; });
-    if (idx3 >= 0) customData.cards.splice(idx3, 1);
-    saveCustomCards();
-    renderLedger();
+    customConfirm('Remove custom card "'+name+'"? It leaves the draw pool — anything already banked or on the map stays put.', function(){
+      var idx1 = CARDS.findIndex(function(x){ return x.n === n; });
+      if (idx1 >= 0) CARDS.splice(idx1, 1);
+      var idx2 = ALL_CARDS.findIndex(function(x){ return x.n === n; });
+      if (idx2 >= 0) ALL_CARDS.splice(idx2, 1);
+      var idx3 = customData.cards.findIndex(function(x){ return x.n === n; });
+      if (idx3 >= 0) customData.cards.splice(idx3, 1);
+      saveCustomCards();
+      renderLedger();
+    });
   }
 
   var customCardPopupEl = null;
@@ -715,7 +787,7 @@
     pop.querySelector(".deck-assign-close").addEventListener("click", closeCustomCardPopup);
     pop.querySelector("#btn-save-custom").addEventListener("click", function(){
       var name = pop.querySelector("#custom-card-name").value.trim();
-      if (!name){ alert("Give the card a name first."); return; }
+      if (!name){ customAlert("Give the card a name first."); return; }
       var card = {
         n: 100 + customData.counter,
         name: name,
@@ -1351,7 +1423,7 @@
   }
 
   function runVictoryDraw(){
-    if (pendingLives === 0 && !confirm("Lives are set to 0 — sure this is a Victory Draw?")) return;
+    function proceed(){
     var pool = poolNumbers();
     if (pool.length < 1) return;
     var picks = shuffle(pool).slice(0, Math.min(victoryCount, pool.length));
@@ -1423,10 +1495,16 @@
         buttonsEnabled(poolNumbers().length > 0);
       });
     });
+    }
+    if (pendingLives === 0){
+      customConfirm("Lives are set to 0 — sure this is a Victory Draw?", proceed);
+    } else {
+      proceed();
+    }
   }
 
   function runDeathDraw(){
-    if (pendingLives > 0 && !confirm("Lives are set to "+pendingLives+" — sure this is a Death Draw?")) return;
+    function proceed(){
     var pool = poolNumbers();
     if (pool.length < 1) return;
     var picks = shuffle(pool).slice(0, Math.min(deathCount, pool.length));
@@ -1482,12 +1560,18 @@
         }, 150 + idx * 120);
       });
     });
+    }
+    if (pendingLives > 0){
+      customConfirm("Lives are set to "+pendingLives+" — sure this is a Death Draw?", proceed);
+    } else {
+      proceed();
+    }
   }
 
   function runWorldReveal(){
     var lastRegular = FLOORS[FLOORS.length - 2];
     if (mapState.active !== lastRegular.key){
-      alert("Reveal The World is available once you're on "+lastRegular.label+" — the floor right before the Boss Floor.");
+      customAlert("Reveal The World is available once you're on "+lastRegular.label+" — the floor right before the Boss Floor.");
       return;
     }
     btnWorld.disabled = true;
@@ -1658,8 +1742,9 @@
   btnCoin.addEventListener("click", runCoinToss);
   btnWorld.addEventListener("click", runWorldReveal);
   btnReset.addEventListener("click", function(){
-    if (!confirm("Reset the run? This returns every card to the deck and clears the Bank, Curses, and Map. This can't be undone.")) return;
-    resetRun();
+    customConfirm("Reset the run? This returns every card to the deck and clears the Bank, Curses, and Map. This can't be undone.", function(){
+      resetRun();
+    });
   });
 
   renderLedger();
@@ -1801,7 +1886,7 @@
       r.addEventListener("change", function(){
         var key = r.value;
         if (key === "boss" && !btnWorld.disabled){
-          alert("Reveal The World first — the Boss Floor is locked until that decision is made.");
+          customAlert("Reveal The World first — the Boss Floor is locked until that decision is made.");
           renderActiveFloorPicker();
           return;
         }
@@ -1809,7 +1894,7 @@
         if (document.getElementById("floor-active-overwrite").checked){
           var overCap = bank.relics.length > relicCap() || bank.curses.length > CURSE_CAP;
           if (overCap){
-            alert("Bank is over its cap right now — archive or remove the extra Relic/Curse before the map can capture what you're entering with. The floor still switches; entered-with stays as it was.");
+            customAlert("Bank is over its cap right now — archive or remove the extra Relic/Curse before the map can capture what you're entering with. The floor still switches; entered-with stays as it was.");
           } else {
             s.enteredWith = snapshotBank();
           }
@@ -2083,7 +2168,7 @@
         mapPoster.innerHTML = "";
         setMapView(false);
       } catch(e){
-        window.alert("Could not read that save file.");
+        customAlert("Could not read that save file.");
       }
     };
     reader.readAsText(file);
