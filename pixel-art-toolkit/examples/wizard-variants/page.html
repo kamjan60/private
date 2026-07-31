@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Wizard Shapes — 4 Variants</title>
+<style>
+  :root{
+    --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+           --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+  }
+  :root[data-theme="dark"]{ --bg:#0d0a11; --bg2:#08060c; --panel:#151019; --line:rgba(86,210,140,0.14);
+    --ink:#d9d4dc; --ink-dim:rgba(217,212,220,0.58); --accent:#56d28c; }
+  :root[data-theme="light"]{ --bg:#e7e3ea; --bg2:#dcd6e2; --panel:#ffffff; --line:rgba(58,120,86,0.2);
+    --ink:#1c1722; --ink-dim:rgba(28,23,34,0.6); --accent:#1f8a52; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:radial-gradient(ellipse 80% 55% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:900px; display:flex; flex-direction:column; gap:24px; }
+  header h1{ font-size:clamp(22px,3vw,28px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:70ch; line-height:1.5; }
+
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:16px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:18px; display:flex; flex-direction:column; align-items:center; gap:12px;
+  }
+  .card img{
+    image-rendering:pixelated; image-rendering:crisp-edges; width:192px; height:192px;
+    background:repeating-conic-gradient(#00000018 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:8px;
+  }
+  .card h2{ font-size:15px; margin:0; letter-spacing:0.02em; }
+  .card p{ margin:0; font-size:12.5px; color:var(--ink-dim); text-align:center; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Wizard Shapes — 4 Variants</h1>
+    <p>Cztery różne sylwetki/układy, nie tylko przekolorowania — inny kształt kapelusza, inna sylwetka szaty, inny przedmiot w ręce. 32×32 px, ten sam generator (pixel_lib.py), pojedyncza klatka idle.</p>
+  </header>
+  <div class="grid">
+    <div class="card">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4nM1WP0gbURz+0krJ4eNaRCRI2kApFIQ6FHs4lW4tRUQytJCpg2YqoWTK2DFTKNIpOjgJOoQiDrqJkxziYCHgUpo0SAhBajib0OU6xHfcvbz73b1HK/2WPN7ve+/33e/fSwKaYIbppu4+AAC0L5tw+r2Ezj1ah5hhurOZucDeaeNYS4TSAWaYLgCIzv0iACgJIYncIcfrZ1m0Os3IS7kQDkpQqEEWZl1Q6YkVgfdvH2o5/rz1DYBmBPwi9vZrAIB3bz7Ecryx/QkA8OplNrIexmLdeI32ZRNf1j+SnKVl2i7ilgrZ75w9SUrXUQJFKEXAD+frQLqWwd9NYkq0BCTvz0r3Bz9Opc6nVl5gbvk5jtcPgbUD1y+CFCDOAdHx0ZENAJift0hhnbUDdA/r6Jx1RiIQWgPMMN2ZjAXeATrY269hJmORHKkA7rxSLQEAivmysnN+plItkSLIScjX/AIuiENMgei83rC9PevxFGyVFDj9XkL3iRXvoezkHGCG6U6Mp9HunqPdPUcuW4h0mMsWPP7EeHqkkEVEtmFqcjrSKcW/uGqR/MguEEEVpMym1QU3CWmB8NzLsFlbBTDM9WJhAQCws7ob2JfhUfq3tAtCa4DKfTFfDthTk9Mo5suoVEvEue/S3ZEIhOVeBiv3FABgb57E4tcbdvw5cFMIpMDf9/EwjEBc/rCuWvRrqNr3qmfEueApYYbp3rnNwJL34Ax+/tPfi6uWVwuBgqDGJjNMb+30e8oc/hhd2+QpCHs4ZMJELsX5K3/Jfg0cbY7T7yXsM7iyD4z93FJfocL57/AH/VoznFtqDscAAAAASUVORK5CYII=" alt="Classic Sorcerer" />
+      <h2>Classic Sorcerer</h2>
+      <p>Stożkowy kapelusz, prosta zwężająca się szata, długa broda, żarzący klejnot laski.</p>
+    </div>
+    <div class="card">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABdElEQVR4nO1XMU+EMBR+XFhqXmpCiGFw8hiFmcnd3Z/p7u50M+fIORpiLiaShnOrwwVsC7Sld8DgfQmhLa/9vr73EQrAf4fnOhEJ5WKfHSqntXxXYnodqo+4ixDr4Ib4bn2vjXvfvcEYIVZBSCg3EfcJsRGxmoIc4Jgp1Sd90CpEQnlPrUeh+t5rM2FMkbqLp8cHbfzzy6vUN5Wh8xYgoVycJLZtUmpDOigACeXpOoR8B4NExUdtXHRIaJ8waaARAFexkcQF+XbTESKlN00ygLqYTIAopBFhfA11QERAxJPErACE3c+ENMlan7QmLD9LAACI8K9tQoyxNNcFXmf3IzzQpJ8x5kSebzeneeAcWM1ZexVpkoGv1m9uD/jRTSSP1AV0xgwYGy9ieQ8sLeDigcVLsLgALwxuOaUBVNUXUBpAhAxKhm1/6runnl6OJ6K9UTkS2rbZoXLOgD905tOd65BQXv/IHyDXX7PexW3jmussxEvhF3Ffw29JDWsRAAAAAElFTkSuQmCC" alt="Hooded Wanderer" />
+      <h2>Hooded Wanderer</h2>
+      <p>Bez kapelusza — głęboki kaptur, twarz w cieniu, płaszcz w kształcie dzwonu, zwykły kij.</p>
+    </div>
+    <div class="card">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABsElEQVR4nGNgGAUDDBjJ0cTDyfcfm/iX759INo+gBmyWGWgrYFV74eoDkh2FUxJmsRInD4o4n5IIPvMYPt17g8K/9/0LXodgFeTh5PtvJSqF1YKy9jS8DuiqnIVV/NjrZ1gdwUSK5cjgnaQfVjYuYCUqhTU6WdAFvnz/xHjsNcN/9KBHB0LPN2Flv/jyCav6e9+/YA0BDAfAHHGPgQFrSr9y9RZeh8HiHJuZ2MSJygUKqlaElGEFD24fI5gLMNIAtSxnYGBgUFC1wllmEOUAQkDPyIpBz4h8BzIw4EgD2IDKq2sYYt92XGPg8kihjwNK5uRhFZ+25ht9HNCTMgmrON1C4I6YFoYYpfHPwEBhIqQGwBkCPJx8/2VE2Rj+fDiDU7ONEqTQObfvBk41MqJsDE9e8/0nuSCitAxABvgKJLxp4N27F1RxAD6Aszqmlu9hAFcoDHgixHARDyfffz5hJZpY9untPYxQwJoGhIQkaOYAdIASBbSIe2SArXbEGgVYxFD4X75jb/UQo45gFKArILYPQG5fgai64NsP7M0sctUhA6J6Mui+w+UrYtWNAmQAAMPiqgkuj5lVAAAAAElFTkSuQmCC" alt="Court Mage" />
+      <h2>Court Mage</h2>
+      <p>Wysoki kołnierz zamiast kapelusza, kanciasta prostokątna szata, pasek z klamrą, księga zamiast laski.</p>
+    </div>
+    <div class="card">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB3klEQVR4nM2XQWrCQBiFX8S2mTAMYmsREbrppl31CD2D5/AMXsgbiBSP0FW76aYgRaqCDIMZFTpd2D8m1mQyMYJvk/jPxP+beS+aeChBnAlzeeFjvdFQofRcrq0e2xgAbq9bu+IcxgXCiTazcUzf86/cO+EMwJkwaY2LQDgBkNc2rTcaAKBC6XEmMi2puACoUHrrjcZ6ozFq1dHrdtDrdjBq1UF1aj4c9MGZMHQsBYAgAOCl8xzV6FyF0ouvdjjoW7/P2QI6f3p4TIy9vr8lIDkT5v7uBh+fs8ws5L4NOROm2WhHnyczmRhPjE3HqVu+r1wW7De3yWWucwbK1vkDuG4/Ke81uUK4kAtnAADggf1HKxdATdQKAQDaOuO8M1DUf5JalmBBUf/zygpQ3P+tJlOVOX6+GTjWf1Kz0c78O8604NT+WwGO9Z+UlYPzzEBZ/pOycpBqwSn8Jwh6YkoF+HuEOkjsX3EstULFA34MEPgceqUO1ttNH+OJ/lcHYGh+6g4ceo7jTJilVlHTwN811avtEUBUB3zY5ju/molAEAzkUiLwOaqVXZRUKKOmAKJmABIwtEBngO3KkiuNA8TrgE9QHmfCxHeAVOjVzDYnno24lfEQuvZ1EmfC5AEFgF+hevoR+F0CfwAAAABJRU5ErkJggg==" alt="Necromancer" />
+      <h2>Necromancer</h2>
+      <p>Wysoka, krzywa sylwetka, poszarpany rąbek szaty, laska z czaszką, czerwone oczy.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
