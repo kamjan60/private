@@ -21,6 +21,13 @@
   ];
   var WORLD_W = 1400, WORLD_H = 900;
   var SPR = 32, ZOOM = 2;
+  // Zoom follows the viewport: locked at 2 a handset shows less floor than
+  // its own vision radius, so you would be blind inside your own eyesight.
+  function fitZoom() { ZOOM = Math.max(1, Math.min(2, cv.width / 460)); }
+
+  var TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  var lastAim = { x: 1, y: 0 };
 
   var sheets = {};
   ["hunters", "fireball", "lightning", "sleep", "wizard"].forEach(function (k) {
@@ -51,10 +58,92 @@
   }
 
   function resize() {
-    cv.width = window.innerWidth; cv.height = window.innerHeight;
+    cv.width = cv.clientWidth || window.innerWidth;
+    cv.height = cv.clientHeight || window.innerHeight;
+    fitZoom();
     ctx.imageSmoothingEnabled = false;
   }
-  window.addEventListener("resize", resize); resize();
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+  resize();
+
+  function aimVec() {
+    // On touch the last tap sets the heading, so the storm button fires along
+    // the same line as the last fireball rather than needing its own gesture.
+    if (TOUCH) return lastAim;
+    var dx = mouse.x - cv.width / 2, dy = mouse.y - cv.height / 2;
+    var d = Math.hypot(dx, dy) || 1;
+    return { x: dx / d, y: dy / d };
+  }
+
+  function setupTouch() {
+    document.body.classList.add("touch");
+    cv.addEventListener("touchstart", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i], r = cv.getBoundingClientRect();
+        var x = t.clientX - r.left, y = t.clientY - r.top;
+        if (x < cv.width * 0.45 && !stick.active) {
+          // floating stick anchored where the thumb lands - on a handset you
+          // cannot look down to find a fixed pad
+          stick.active = true; stick.id = t.identifier;
+          stick.ox = x; stick.oy = y; stick.x = x; stick.y = y;
+        } else if (role === "mage" && ws && ws.readyState === 1) {
+          var dx = x - cv.width / 2, dy = y - cv.height / 2, d = Math.hypot(dx, dy) || 1;
+          lastAim = { x: dx / d, y: dy / d };
+          ws.send(JSON.stringify({ t: "ball", ax: lastAim.x, ay: lastAim.y }));
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    cv.addEventListener("touchmove", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === stick.id) {
+          var r = cv.getBoundingClientRect();
+          stick.x = t.clientX - r.left; stick.y = t.clientY - r.top;
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    function end(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stick.id) { stick.active = false; stick.id = null; }
+      }
+    }
+    cv.addEventListener("touchend", end);
+    cv.addEventListener("touchcancel", end);
+
+    bindBtn("tHold", null, function (d) { keys.KeyE = d; });
+    bindBtn("tA", function () {
+      if (!ws || ws.readyState !== 1) return;
+      if (role === "mage") { var a = aimVec(); ws.send(JSON.stringify({ t: "storm", ax: a.x, ay: a.y })); }
+      else ws.send(JSON.stringify({ t: "taser" }));
+    });
+    bindBtn("tB", function () {
+      if (!ws || ws.readyState !== 1) return;
+      if (role === "mage") ws.send(JSON.stringify({ t: "disguise" }));
+      else if (myCls === "Zwiadowca") ws.send(JSON.stringify({ t: "camera" }));
+    });
+  }
+
+  function bindBtn(id, tap, hold) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("touchstart", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.add("on");
+      if (hold) hold(true); else if (tap) tap();
+    }, { passive: false });
+    var off = function (e) {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.remove("on");
+      if (hold) hold(false);
+    };
+    el.addEventListener("touchend", off);
+    el.addEventListener("touchcancel", off);
+  }
 
   // --------------------------------------------------------------- network
   function connect(name, room) {
@@ -169,6 +258,13 @@
     if (!ws || ws.readyState !== 1 || !role) return;
     var x = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     var y = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+    if (stick.active) {
+      var sdx = stick.x - stick.ox, sdy = stick.y - stick.oy, sd = Math.hypot(sdx, sdy);
+      if (sd > 8) {                        // dead zone, or a resting thumb drifts
+        var cl = Math.min(1, sd / 56);
+        x = (sdx / sd) * cl; y = (sdy / sd) * cl;
+      }
+    }
     ws.send(JSON.stringify({ t: "input", x: x, y: y, hold: !!keys.KeyE }));
   }, 1000 / 20);
 
@@ -374,7 +470,16 @@
       ctx.fillText(labels[y.chKind] || "", cv.width / 2, y0 + 18);
       ctx.textAlign = "left";
     }
-    if (role === "mage") {           // crosshair, so aiming reads as aiming
+    if (stick.active) {              // floating stick, drawn where it was placed
+      ctx.strokeStyle = "rgba(127,216,255,0.35)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 56, 0, Math.PI * 2); ctx.stroke();
+      var sdx = stick.x - stick.ox, sdy = stick.y - stick.oy;
+      var sd = Math.hypot(sdx, sdy), cl = Math.min(1, sd / 56) * 56;
+      var nx = sd ? sdx / sd : 0, ny = sd ? sdy / sd : 0;
+      ctx.fillStyle = "rgba(127,216,255,0.55)";
+      ctx.beginPath(); ctx.arc(stick.ox + nx * cl, stick.oy + ny * cl, 22, 0, Math.PI * 2); ctx.fill();
+    }
+    if (role === "mage" && !TOUCH) {  // crosshair, so aiming reads as aiming
       ctx.strokeStyle = "rgba(198,130,255,0.8)"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath();
@@ -396,6 +501,24 @@
   function renderKeys() {
     if (!state || !state.you) return;
     var y = state.you, out = [];
+    if (TOUCH) {                     // labels live on the buttons instead
+      var A = document.getElementById("tA"), B = document.getElementById("tB");
+      if (A) {
+        A.querySelector("span").textContent = role === "mage" ? "PIORUN"
+          : (myCls === "Strzelec" ? "KARABIN" : "TAZER");
+        A.classList.toggle("cd", (role === "mage" ? y.storm : y.taser) > 0);
+      }
+      if (B) {
+        var show = role === "mage" || myCls === "Zwiadowca";
+        B.style.display = show ? "flex" : "none";
+        B.querySelector("span").textContent = role === "mage" ? "MASKA" : "KAMERY";
+        B.classList.toggle("cd", role === "mage" && y.disguise > 0);
+      }
+      $("keys").innerHTML = role === "mage"
+        ? '<div class="key">Dotknij po prawej — <b>fireball</b></div>'
+        : '<div class="key">Lewy kciuk — ruch</div>';
+      return;
+    }
     out.push(k("WSAD", "ruch", 0));
     out.push(k("E", "przytrzymaj: artefakt / wiązanie", 0));
     out.push(k("SPACJA", myCls === "Strzelec" ? "karabin" : "tazer", y.taser));
@@ -443,5 +566,6 @@
   $("btnStart").addEventListener("click", function () { ws.send(JSON.stringify({ t: "start" })); });
   $("btnAgain").addEventListener("click", function () { ws.send(JSON.stringify({ t: "start" })); });
 
+  if (TOUCH) setupTouch();
   draw();
 })();

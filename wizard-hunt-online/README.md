@@ -38,6 +38,26 @@ from the environment.
 | `R` | *mage only* — decoy bloom somewhere you are not |
 | `C` | *Scout only* — station cameras, brief full map vision |
 
+### Touch
+
+The page detects a touch device and swaps in an on-screen layer: a floating
+virtual joystick anywhere on the left 45% of the screen for movement, and
+three buttons bottom-right.
+
+| Control | Action |
+|---|---|
+| Left thumb, drag | move — the stick spawns where you press, 8 px dead zone |
+| Tap right half | fire in that direction: taser for a hunter, fireball for the mage |
+| `TRZYMAJ` | hold-to-channel: extract, bind, stabilise (`E`) |
+| `TAZER` / `PIORUN` | taser, or the mage's storm at the last aim point |
+| `KAMERY` / `MASKA` | Scout's cameras, or the mage's disguise — hidden for classes with neither |
+
+Aim comes from the last direction you tapped or moved, so a button press
+fires where you were already pointing. The camera zoom clamps to 1–2× off
+the viewport width so a phone shows roughly the same slice of floor as a
+desktop, not a pixel-doubled keyhole. The perk pill is hidden under 560 px
+because it collides with the stat pills and already reads on the role line.
+
 ## Classes
 
 Everyone carries a taser. The kit differs in reach, eyesight, toughness and

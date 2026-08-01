@@ -25,6 +25,7 @@ HTML = """<!doctype html>
 <html lang="pl">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>I'm Not a Wizard, Harry — poligon</title>
 <style>
   :root{
@@ -37,6 +38,11 @@ HTML = """<!doctype html>
     background:radial-gradient(ellipse 90% 60% at 50% 0%, #0f1524, #05070c);
     color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
     overflow:hidden;
+    /* stop the browser hijacking drags as scroll / pull-to-refresh, and kill
+       the tap highlight so buttons do not flash blue on every press */
+    touch-action:none; overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
   }
 
   /* ------------- class picker ------------- */
@@ -85,6 +91,46 @@ HTML = """<!doctype html>
     background:rgba(10,14,24,0.88); border:1px solid var(--line); color:var(--dim);
     font:inherit; font-size:12.5px; padding:6px 14px; border-radius:9px; cursor:pointer; }
   #btnQuit:hover{ border-color:var(--accent); color:var(--accent); }
+
+  /* ------------- touch controls ------------- */
+  #touch{ display:none; }
+  body.touch #touch{ display:block; }
+  body.touch #cv{ cursor:default; }
+  .tbtn{
+    position:absolute; pointer-events:auto; display:flex; align-items:center;
+    justify-content:center; text-align:center;
+    background:rgba(16,22,38,0.9); border:1px solid rgba(120,150,220,0.3);
+    color:var(--ink); border-radius:50%; font-size:11px; font-weight:600;
+    letter-spacing:0.04em; padding:6px;
+  }
+  .tbtn span{ pointer-events:none; }
+  .tbtn.on{ background:rgba(127,216,255,0.28); border-color:var(--accent); }
+  .tbtn.cd{ opacity:0.4; }
+  #tHold{ right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(140px + env(safe-area-inset-bottom)); width:92px; height:92px;
+    border-color:rgba(127,216,255,0.45); font-size:10px; }
+  #tA{ right:calc(118px + env(safe-area-inset-right));
+    bottom:calc(96px + env(safe-area-inset-bottom)); width:80px; height:80px; }
+  #tB{ right:calc(22px + env(safe-area-inset-right));
+    bottom:calc(38px + env(safe-area-inset-bottom)); width:80px; height:80px; }
+
+  /* keep the HUD legible on a handset: hints move above the buttons and the
+     top pills wrap instead of pushing off-screen */
+  body.touch #keys{ bottom:calc(12px + env(safe-area-inset-bottom)); max-width:50%; }
+  body.touch #top{ padding-top:calc(10px + env(safe-area-inset-top)); padding-right:86px; }
+  @media (max-width:560px){
+    .pill{ font-size:11px; padding:5px 9px; }
+    /* the perk already reads on the class card; on a handset it only
+       collides with the back button */
+    #hPerk{ display:none; }
+    #picker{ gap:16px; padding:18px 14px 34px; justify-content:flex-start; padding-top:34px; }
+    #cards{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    .pick{ padding:12px 8px; }
+    .pick canvas{ width:64px; height:64px; }
+    .pick strong{ font-size:13px; }
+    .pick small{ font-size:10.5px; }
+    #btnQuit{ top:calc(10px + env(safe-area-inset-top)); }
+  }
 </style>
 </head>
 <body>
@@ -92,9 +138,8 @@ HTML = """<!doctype html>
 <div id="picker">
   <h1>Wybierz klasę i przejdź się po wraku</h1>
   <p class="sub">Poligon, nie rozgrywka: manekiny chodzą, artefakty czekają, nikt cię nie ściga.
-    Zagraj łowcą, żeby poczuć zasięg wzroku i tazera, albo <b>Magiem</b> — celuj myszą,
-    <b>LPM</b> rzuca fireballa jako lecący pocisk, <b>PPM</b> wali piorunem, który ogłusza
-    wszystkich w promieniu, <b>F</b> zmienia twój wygląd na najbliższą postać.</p>
+    Zagraj łowcą, żeby poczuć zasięg wzroku i tazera, albo <b>Magiem</b>.</p>
+  <p class="sub" id="howto"></p>
   <div id="cards"></div>
 </div>
 
@@ -109,6 +154,11 @@ HTML = """<!doctype html>
   <button id="btnQuit">← Klasy</button>
   <div id="keys"></div>
   <div id="toast"></div>
+  <div id="touch">
+    <button class="tbtn" id="tHold"><span>TRZYMAJ</span></button>
+    <button class="tbtn" id="tA"><span>TAZER</span></button>
+    <button class="tbtn" id="tB"><span>KAMERY</span></button>
+  </div>
 </div>
 
 <script>

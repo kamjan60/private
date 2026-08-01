@@ -29,7 +29,19 @@
     { x: 580, y: 660, w: 380, h: 180, name: "Maszynownia" },
     { x: 1020, y: 660, w: 320, h: 180, name: "Śluza" }
   ];
-  var W = 1400, H = 900, SPR = 32, ZOOM = 2;
+  var W = 1400, H = 900, SPR = 32;
+  // Zoom adapts to the viewport. Locked at 2 a phone shows ~195 world px of
+  // a 210-330 px vision radius, so you would be blind inside your own
+  // eyesight. Scaled to the canvas, a handset gets roughly the same field of
+  // view as a desktop.
+  var ZOOM = 2;
+  function fitZoom() {
+    ZOOM = Math.max(1, Math.min(2, cv.width / 460));
+  }
+
+  var TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  var lastAim = { x: 1, y: 0 };
 
   var FXDEF = {
     fire: { img: "fireball", w: 32, h: 32, frames: 6, ms: 80 },
@@ -49,8 +61,16 @@
   function boot(sheetMap) {
     sheets = sheetMap;
     cv = $("cv"); ctx = cv.getContext("2d");
-    resize(); window.addEventListener("resize", resize);
+    resize();
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
     buildPicker();
+    $("howto").innerHTML = TOUCH
+      ? "Lewy kciuk gdziekolwiek po lewej — <b>ruch</b>. Dotknięcie po prawej — " +
+        "<b>fireball</b> w to miejsce. Przyciski: przytrzymanie (artefakt), " +
+        "piorun AoE, przebranie."
+      : "Celuj myszą: <b>LPM</b> rzuca fireballa jako lecący pocisk, <b>PPM</b> wali " +
+        "piorunem ogłuszającym w promieniu, <b>F</b> zmienia wygląd na najbliższą postać.";
 
     document.addEventListener("keydown", function (e) {
       if (!running) return;
@@ -73,11 +93,92 @@
     });
     cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     $("btnQuit").addEventListener("click", quit);
+    if (TOUCH) setupTouch();
+  }
+
+  // ------------------------------------------------------------------ touch
+  function setupTouch() {
+    document.body.classList.add("touch");
+
+    // Left thumb drives a floating stick anchored wherever the finger lands,
+    // rather than a fixed pad - on a handset you cannot look down to find it.
+    cv.addEventListener("touchstart", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var r = cv.getBoundingClientRect();
+        var x = t.clientX - r.left, y = t.clientY - r.top;
+        if (x < cv.width * 0.45 && !stick.active) {
+          stick.active = true; stick.id = t.identifier;
+          stick.ox = x; stick.oy = y; stick.x = x; stick.y = y;
+        } else if (running && me && me.mage) {
+          // Tap the right side to aim and throw in one gesture. A separate
+          // aim-then-fire pair needs two thumbs and reads as a chore.
+          aimAtScreen(x, y);
+          castFireball();
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    cv.addEventListener("touchmove", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier === stick.id) {
+          var r = cv.getBoundingClientRect();
+          stick.x = t.clientX - r.left; stick.y = t.clientY - r.top;
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    function endTouch(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === stick.id) {
+          stick.active = false; stick.id = null;
+        }
+      }
+    }
+    cv.addEventListener("touchend", endTouch);
+    cv.addEventListener("touchcancel", endTouch);
+
+    bindBtn("tHold", null, function (down) { keys.KeyE = down; });
+    bindBtn("tA", function () {
+      if (me.mage) castStormAt(); else useTaser();
+    });
+    bindBtn("tB", function () {
+      if (me.mage) disguise();
+      else if (me.cls === "Zwiadowca") { me.seeAllUntil = now() + 5000; toast("Kamery aktywne"); }
+    });
+  }
+
+  function bindBtn(id, tap, holdFn) {
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener("touchstart", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.add("on");
+      if (holdFn) holdFn(true); else if (tap) tap();
+    }, { passive: false });
+    var off = function (e) {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.remove("on");
+      if (holdFn) holdFn(false);
+    };
+    el.addEventListener("touchend", off);
+    el.addEventListener("touchcancel", off);
+  }
+
+  function aimAtScreen(x, y) {
+    var dx = x - cv.width / 2, dy = y - cv.height / 2;
+    var d = Math.hypot(dx, dy) || 1;
+    lastAim = { x: dx / d, y: dy / d };
+    mouse.x = x; mouse.y = y;
   }
 
   function resize() {
     if (!cv) return;
     cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+    fitZoom();
     ctx.imageSmoothingEnabled = false;
   }
   function now() { return performance.now(); }
@@ -161,6 +262,9 @@
   // ---------------------------------------------------------------- actions
   function aimVector() {
     // Aim is screen-relative: the player is always dead centre of the view.
+    // On touch the last tap sets it, so the storm button fires along the same
+    // heading as the last fireball instead of needing its own aim gesture.
+    if (TOUCH) return lastAim;
     var dx = mouse.x - cv.width / 2, dy = mouse.y - cv.height / 2;
     var d = Math.hypot(dx, dy) || 1;
     return { x: dx / d, y: dy / d };
@@ -238,6 +342,14 @@
 
     var ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     var iy = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+    if (stick.active) {
+      var sdx = stick.x - stick.ox, sdy = stick.y - stick.oy;
+      var sd = Math.hypot(sdx, sdy);
+      if (sd > 8) {                        // dead zone, or a stationary thumb drifts
+        var cl = Math.min(1, sd / 56);
+        ix = (sdx / sd) * cl; iy = (sdy / sd) * cl;
+      }
+    }
     var len = Math.hypot(ix, iy);
     if (len > 0.01) {
       var sp = 2.5 * me.speed * (dt / (1000 / 60));
@@ -416,8 +528,17 @@
   }
 
   function drawOverlay() {
+    if (stick.active) {                    // floating stick, drawn where it was placed
+      ctx.strokeStyle = "rgba(127,216,255,0.35)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 56, 0, 6.29); ctx.stroke();
+      var dx = stick.x - stick.ox, dy = stick.y - stick.oy;
+      var d = Math.hypot(dx, dy), c = Math.min(1, d / 56) * 56;
+      var nx = d ? dx / d : 0, ny = d ? dy / d : 0;
+      ctx.fillStyle = "rgba(127,216,255,0.55)";
+      ctx.beginPath(); ctx.arc(stick.ox + nx * c, stick.oy + ny * c, 22, 0, 6.29); ctx.fill();
+    }
     // crosshair, so aiming reads as aiming
-    if (me.mage) {
+    if (me.mage && !TOUCH) {
       ctx.strokeStyle = "rgba(198,130,255,0.8)"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, 6.29); ctx.stroke();
       ctx.beginPath();
@@ -444,6 +565,24 @@
   }
 
   function renderKeyHints() {
+    if (TOUCH) {                           // labels live on the buttons instead
+      var A = $("tA"), B = $("tB");
+      if (A) {
+        // Short labels: anything longer overflows an 80px circle on a handset
+        A.querySelector("span").textContent = me.mage ? "PIORUN" : "TAZER";
+        A.classList.toggle("cd", (me.mage ? me.cd.storm : me.cd.taser) > 0);
+      }
+      if (B) {
+        var show = me.mage || me.cls === "Zwiadowca";
+        B.style.display = show ? "flex" : "none";
+        B.querySelector("span").textContent = me.mage ? "MASKA" : "KAMERY";
+        B.classList.toggle("cd", me.mage && me.cd.disguise > 0);
+      }
+      $("keys").innerHTML = me.mage
+        ? '<div class="key">Dotknij po prawej — <b>fireball</b></div>'
+        : '<div class="key">Lewy kciuk — ruch</div>';
+      return;
+    }
     var out = [key("WSAD", "ruch", 0), key("E", "przytrzymaj: artefakt / wiązanie", 0)];
     if (me.mage) {
       out.push(key("LPM", "fireball", me.cd.ball));
