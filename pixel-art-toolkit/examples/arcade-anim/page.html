@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Arcade Wizard — 32×32 Walk Cycles</title>
+<style>
+  :root{
+    --bg:#f2eefa; --bg2:#e6dff5; --panel:#ffffff; --line:rgba(92,58,140,0.16);
+    --ink:#2a1f3d; --ink-dim:#6b5c85; --accent:#7c50b6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#191426; --bg2:#120e1c; --panel:#221a33; --line:rgba(166,118,214,0.2);
+           --ink:#ece7f5; --ink-dim:#a496bd; --accent:#a676d6; }
+  }
+  :root[data-theme="dark"]{ --bg:#191426; --bg2:#120e1c; --panel:#221a33; --line:rgba(166,118,214,0.2);
+    --ink:#ece7f5; --ink-dim:#a496bd; --accent:#a676d6; }
+  :root[data-theme="light"]{ --bg:#f2eefa; --bg2:#e6dff5; --panel:#ffffff; --line:rgba(92,58,140,0.16);
+    --ink:#2a1f3d; --ink-dim:#6b5c85; --accent:#7c50b6; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    background:radial-gradient(ellipse 90% 60% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:860px; display:flex; flex-direction:column; gap:26px; }
+
+  header h1{ font-size:clamp(21px,3vw,27px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:68ch; line-height:1.55; }
+
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 24px; }
+  .panel h2{ font-size:12.5px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 16px; font-weight:600; }
+
+  .hero{ display:flex; align-items:center; gap:28px; flex-wrap:wrap; }
+  .hero img{ image-rendering:pixelated; width:256px; height:256px;
+    background:repeating-conic-gradient(#00000012 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:10px; }
+  .hero dl{ margin:0; display:grid; grid-template-columns:auto auto; gap:6px 16px;
+    font-size:13px; align-content:start; }
+  .hero dt{ color:var(--ink-dim); }
+  .hero dd{ margin:0; font-variant-numeric:tabular-nums; }
+
+  .walks{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .walk{ display:flex; flex-direction:column; align-items:center; gap:9px; }
+  .walk .view{
+    width:160px; height:160px;
+    background-image:url("data:image/png;base64,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");
+    background-repeat:no-repeat;
+    background-size:480px 640px;
+    image-rendering:pixelated;
+    border:1px solid var(--line); border-radius:10px;
+    background-color:rgba(124,80,182,0.05);
+  }
+  .walk span{ font-size:11.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink-dim); }
+
+  .view.down  { animation:wDown 0.52s steps(1) infinite; }
+  .view.left  { animation:wLeft 0.52s steps(1) infinite; }
+  .view.right { animation:wRight 0.52s steps(1) infinite; }
+  .view.up    { animation:wUp 0.52s steps(1) infinite; }
+
+  /* frame order 0-1-2-1: the passing pose lands on both halves of the
+     stride, so the loop does not snap back at the end */
+  @keyframes wDown  { 0%{background-position:0 0;}  25%{background-position:-160px 0;}
+                      50%{background-position:-320px 0;} 75%{background-position:-160px 0;} }
+  @keyframes wLeft  { 0%{background-position:0 -160px;} 25%{background-position:-160px -160px;}
+                      50%{background-position:-320px -160px;} 75%{background-position:-160px -160px;} }
+  @keyframes wRight { 0%{background-position:0 -320px;} 25%{background-position:-160px -320px;}
+                      50%{background-position:-320px -320px;} 75%{background-position:-160px -320px;} }
+  @keyframes wUp    { 0%{background-position:0 -480px;} 25%{background-position:-160px -480px;}
+                      50%{background-position:-320px -480px;} 75%{background-position:-160px -480px;} }
+
+  @media (prefers-reduced-motion: reduce){ .view{ animation-play-state:paused; } }
+
+  .sheet-wrap{ overflow-x:auto; }
+  .sheet-wrap img{ image-rendering:pixelated; width:288px; height:384px;
+    background:repeating-conic-gradient(#00000012 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:8px; display:block; }
+
+  @media (max-width:640px){ .walks{ grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Arcade Wizard — 32×32</h1>
+    <p>Chudy staruszek w dialekcie bez konturu: kształty rozdziela wyłącznie kontrast barwy i jasności, dlatego paleta musi być nasycona. Oczy to jeden ciemny pas — przy tej rozdzielczości nie ma miejsca na dwa punkty.</p>
+  </header>
+
+  <section class="panel hero">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABuklEQVR4nO2VP2jCQBTGv5QOnR2Kkzh0kEwdi3QoHaUUBydxciqlowQRxxJEHEpxcCodJEMpxSlj6VCcRBxKCFJKkA7SQTo4dLsOkhBjcne5xP6jv/Hl7t73vrv3IiFGbswPAgDX/XcAgF5OSqw9G2GT1PM6qed1EpTcTe5quhLzwlToRlMMAgDG2AIAnPdyzn5vMmu0WGNc7lFzhHYgCLfdvMmBEA54q7dxuwAArVKWPL/O0Hkwuc6OzQFRNlkLStkWAQD9Uad+7/Yrod6Tzc93wK5sclvzbalUQRWqnFuAzeGZ/xVEhVvAfTu3Epu8TLCvjNYvQFMMMpe3VuIJGSj1donoA+QW4MdgMBTdusS3dwFTgKYYxDv93KS3ZWcWiMC8O7eAoppZ/lYzUW00AQCzp6wTV9t3XzeKG1UFJ+Uj4f1UAXPzgByXT7kOShVUKVVQpc7OEImLNLcAqk1+929fg1Yzl+LWm4FuvyL9vb+hF2/lUYnkQLXRdLpAlEAHWP0PLDogKlQH4qiQBfUNxFEhi1BvYB2OhOqCIEfsGRCrgGJTdg5MJzO+PxtryjdsaPyOQRRHpf8E8Qk3vKxazLamsQAAAABJRU5ErkJggg==" alt="Arcade wizard, 32x32" />
+    <dl>
+      <dt>Rozdzielczość</dt><dd>32 × 32 px</dd>
+      <dt>Kontur</dt><dd>brak</dd>
+      <dt>Kolory</dt><dd>15</dd>
+      <dt>Klatki</dt><dd>4 kierunki × 3</dd>
+      <dt>Tempo</dt><dd>130 ms / klatkę</dd>
+      <dt>Barki → rąbek</dt><dd>8 → 12 px</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Chód</h2>
+    <div class="walks">
+      <div class="walk"><div class="view down"></div><span>Dół</span></div>
+      <div class="walk"><div class="view left"></div><span>Lewo</span></div>
+      <div class="walk"><div class="view right"></div><span>Prawo</span></div>
+      <div class="walk"><div class="view up"></div><span>Góra</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Sprite sheet — 3 × 4, surowy</h2>
+    <div class="sheet-wrap">
+      <img src="data:image/png;base64,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" alt="sprite sheet 3 kolumny x 4 wiersze" />
+    </div>
+  </section>
+</div>
+</body>
+</html>
