@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>I'm Not a Wizard, Harry</title>
+<style>
+  :root{
+    --bg:#0b0e18; --bg2:#060811; --panel:#141a2b; --panel2:#0f1422;
+    --line:rgba(120,150,220,0.16); --ink:#e6ecfa; --ink-dim:#8b9ac0;
+    --accent:#7fd8ff; --warn:#ffc35c; --bad:#ff6b6b; --good:#7ce8a8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:radial-gradient(ellipse 90% 60% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(16px,3vw,36px);
+  }
+  .wrap{ width:100%; max-width:1000px; display:flex; flex-direction:column; gap:18px; }
+
+  header h1{ font-size:clamp(20px,3vw,27px); margin:0 0 5px; letter-spacing:-0.01em; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14px; line-height:1.55; max-width:74ch; }
+
+  .hud{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .stat{ background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:7px 13px; font-size:12.5px; color:var(--ink-dim); }
+  .stat b{ color:var(--ink); font-variant-numeric:tabular-nums; font-size:14px; }
+  .status{ flex:1; min-width:200px; font-size:13.5px; padding:7px 13px;
+    border-radius:10px; background:var(--panel); border:1px solid var(--line); }
+  .status.warn{ color:var(--warn); border-color:rgba(255,195,92,0.4); }
+  .status.win{ color:var(--good); border-color:rgba(124,232,168,0.45); }
+  .status.lose{ color:var(--bad); border-color:rgba(255,107,107,0.45); }
+  button.ghost{ background:var(--panel); border:1px solid var(--line); color:var(--ink);
+    font:inherit; font-size:13px; padding:8px 16px; border-radius:10px; cursor:pointer; }
+  button.ghost:hover{ border-color:var(--accent); color:var(--accent); }
+
+  .board{ display:grid; grid-template-columns:1fr 268px; gap:16px; }
+  @media (max-width:880px){ .board{ grid-template-columns:1fr; } }
+
+  #arena{
+    position:relative; width:620px; height:380px; max-width:100%;
+    background:
+      linear-gradient(rgba(120,150,220,0.05) 1px, transparent 1px) 0 0/31px 31px,
+      linear-gradient(90deg, rgba(120,150,220,0.05) 1px, transparent 1px) 0 0/31px 31px,
+      radial-gradient(ellipse 70% 60% at 50% 45%, #1a2136, #0a0d16);
+    border:1px solid var(--line); border-radius:14px; overflow:hidden;
+  }
+
+  .marine{
+    position:absolute; left:0; top:0;
+    background-image:url("data:image/png;base64,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");
+    background-size:128px 1536px;
+    image-rendering:pixelated; cursor:pointer;
+  }
+  .marine:hover{ filter:brightness(1.35) drop-shadow(0 0 6px var(--accent)); }
+  .marine.down{ filter:grayscale(1) brightness(0.45); cursor:default; transform-origin:50% 100%; }
+  .marine.revealed{ filter:drop-shadow(0 0 9px #b06cff) brightness(1.2); }
+
+  /* FX strips. Offsets are pixels, one container width per frame -
+     percentages in background-position resolve against
+     (container - image) width and scatter the frames. */
+  .fx{ position:absolute; left:0; top:0; image-rendering:pixelated;
+       background-repeat:no-repeat; pointer-events:none; }
+  .fx-fire{ background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAAAgCAYAAABEmHeFAAADEElEQVR4nO2boY7bQBCGx1LRobBUQVFRQUFZpaKCA1V1PGF9gYNRQR+g4BRQkIdweFUFFBSdVBZQEFQZnWRmVLoF6abr9dger3fsXvJ/6JLY/v6d3Y2T7B4RAAAAAAAAAAAAAAAAAAAAEZn1zEiOS+cT0XH/K9J2PnbnOSOtZxJbzA3+ZVYEe8x6ZpLVQ6fz/Qx9/CHeZVYkboah/G4GF21/Op8Y1+FnWNxeUdc+DMlA9K+t0vr3CsVJ0vnEvHl+Rd8PvyvHa3SEye/M9tUn0bGx/Ca/M8n0Q+lakrueRvvdwWdrT0RR6s+1k/P7z/Xpf4lTkoGD83fuEFtwK3ULvvjxkfL3n9nzbEH6DgJ/0rk5rMNm0vDXZeCcMf2SSdeUIWb7fb87BuoyaNXf9bseP0edv9dM4xo7Xb+sPJev9qUgoUXwBxpXcA1/W8Ht4+k1Eb3V9zdNOu36+88NUX8/Q9NE7+oXB+HE02vvIKbzT+z2lH87/vl0J/886BbdHWj2WqUcSn52oHEZIvv9d1iLnXSa9ZcMdiJvDCi1n8vg1r9P/7NB6sSVgrtY+bN19bVfq1MIIhJ9IeI6fyx/o1fB77d9DH/rYFfyc294ogyB/ie+vLHDm2aYBHv+6oF9ubXjx/L39Qr9NsPi1uv4gfy2/RV/rBwCv/iNNpK/NAEWX16HXzwCl+43P9+NuhYwdvvH8JcmwPbmvvmWH+udqIbtzT0RKd4BQv3KXkvy4muiegdowbZf7Q4g8KveARhKE2CZFQllBaWHmu8AtO8XbNdwPjk/UWXF8XZ88L4DjORv9Eb0nzJsqPxRbCD/qf0b4r8DDFD/lMjQ4fi4U4ZAP34FEvjxK9CRi/kVSBoI6wBYB7iYdQA3QN1KsPvYByvBeiuxFqwEK68E+5j1zGw35Qtr7wXiNsf12QsSi9h7gaSbAGPuBYqx8ZCo316gEAbdCxQSplPHB2yGasvQ2vEtzi6D0foueTeov0GxyR8y6djr/HV23Q3aetGQ8x77/wOcE6F9CAAAAAAAAAAAAAAAAOAs+APU0Q6AiykKIQAAAABJRU5ErkJggg==");
+    background-size:384px 64px; animation:aFire .48s steps(1) infinite; }
+  .fx-bolt{ background-image:url("data:image/png;base64,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");
+    background-size:1024px 64px; animation:aBolt .56s steps(1) infinite; }
+  .fx-sleep{ background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAAwCAYAAABgxaPfAAAE8ElEQVR4nO2bL2wUQRTG5zBUViAaNAIFlbiz5BQSkoYgUBWQoCoPV0kQKEQForKqqa2rPFAn0E1FxcmiFrV0mZvZnT9vZr/Z+X7JiTY7s2+/92fezN4pRQghhBBCCCGEEEIImTKzsQ0gpAYOD04b/X/ffrxm/hFC6sNUEEl+uAKBw85hehwenDb0IQZ0QmEwecqFvnOHCz/Zgtum/zk7uWn0z9g22aDv4kilHytqAbBzcOPs5KZ59W4PUid2NOEw/hOC3kWwc3ADzW8knhyxz6qqgdZFsHPoB81fJWJaPMbWNFfXx8DpwGTCTAYb9FcaEHTlwp8Rbp/sIGuDfnxRItRQiFKCE9UuBKhNPdTq62wtJUJbbaKkLV8uUH01BRDjrWZ/Z3nomgXWQUyALvRVXhD0Ro/JYqm1rfYBTaNSji6mALWdMHTuMNSoTuj3MG6vm0b/xM6ZrM1lW20HYdtTA6YEefR4Nvp2k76X4fa6aWL9OUlHIAZ+CxNgPCQSJhY2BjJI+bIK4RECv4UJMA5IMUDCoR89kTgnIOVC/9tJcaaWkhT2TbaScqXIA/JxA2PAD3S9UsSayMN2DUMQEN2RUwZJe+TijAaS34oFpYUurbWfCtS5POgzAShi3dD/25Sw+CLblotJboGnBLq23Dr1g6wPjwgm/BJkaqAmEpPIDKq/Sge9ISDCcJtSJiVsgUtGSldWUHC44m1DTepFurOuNniYROXDbWZ9MG+F4RalPOizPHAbP2Ho1HJhYuaFOgeyXm1GF85mA2oSIWimlLs+CPYi2OBLCTbrvh/T5lT39tpDr1eb5un+rnVMyfvzoWdLydXFndW5L17ujGJTq8cUz9nG9DUKLhqUnM9KuT1j9EMdH622kvf9h+fq+9ef//4+Ot7PKl5fQRkiVcFpnWGyre+eput39+5UygS+urhrnjx7qH7/+uM9NnfBNsWfTs74ky6uLNZpCRK2G3Td4LJ1C7brpZ3bFovQJNSLjWQyx9qWai7bvCGrf0r9lLqPF1s82fC9XorFfOm8EJ9fLkcpci425rJNrwc59PMa1AaSLYi6SfP2zWejYUNz+LJebZrNzY5Syj/hWoFN4kkVmdB5us63OVfaRt/Ockg/6U7VJ3ZstknHn+2+pnunGOdDW2B87qUXIf166SYGVr/QQ8jFfNmYKrnL1sWFq4u7xrRN9Fk9bDauVxvj3L72xdjWtc80TsK+VPrZ5g4hNF76fBtvlfleLnPbfGqzV9rGEPtQbLPZ5zuHM6bg871RqiIoUWD6xsUksG1szGJiGittI4p+LUPx51pwXOaNwZSMruO6z5CqyIQUtJxFUJ/XNU9Cxyml1APXC024tJoor/tR7FjMl82nj1+Cx8eMlQRBzzb+EF4SLObLppsP+t99nF8uZ12/nl8uZ6mKjG6TaUvrc70UJv1c/arrpW/z+4gqgC43QQhOpXDsiA2gsQ7LdRD0TLkd80VPQp8iFlM8fRnqUnW/hna1vsDrJ30GU8IZoMQZls22EPt4BuhP6vhzuVfftTwD9LfNZp/vHEoJvwXWDVEqz1u42DetiG+Bh+xDsDGHfl1Q4890X9O9U4wLYejNbui1EuTWT/R7gFLXh8LvAY47b+rvAbagxp+OTyfC7wFuk0O/JL8E0eEvQe6R+CXIGDa6UvsvQUhZMDAAQPwtMCE18BcLh93SZhJ4YAAAAABJRU5ErkJggg==");
+    background-size:640px 96px; animation:aSleep 1.6s steps(1) infinite; }
+
+  @keyframes aFire{
+    0%{background-position-x:0;} 16.6%{background-position-x:-64px;}
+    33.3%{background-position-x:-128px;} 50%{background-position-x:-192px;}
+    66.6%{background-position-x:-256px;} 83.3%{background-position-x:-320px;} }
+  @keyframes aBolt{
+    0%{background-position-x:0;} 12.5%{background-position-x:-128px;}
+    25%{background-position-x:-256px;} 37.5%{background-position-x:-384px;}
+    50%{background-position-x:-512px;} 62.5%{background-position-x:-640px;}
+    75%{background-position-x:-768px;} 87.5%{background-position-x:-896px;} }
+  @keyframes aSleep{
+    0%{background-position-x:0;} 12.5%{background-position-x:-80px;}
+    25%{background-position-x:-160px;} 37.5%{background-position-x:-240px;}
+    50%{background-position-x:-320px;} 62.5%{background-position-x:-400px;}
+    75%{background-position-x:-480px;} 87.5%{background-position-x:-560px;} }
+
+  /* the detection radius, shown for as long as the FX plays */
+  .bloom{ position:absolute; left:0; top:0; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle, rgba(127,216,255,0.16), rgba(127,216,255,0.05) 60%, transparent 72%);
+    border:1px solid rgba(127,216,255,0.22); animation:bloomIn 1.5s ease-out forwards; }
+  @keyframes bloomIn{ from{opacity:0; transform-origin:center; } 15%{opacity:1;} to{opacity:0;} }
+
+  .side{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .card h2{ font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 11px; font-weight:600; }
+
+  .suspect{ display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:7px 9px; margin-bottom:7px; cursor:pointer; color:inherit; font:inherit; }
+  .suspect:hover:not(:disabled){ border-color:var(--bad); }
+  .suspect:disabled{ opacity:0.42; cursor:default; }
+  .suspect.dead strong{ text-decoration:line-through; }
+  .chip{ width:36px; height:48px; flex:none; image-rendering:pixelated;
+    background-image:url("data:image/png;base64,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");
+    background-size:96px 1152px; background-repeat:no-repeat; }
+  .s-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .s-body strong{ font-size:13px; }
+  .s-body small{ font-size:11px; color:var(--ink-dim); }
+  .bar{ display:block; height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; }
+  .bar i{ display:block; height:100%; background:var(--ink-dim); transition:width .3s; }
+  .bar i.hot{ background:var(--bad); }
+  .bar i.cold{ background:var(--good); }
+
+  #log{ max-height:210px; overflow-y:auto; display:flex; flex-direction:column; gap:5px;
+    font-size:11.5px; line-height:1.45; }
+  .log-line{ color:var(--ink-dim); border-left:2px solid var(--line); padding-left:8px; }
+  .log-line.cast{ color:var(--accent); border-color:var(--accent); }
+  .log-line.bad{ color:var(--bad); border-color:var(--bad); }
+  .log-line.good{ color:var(--good); border-color:var(--good); }
+
+  .how{ font-size:12.5px; color:var(--ink-dim); line-height:1.6; }
+  .how b{ color:var(--ink); }
+  .how img{ image-rendering:pixelated; width:48px; height:48px; float:right; margin-left:10px; }
+
+  @media (prefers-reduced-motion: reduce){ .fx, .bloom{ animation:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>I'm Not a Wizard, Harry</h1>
+    <p>Sześciu kosmicznych marines na pokładzie. Jeden z nich jest magiem — udaje swojego, rzuca zaklęcia i po kolei zabija łowców. Każde zaklęcie zostawia ślad: tylko marines w zasięgu rozbłysku mogli je rzucić. Mag zawsze jest w tym zbiorze. Przecinaj zbiory i wskaż go, zanim zostanie was dwóch.</p>
+  </header>
+
+  <div class="hud">
+    <div class="stat">Oskarżenia: <b id="accusations">2</b></div>
+    <div class="stat">Zaklęcia: <b id="castcount">0</b></div>
+    <div class="status" id="status">Namierz maga.</div>
+    <button class="ghost" id="restart">Nowa gra</button>
+  </div>
+
+  <div class="board">
+    <div id="arena"></div>
+    <div class="side">
+      <div class="card">
+        <h2>Podejrzani</h2>
+        <div id="roster"></div>
+      </div>
+      <div class="card">
+        <h2>Jak grać</h2>
+        <p class="how">
+          <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABx0lEQVR4nO2XMUjDQBSG/4iDOHaQTqWDQ8kk0kGKgzgWkQ6dSqdOIo4llNJRQgkdRDp0EoeSQaR0yigO0qmUDhJCESnFoTiIQwe3cyipSZrkLpcUi/iNL7m7//3v3gsRECF3xhcBgNveJwBAK8UF2pqNoIfUchqp5TTidbiV7M10KeaEqtCKKukEAPTRGABw2c0u1jsPGw/n7+jXB75nBHbAC6vdrIcDARxwZm9idQEAGsUMeXn7QOvRYNo7Mgd42aS9UMw0CABoT5rv83avHOg+may/A2Zmk/uqa0sl8jJX5swCTI4v3EsQFmYBD83sUmzyOsGhNFy9AFXSyUzcWorHRKDY3SO8F5BZgBv9/oB3qY1f7wKqAFXSiXP6WUnuiItZwANzCdSqgYKcssVGnW1U6goAQH7+aVO52WEWwF2CdHofAFCvSDgrnfBu4y9gZhyR09I500aJvCwk8rLQ2h0gdpVkFuDbPm71N8ugVg1bfPyuo90rC3/va+jEmXlYQjlQqSuLLuDF0wFa/wPzDgiLrwNRZEjD9w5EkSGNQHdgFY4E6gIvR8wZEKmAgiIKyXjK/rMxnQ8XrzgP6z2IvDILk/E/Tr4BmNCuT7TIhkMAAAAASUVORK5CYII=" alt="mag" />
+          Kliknij marine — w arenie lub na liście — żeby go oskarżyć.<br><br>
+          Pasek pokazuje, przy ilu zaklęciach był w zasięgu. <b>Pełny pasek</b> = był przy każdym, główny trop. <b>Pusty</b> = ma alibi na wszystko, jest niewinny.<br><br>
+          Masz <b>2 oskarżenia</b>. Pomyłka zabija niewinnego.
+        </p>
+      </div>
+      <div class="card">
+        <h2>Dziennik</h2>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// "I'm Not a Wizard, Harry" - hidden-mage deduction.
+//
+// One of six marines is a wizard. Every cast leaves an FX bloom on the
+// deck; only marines that were close enough to it could have cast. The
+// wizard is always in that set, so intersecting the sets across casts
+// narrows the field. The player accuses; a wrong accusation costs a
+// marine, and the wizard is picking them off in the meantime.
+(function () {
+  "use strict";
+
+  var Z = 2;                      // sprite zoom
+  var ARENA_W = 620, ARENA_H = 380;
+  var SPR = 32 * Z;               // on-screen marine size
+  var CAST_EVERY = 6200;          // ms between casts
+  var KILL_EVERY = 13000;         // ms between wizard kills
+  var DETECT_R = 118;             // how close a marine must be to be a suspect
+  var CAST_SPREAD = 46;           // FX lands this far from the wizard, at most
+
+  var NAMES = ["Vance", "Okoye", "Reyes", "Ilves", "Petrov", "Sato"];
+  var FX = {
+    fire:  { cls: "fx-fire",  w: 32, h: 32, label: "ogień" },
+    bolt:  { cls: "fx-bolt",  w: 64, h: 32, label: "błyskawica" },
+    sleep: { cls: "fx-sleep", w: 40, h: 48, label: "sen" }
+  };
+  var FX_KEYS = ["fire", "bolt", "sleep"];
+
+  var arena = document.getElementById("arena");
+  var roster = document.getElementById("roster");
+  var logEl = document.getElementById("log");
+  var statusEl = document.getElementById("status");
+  var accEl = document.getElementById("accusations");
+  var castEl = document.getElementById("castcount");
+  var restartBtn = document.getElementById("restart");
+
+  var marines, wizard, casts, accusations, over, lastCast, lastKill, raf;
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  function log(msg, kind) {
+    var d = document.createElement("div");
+    d.className = "log-line" + (kind ? " " + kind : "");
+    d.textContent = msg;
+    logEl.insertBefore(d, logEl.firstChild);
+    while (logEl.childNodes.length > 40) logEl.removeChild(logEl.lastChild);
+  }
+
+  function init() {
+    cancelAnimationFrame(raf);
+    arena.querySelectorAll(".marine, .fx, .bloom").forEach(function (n) { n.remove(); });
+    logEl.innerHTML = "";
+    casts = [];
+    accusations = 2;
+    over = false;
+    // Offsets are subtracted from the interval, not added to `now` - added,
+    // the first cast lands at interval + delay instead of at the delay.
+    lastCast = performance.now() - CAST_EVERY + 2500;
+    lastKill = performance.now() - KILL_EVERY + 9000;
+
+    marines = NAMES.map(function (name, i) {
+      var el = document.createElement("div");
+      el.className = "marine";
+      el.style.width = SPR + "px";
+      el.style.height = SPR + "px";
+      el.title = name;
+      el.addEventListener("click", function () { accuse(i); });
+      arena.appendChild(el);
+      return {
+        i: i, name: name, el: el,
+        x: rnd(40, ARENA_W - 40), y: rnd(40, ARENA_H - 40),
+        tx: 0, ty: 0, dir: 0, step: 0, phase: Math.random() * 1000,
+        alive: true, seen: 0
+      };
+    });
+    marines.forEach(retarget);
+    wizard = Math.floor(Math.random() * marines.length);
+
+    statusEl.textContent = "Namierz maga.";
+    statusEl.className = "status";
+    renderRoster();
+    updateHud();
+    log("Patrol rozpoczęty. Jeden z sześciu jest magiem.");
+    raf = requestAnimationFrame(tick);
+  }
+
+  function retarget(m) {
+    m.tx = rnd(30, ARENA_W - 30);
+    m.ty = rnd(30, ARENA_H - 30);
+  }
+
+  function updateHud() {
+    accEl.textContent = accusations;
+    castEl.textContent = casts.length;
+  }
+
+  function renderRoster() {
+    roster.innerHTML = "";
+    marines.forEach(function (m) {
+      var row = document.createElement("button");
+      row.className = "suspect" + (m.alive ? "" : " dead");
+      row.disabled = !m.alive || over;
+      row.addEventListener("click", function () { accuse(m.i); });
+
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      chip.style.backgroundPositionY = -(m.i * 4 * 32 * 1.5) + "px";
+
+      var body = document.createElement("span");
+      body.className = "s-body";
+      var nm = document.createElement("strong");
+      nm.textContent = m.name;
+      var meta = document.createElement("small");
+      if (!m.alive) {
+        meta.textContent = "wyeliminowany";
+      } else if (casts.length === 0) {
+        meta.textContent = "brak danych";
+      } else {
+        meta.textContent = "w zasięgu " + m.seen + " / " + casts.length + " zaklęć";
+      }
+      body.appendChild(nm);
+      body.appendChild(meta);
+
+      var bar = document.createElement("span");
+      bar.className = "bar";
+      var fill = document.createElement("i");
+      var pct = casts.length ? (m.seen / casts.length) * 100 : 0;
+      fill.style.width = pct + "%";
+      // A marine present at *every* cast is the strongest lead; one missing
+      // from any cast is provably innocent, so the bar is the whole tell.
+      if (casts.length && m.seen === casts.length) fill.className = "hot";
+      else if (casts.length && m.seen === 0) fill.className = "cold";
+      bar.appendChild(fill);
+      body.appendChild(bar);
+
+      row.appendChild(chip);
+      row.appendChild(body);
+      roster.appendChild(row);
+    });
+  }
+
+  function tick(now) {
+    if (!over) {
+      step(now);
+      if (now - lastCast > CAST_EVERY) { lastCast = now; doCast(); }
+      if (now - lastKill > KILL_EVERY) { lastKill = now; doKill(); }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function step(now) {
+    marines.forEach(function (m) {
+      if (!m.alive) return;
+      var dx = m.tx - m.x, dy = m.ty - m.y;
+      var d = Math.hypot(dx, dy);
+      if (d < 6) { retarget(m); return; }
+      var sp = 0.55;
+      m.x += (dx / d) * sp;
+      m.y += (dy / d) * sp;
+      // facing from the dominant axis; sprite rows are down/left/right/up
+      m.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
+      m.phase += sp;
+      m.step = (Math.floor(m.phase / 9) % 2);
+      m.el.style.transform = "translate(" + (m.x - SPR / 2) + "px," + (m.y - SPR) + "px)";
+      m.el.style.backgroundPosition =
+        -(m.step * 32 * Z) + "px " + -((m.i * 4 + m.dir) * 32 * Z) + "px";
+    });
+  }
+
+  function doCast() {
+    var w = marines[wizard];
+    if (!w.alive) return;
+    var kind = FX_KEYS[Math.floor(Math.random() * FX_KEYS.length)];
+    var a = Math.random() * Math.PI * 2;
+    var r = rnd(14, CAST_SPREAD);
+    var cx = Math.max(30, Math.min(ARENA_W - 30, w.x + Math.cos(a) * r));
+    var cy = Math.max(40, Math.min(ARENA_H - 20, w.y + Math.sin(a) * r));
+
+    var suspects = marines.filter(function (m) {
+      return m.alive && dist(m, { x: cx, y: cy }) <= DETECT_R;
+    }).map(function (m) { return m.i; });
+    // the wizard is by construction always inside the radius
+    if (suspects.indexOf(wizard) < 0) suspects.push(wizard);
+
+    casts.push({ x: cx, y: cy, kind: kind, suspects: suspects });
+    marines.forEach(function (m) {
+      if (m.alive && suspects.indexOf(m.i) >= 0) m.seen++;
+    });
+
+    spawnFx(kind, cx, cy);
+    spawnBloom(cx, cy);
+    log("Wykryto zaklęcie: " + FX[kind].label + ". W zasięgu: " +
+        suspects.map(function (i) { return marines[i].name; }).join(", "), "cast");
+    renderRoster();
+    updateHud();
+  }
+
+  function spawnFx(kind, x, y) {
+    var f = FX[kind];
+    var el = document.createElement("div");
+    el.className = "fx " + f.cls;
+    el.style.width = (f.w * Z) + "px";
+    el.style.height = (f.h * Z) + "px";
+    el.style.transform = "translate(" + (x - f.w * Z / 2) + "px," + (y - f.h * Z / 2) + "px)";
+    arena.appendChild(el);
+    setTimeout(function () { el.remove(); }, 1500);
+  }
+
+  function spawnBloom(x, y) {
+    var b = document.createElement("div");
+    b.className = "bloom";
+    b.style.transform = "translate(" + (x - DETECT_R) + "px," + (y - DETECT_R) + "px)";
+    b.style.width = b.style.height = (DETECT_R * 2) + "px";
+    arena.appendChild(b);
+    setTimeout(function () { b.remove(); }, 1500);
+  }
+
+  function doKill() {
+    var w = marines[wizard];
+    if (!w.alive) return;
+    var victims = marines.filter(function (m) {
+      return m.alive && m.i !== wizard && dist(m, w) < 150;
+    });
+    if (!victims.length) return;
+    var v = victims[Math.floor(Math.random() * victims.length)];
+    kill(v, "zginął od zaklęcia");
+    spawnFx("bolt", v.x, v.y);
+    if (marines.filter(function (m) { return m.alive; }).length <= 2) {
+      finish(false, "Zostało za mało łowców. Mag wygrał.");
+    }
+  }
+
+  function kill(m, why) {
+    m.alive = false;
+    m.el.classList.add("down");
+    log(m.name + " " + why + ".", "bad");
+    renderRoster();
+  }
+
+  function accuse(i) {
+    if (over) return;
+    var m = marines[i];
+    if (!m.alive) return;
+    if (i === wizard) {
+      m.el.classList.add("revealed");
+      finish(true, m.name + " był magiem. Polowanie zakończone.");
+      return;
+    }
+    accusations--;
+    kill(m, "był niewinny — egzekucja");
+    updateHud();
+    if (accusations <= 0) {
+      finish(false, "Wyczerpano oskarżenia. Mag wygrał.");
+    } else {
+      statusEl.textContent = "Pomyłka. Pozostałe oskarżenia: " + accusations;
+      statusEl.className = "status warn";
+    }
+  }
+
+  function finish(win, msg) {
+    over = true;
+    statusEl.textContent = msg;
+    statusEl.className = "status " + (win ? "win" : "lose");
+    marines[wizard].el.classList.add("revealed");
+    log(msg, win ? "good" : "bad");
+    renderRoster();
+  }
+
+  restartBtn.addEventListener("click", init);
+  init();
+})();
+
+</script>
+</body>
+</html>
