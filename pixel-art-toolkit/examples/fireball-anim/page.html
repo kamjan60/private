@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Fireball — 32×32, 6 klatek</title>
+<style>
+  :root{
+    --bg:#1a1015; --bg2:#0d0709; --panel:#241619; --line:rgba(255,140,26,0.2);
+    --ink:#f2e4dc; --ink-dim:#b09287; --accent:#ff8c1a;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#fdf3ec; --bg2:#f6e5d8; --panel:#ffffff; --line:rgba(200,80,20,0.18);
+           --ink:#2c1a14; --ink-dim:#7a5a4c; --accent:#d2560e; }
+  }
+  :root[data-theme="dark"]{ --bg:#1a1015; --bg2:#0d0709; --panel:#241619; --line:rgba(255,140,26,0.2);
+    --ink:#f2e4dc; --ink-dim:#b09287; --accent:#ff8c1a; }
+  :root[data-theme="light"]{ --bg:#fdf3ec; --bg2:#f6e5d8; --panel:#ffffff; --line:rgba(200,80,20,0.18);
+    --ink:#2c1a14; --ink-dim:#7a5a4c; --accent:#d2560e; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    background:radial-gradient(ellipse 90% 55% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:880px; display:flex; flex-direction:column; gap:26px; }
+
+  header h1{ font-size:clamp(21px,3vw,27px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:68ch; line-height:1.55; }
+
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:22px 24px; }
+  .panel h2{ font-size:12px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 16px; font-weight:600; }
+
+  /* one frame of the 6-frame strip; sheet is 192x32 logical */
+  .fb{
+    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAAAgCAYAAABEmHeFAAADEElEQVR4nO2boY7bQBCGx1LRobBUQVFRQUFZpaKCA1V1PGF9gYNRQR+g4BRQkIdweFUFFBSdVBZQEFQZnWRmVLoF6abr9dger3fsXvJ/6JLY/v6d3Y2T7B4RAAAAAAAAAAAAAAAAAAAAEZn1zEiOS+cT0XH/K9J2PnbnOSOtZxJbzA3+ZVYEe8x6ZpLVQ6fz/Qx9/CHeZVYkboah/G4GF21/Op8Y1+FnWNxeUdc+DMlA9K+t0vr3CsVJ0vnEvHl+Rd8PvyvHa3SEye/M9tUn0bGx/Ca/M8n0Q+lakrueRvvdwWdrT0RR6s+1k/P7z/Xpf4lTkoGD83fuEFtwK3ULvvjxkfL3n9nzbEH6DgJ/0rk5rMNm0vDXZeCcMf2SSdeUIWb7fb87BuoyaNXf9bseP0edv9dM4xo7Xb+sPJev9qUgoUXwBxpXcA1/W8Ht4+k1Eb3V9zdNOu36+88NUX8/Q9NE7+oXB+HE02vvIKbzT+z2lH87/vl0J/886BbdHWj2WqUcSn52oHEZIvv9d1iLnXSa9ZcMdiJvDCi1n8vg1r9P/7NB6sSVgrtY+bN19bVfq1MIIhJ9IeI6fyx/o1fB77d9DH/rYFfyc294ogyB/ie+vLHDm2aYBHv+6oF9ubXjx/L39Qr9NsPi1uv4gfy2/RV/rBwCv/iNNpK/NAEWX16HXzwCl+43P9+NuhYwdvvH8JcmwPbmvvmWH+udqIbtzT0RKd4BQv3KXkvy4muiegdowbZf7Q4g8KveARhKE2CZFQllBaWHmu8AtO8XbNdwPjk/UWXF8XZ88L4DjORv9Eb0nzJsqPxRbCD/qf0b4r8DDFD/lMjQ4fi4U4ZAP34FEvjxK9CRi/kVSBoI6wBYB7iYdQA3QN1KsPvYByvBeiuxFqwEK68E+5j1zGw35Qtr7wXiNsf12QsSi9h7gaSbAGPuBYqx8ZCo316gEAbdCxQSplPHB2yGasvQ2vEtzi6D0foueTeov0GxyR8y6djr/HV23Q3aetGQ8x77/wOcE6F9CAAAAAAAAAAAAAAAAOAs+APU0Q6AiykKIQAAAABJRU5ErkJggg==");
+    background-repeat:no-repeat;
+    image-rendering:pixelated;
+    animation:burn 0.48s steps(1) infinite;
+  }
+  .fb.xl{ width:256px; height:256px; background-size:1536px 256px; }
+  .fb.md{ width:128px; height:128px; background-size:768px 128px; }
+  .fb.sm{ width:64px;  height:64px;  background-size:384px 64px; }
+
+  @keyframes burn{
+    0%   {background-position-x:0;}
+    16.6%{background-position-x:-100%;}
+    33.3%{background-position-x:-200%;}
+    50%  {background-position-x:-300%;}
+    66.6%{background-position-x:-400%;}
+    83.3%{background-position-x:-500%;}
+  }
+
+  .hero{ display:flex; align-items:center; gap:30px; flex-wrap:wrap; }
+  .hero dl{ margin:0; display:grid; grid-template-columns:auto auto; gap:6px 18px; font-size:13px; }
+  .hero dt{ color:var(--ink-dim); }
+  .hero dd{ margin:0; font-variant-numeric:tabular-nums; }
+
+  /* travel lane: the loop plays while the sprite is translated across */
+  .lane{
+    position:relative; height:140px; overflow:hidden; border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,140,26,0.05), transparent 70%);
+    border:1px solid var(--line);
+  }
+  .flyer{ position:absolute; top:6px; left:0; animation:fly 2.4s linear infinite; }
+  @keyframes fly{ from{ transform:translateX(-140px);} to{ transform:translateX(calc(100% + 880px));} }
+
+  .sizes{ display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap; }
+  .size-item{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .size-item span{ font-size:11.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-dim); }
+
+  .strip{ overflow-x:auto; }
+  .strip img{ image-rendering:pixelated; width:768px; height:128px; display:block;
+    background:repeating-conic-gradient(#ffffff10 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:8px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .fb, .flyer{ animation-play-state:paused; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fireball — 32×32, pętla 6 klatek</h1>
+    <p>Zbudowana jako pole, nie jako rysowane kształty: każda kolumna ma połowiczną wysokość płomienia, a każdy piksel dobiera barwę z odległości od osi w stosunku do tej wysokości. Koncentryczne pasy wychodzą z tego same i trzymają rejestrację, mimo że sylwetka faluje.</p>
+  </header>
+
+  <section class="panel hero">
+    <div class="fb xl"></div>
+    <dl>
+      <dt>Rozdzielczość</dt><dd>32 × 32 px</dd>
+      <dt>Klatki</dt><dd>6</dd>
+      <dt>Tempo</dt><dd>80 ms / klatkę</dd>
+      <dt>Kolory</dt><dd>6</dd>
+      <dt>Kontur</dt><dd>brak</dd>
+      <dt>Pętla</dt><dd>faza = pełny okres</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>W locie</h2>
+    <div class="lane">
+      <div class="flyer"><div class="fb md"></div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Skala</h2>
+    <div class="sizes">
+      <div class="size-item"><div class="fb xl"></div><span>8×</span></div>
+      <div class="size-item"><div class="fb md"></div><span>4×</span></div>
+      <div class="size-item"><div class="fb sm"></div><span>2×</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Sprite sheet — 6 × 1, surowy</h2>
+    <div class="strip">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAAAgCAYAAABEmHeFAAADEElEQVR4nO2boY7bQBCGx1LRobBUQVFRQUFZpaKCA1V1PGF9gYNRQR+g4BRQkIdweFUFFBSdVBZQEFQZnWRmVLoF6abr9dger3fsXvJ/6JLY/v6d3Y2T7B4RAAAAAAAAAAAAAAAAAAAAEZn1zEiOS+cT0XH/K9J2PnbnOSOtZxJbzA3+ZVYEe8x6ZpLVQ6fz/Qx9/CHeZVYkboah/G4GF21/Op8Y1+FnWNxeUdc+DMlA9K+t0vr3CsVJ0vnEvHl+Rd8PvyvHa3SEye/M9tUn0bGx/Ca/M8n0Q+lakrueRvvdwWdrT0RR6s+1k/P7z/Xpf4lTkoGD83fuEFtwK3ULvvjxkfL3n9nzbEH6DgJ/0rk5rMNm0vDXZeCcMf2SSdeUIWb7fb87BuoyaNXf9bseP0edv9dM4xo7Xb+sPJev9qUgoUXwBxpXcA1/W8Ht4+k1Eb3V9zdNOu36+88NUX8/Q9NE7+oXB+HE02vvIKbzT+z2lH87/vl0J/886BbdHWj2WqUcSn52oHEZIvv9d1iLnXSa9ZcMdiJvDCi1n8vg1r9P/7NB6sSVgrtY+bN19bVfq1MIIhJ9IeI6fyx/o1fB77d9DH/rYFfyc294ogyB/ie+vLHDm2aYBHv+6oF9ubXjx/L39Qr9NsPi1uv4gfy2/RV/rBwCv/iNNpK/NAEWX16HXzwCl+43P9+NuhYwdvvH8JcmwPbmvvmWH+udqIbtzT0RKd4BQv3KXkvy4muiegdowbZf7Q4g8KveARhKE2CZFQllBaWHmu8AtO8XbNdwPjk/UWXF8XZ88L4DjORv9Eb0nzJsqPxRbCD/qf0b4r8DDFD/lMjQ4fi4U4ZAP34FEvjxK9CRi/kVSBoI6wBYB7iYdQA3QN1KsPvYByvBeiuxFqwEK68E+5j1zGw35Qtr7wXiNsf12QsSi9h7gaSbAGPuBYqx8ZCo316gEAbdCxQSplPHB2yGasvQ2vEtzi6D0foueTeov0GxyR8y6djr/HV23Q3aetGQ8x77/wOcE6F9CAAAAAAAAAAAAAAAAOAs+APU0Q6AiykKIQAAAABJRU5ErkJggg==" alt="fireball sprite sheet, 6 klatek" />
+    </div>
+  </section>
+</div>
+</body>
+</html>
