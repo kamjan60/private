@@ -34,9 +34,9 @@ CABLE    = (40, 42, 52, 255)
 STEEL    = (128, 136, 152, 255)
 VOID     = (12, 13, 18, 255)
 
-# Order must match CLASS_NAMES in ../../wizard-hunt-online/server.js: the
-# client indexes sheet rows by class position, so a reordering here silently
-# gives every player somebody else's body.
+# Order must match CLASS_NAMES in ../../wizard-hunt-online/src/classes.js:
+# the client indexes sheet rows by class position, so a reordering here
+# silently gives every player somebody else's body.
 CLASSES = [
     ("Strażnik", (44, 46, 56, 255), (26, 27, 34, 255),
      (196, 210, 232, 255), (108, 124, 150, 255), "greathelm", "hammer"),
@@ -50,6 +50,10 @@ CLASSES = [
      (216, 232, 120, 255), (128, 146, 48, 255), "beak", "censer"),
     ("Runarz", (56, 34, 74, 255), (34, 20, 46, 255),
      (198, 130, 255, 255), (110, 62, 158, 255), "techcowl", "rod"),
+    ("Archiwista", (40, 46, 62, 255), (24, 28, 40, 255),
+     (159, 180, 216, 255), (86, 104, 142, 255), "datavisor", "slate"),
+    ("Technik", (62, 48, 28, 255), (38, 30, 18, 255),
+     (255, 210, 122, 255), (166, 124, 48, 255), "lamphelm", "torch"),
 ]
 
 
@@ -125,6 +129,34 @@ def head(g, kind, dy, glow, glow_d, cloak, cloak_d, back, side, facing):
         for i, yy in enumerate(range(11, 17)):                    # cables to the back
             g.put(9 - (i // 3), yy + dy, CABLE)
             g.put(22 + (i // 3), yy + dy, CABLE)
+    elif kind == "datavisor":
+        # low scribe's cap: the silhouette has to stay flat, because this is
+        # the class people confuse with the Chirurg down a dark corridor and
+        # the confusion should come from the body, not from a copied hat
+        g.spans([(6 + dy, 12, 19), (7 + dy, 11, 20), (8 + dy, 11, 20),
+                 (9 + dy, 11, 20)], PLATE_D)
+        g.span(7 + dy, 11, 13, PLATE_HI)
+        if not back:
+            g.spans([(10 + dy, 12, 19)], VOID)
+            # one lens, not two: the asymmetry is the reading-eye tell
+            side_x = (16, 18) if facing != "left" else (13, 15)
+            g.span(10 + dy, side_x[0], side_x[1], glow)
+            g.put(side_x[0] - 1 if facing != "left" else side_x[1] + 1, 10 + dy, glow_d)
+        g.spans([(4 + dy, 19, 19), (5 + dy, 19, 19)], BRASS)      # stub aerial
+    elif kind == "lamphelm":
+        g.spans([(6 + dy, 12, 19), (7 + dy, 11, 20), (8 + dy, 11, 20),
+                 (9 + dy, 11, 20), (10 + dy, 11, 20), (11 + dy, 12, 19)],
+                PLATE if not back else PLATE_D)
+        g.span(7 + dy, 11, 12, PLATE_HI)
+        # the lamp: the one class that carries its own light source, which is
+        # exactly what act III is about
+        g.spans([(3 + dy, 14, 17), (4 + dy, 14, 17)], BRASS)
+        g.span(4 + dy, 15, 16, glow)
+        if not back:
+            g.spans([(9 + dy, 12, 19)], VOID)                     # rebreather grille
+            for x in range(13, 19, 2):
+                g.put(x, 9 + dy, glow_d)
+            g.spans([(11 + dy, 13, 18)], PLATE_D)
 
 
 def weapon(g, kind, dy, glow, glow_d, facing):
@@ -168,6 +200,30 @@ def weapon(g, kind, dy, glow, glow_d, facing):
             g.put(gx, y, PLATE_D)
         g.spans([(7 + dy, gx - 1, gx + 1), (8 + dy, gx - 1, gx + 1)], glow)
         g.put(gx, 6 + dy, glow_d)
+    elif kind == "slate":
+        # held flat at the chest rather than out to the side: this is the one
+        # hunter whose hands are busy reading instead of pointing. Chest-held
+        # means it has to disappear when he turns his back, or the screen
+        # glows through him.
+        if facing == "up":
+            g.spans([(16 + dy, 14, 17), (17 + dy, 14, 17)], PLATE_D)  # its harness
+            return
+        cx = 12 if left else 19
+        g.spans([(15 + dy, cx - 3, cx + 3), (16 + dy, cx - 3, cx + 3),
+                 (17 + dy, cx - 3, cx + 3), (18 + dy, cx - 3, cx + 3),
+                 (19 + dy, cx - 3, cx + 3)], PLATE_D)
+        g.spans([(16 + dy, cx - 2, cx + 2), (17 + dy, cx - 2, cx + 2),
+                 (18 + dy, cx - 2, cx + 2)], glow_d)
+        g.spans([(16 + dy, cx - 2, cx + 2), (18 + dy, cx - 1, cx + 1)], glow)
+        g.spans([(14 + dy, cx - 3, cx + 3)], BRASS_D)
+    elif kind == "torch":
+        for y in range(14 + dy, 22 + dy):
+            g.put(gx, y, LEATHER)
+        g.spans([(19 + dy, gx - 1, gx + 1), (20 + dy, gx - 1, gx + 1)], BRASS)
+        # cutting flame, short and bright - the Technik is the walking lamp
+        g.put(gx, 13 + dy, glow)
+        g.put(gx, 12 + dy, glow_d)
+        g.spans([(21 + dy, gx - 2, gx + 2)], PLATE_D)             # gas bottle
 
 
 def hunter(cfg, facing, step):
