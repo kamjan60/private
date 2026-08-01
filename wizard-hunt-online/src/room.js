@@ -53,7 +53,7 @@ function makePlayer(id, name, ws) {
     input: { x: 0, y: 0 }, holding: false,
     stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
     slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
     disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
     itemCharges: 0, itemReadyAt: 0, vests: 0, usedRevive: false,
     lastPingAt: 0, loadoutReady: false
@@ -153,7 +153,7 @@ function startRound(room) {
       alive: true, down: false, ejected: false,
       stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
       slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
       disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
       vests: 0, usedRevive: false, lastPingAt: 0, input: { x: 0, y: 0 }, holding: false
     });

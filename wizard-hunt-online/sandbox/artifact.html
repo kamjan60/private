@@ -125,27 +125,34 @@
     font-size:10.5px; font-weight:600; padding:6px; }
   .tbtn span{ pointer-events:none; }
   .tbtn.on{ background:rgba(127,216,255,0.28); border-color:var(--accent); }
-  #tHold{ right:calc(16px + env(safe-area-inset-right));
-    bottom:calc(150px + env(safe-area-inset-bottom)); width:88px; height:88px;
+  /* Four verbs now, so the cluster is tightened to keep its right-hand
+     column clear of the spell bar on the left. Rightmost extent is 172 px,
+     which is why the bar is capped at 200. */
+  #tHold{ right:calc(12px + env(safe-area-inset-right));
+    bottom:calc(132px + env(safe-area-inset-bottom)); width:84px; height:84px;
     border-color:rgba(127,216,255,0.45); }
-  #tA{ right:calc(112px + env(safe-area-inset-right));
-    bottom:calc(108px + env(safe-area-inset-bottom)); width:76px; height:76px; }
-  #tB{ right:calc(24px + env(safe-area-inset-right));
-    bottom:calc(56px + env(safe-area-inset-bottom)); width:76px; height:76px; }
+  #tA{ right:calc(100px + env(safe-area-inset-right));
+    bottom:calc(96px + env(safe-area-inset-bottom)); width:72px; height:72px; }
+  #tB{ right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(44px + env(safe-area-inset-bottom)); width:64px; height:64px; }
+  #tC{ right:calc(88px + env(safe-area-inset-right));
+    bottom:calc(24px + env(safe-area-inset-bottom)); width:64px; height:64px;
+    font-size:9.5px; }
+  .tbtn.spent{ opacity:0.35; }
   body.touch #keys{ display:none; }
   /* the bar sits on the floor and the log stacks above it: overlapping them
      put the spell names on top of the event feed */
   /* wrap instead of scrolling sideways: a slot you have to scroll to is a
      slot you will not switch to mid-round */
   body.touch #bar{ bottom:calc(14px + env(safe-area-inset-bottom)); left:10px; transform:none;
-    max-width:min(54vw,260px); flex-wrap:wrap; overflow:visible; gap:4px; }
+    max-width:200px; flex-wrap:wrap; overflow:visible; gap:4px; }
   body.touch .slot{ width:60px; flex:0 0 60px; padding:4px 4px; font-size:9.5px; }
   body.touch .slot b{ font-size:9.5px; }
   body.touch #log{ bottom:calc(84px + env(safe-area-inset-bottom)); max-height:104px;
     width:min(300px,52%); }
   /* only a mage carries a spell bar, and it wraps to three rows; a hunter
      should not lose that space to an element that is not there */
-  body.touch.has-bar #log{ bottom:calc(152px + env(safe-area-inset-bottom)); max-height:88px; }
+  body.touch.has-bar #log{ bottom:calc(196px + env(safe-area-inset-bottom)); max-height:80px; }
   body.touch #topbar{ padding-top:calc(10px + env(safe-area-inset-top)); }
 
   /* ---------------- overlays ---------------- */
@@ -249,6 +256,7 @@
     <button class="tbtn" id="tHold"><span>TRZYMAJ</span></button>
     <button class="tbtn" id="tA"><span>TAZER</span></button>
     <button class="tbtn" id="tB"><span>PING</span></button>
+    <button class="tbtn" id="tC"><span>SPRZĘT</span></button>
   </div>
 
   <div class="over" id="oTribunal"><div class="card">
@@ -329,6 +337,18 @@ const MAX_PLAYERS = 8;          // one unique class each, and there are eight
 // ---------------------------------------------------------------- world
 const W = 2000, H = 1600;
 const SPEED_BASE = 2.5;
+/**
+ * Compartments are joined by airlocks, not open floor. Stepping into one
+ * seals you in for this long before the far side opens.
+ *
+ * The void between rooms used to be walkable, which let players drift off
+ * the ship entirely and made the transit log meaningless. Locking the
+ * passage instead turns every room change into a committed, timed act: you
+ * cannot follow somebody through instantly, and you cannot flee through one
+ * mid-fight without buying the pursuer two and a half seconds.
+ */
+const LOCK_MS = 2500;
+const DOOR_REACH = 30;      // how close you must be to a hatch to enter it
 
 // ---------------------------------------------------------------- acts
 const ACTS = 3;
@@ -390,7 +410,7 @@ const LOADOUT_MS = 90000;       // then everyone undecided gets a random pick
 
 module.exports = {
   TICK_HZ, TICK_MS, MIN_PLAYERS, MAX_PLAYERS,
-  W, H, SPEED_BASE,
+  W, H, SPEED_BASE, LOCK_MS, DOOR_REACH,
   ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
   ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE,
   TASER_STUN_MS, TASER_COOLDOWN, BIND_MS, BIND_MS_SHACKLES,
@@ -789,61 +809,127 @@ __def("map", function (module, exports, require) {
 /**
  * The wreck: fifteen compartments in three sections, one section per act.
  *
- * Compartments have solid walls and door gaps. That is new -- the previous
- * build had no collision at all and compartments were only named rectangles.
- * The Earth school needs walls to mean anything: Rygiel shuts a compartment's
- * doors, Zawał shuts them for good, and neither is a threat in open space.
+ * Compartments are sealed boxes joined by airlocks. There is no walkable
+ * space between them: the void outside used to be open floor, which let
+ * players drift off the ship and made a transit log something you could
+ * simply route around.
  *
- * Doors are declared as a side plus a centre offset along that side, so a
- * compartment's geometry stays readable and the door positions move with the
- * room if it is resized.
+ * Walls are solid on all four sides. A hatch is not a gap -- you press
+ * against it, it takes you, and it puts you out the far side a couple of
+ * seconds later. That delay is the point: nobody follows you through
+ * instantly, and fleeing a fight costs the pursuer nothing to match.
  */
 
 const { W, H } = require("./rules");
 
 const WALL = 8;           // wall thickness, also the collision margin
-const DOOR_W = 70;
+const DOOR_W = 70;   // drawn width of a hatch; walls are solid regardless
 
-/** side: "n" | "s" | "w" | "e"; at: centre of the gap along that side */
 const COMPARTMENTS = [
   // ---------------------------------------------------- act I, pokład górny
-  { name: "Mostek",         section: 0, x: 60,   y: 60,   w: 340, h: 400,
-    doors: [{ side: "s", at: 170 }, { side: "e", at: 300 }] },
-  { name: "Ładownia",       section: 0, x: 440,  y: 60,   w: 380, h: 400,
-    doors: [{ side: "s", at: 190 }, { side: "w", at: 300 }] },
-  { name: "Mesa",           section: 0, x: 860,  y: 60,   w: 300, h: 400,
-    doors: [{ side: "s", at: 150 }, { side: "e", at: 260 }] },
-  { name: "Kwatery",        section: 0, x: 1200, y: 60,   w: 340, h: 400,
-    doors: [{ side: "s", at: 170 }, { side: "w", at: 260 }] },
-  { name: "Obserwatorium",  section: 0, x: 1580, y: 60,   w: 360, h: 400,
-    doors: [{ side: "s", at: 180 }] },
+  { name: "Mostek",         section: 0, x: 60,   y: 60,   w: 340, h: 400 },
+  { name: "Ładownia",       section: 0, x: 440,  y: 60,   w: 380, h: 400 },
+  { name: "Mesa",           section: 0, x: 860,  y: 60,   w: 300, h: 400 },
+  { name: "Kwatery",        section: 0, x: 1200, y: 60,   w: 340, h: 400 },
+  { name: "Obserwatorium",  section: 0, x: 1580, y: 60,   w: 360, h: 400 },
 
   // ---------------------------------------------------- act II, pokład dolny
-  { name: "Medyczny",       section: 1, x: 60,   y: 600,  w: 320, h: 400,
-    doors: [{ side: "n", at: 160 }, { side: "e", at: 300 }] },
-  { name: "Kaplica",        section: 1, x: 420,  y: 600,  w: 400, h: 400,
-    doors: [{ side: "n", at: 200 }, { side: "s", at: 200 }] },
-  { name: "Warsztat",       section: 1, x: 860,  y: 600,  w: 340, h: 400,
-    doors: [{ side: "n", at: 170 }, { side: "e", at: 300 }] },
-  { name: "Kriokomory",     section: 1, x: 1240, y: 600,  w: 320, h: 400,
-    doors: [{ side: "n", at: 160 }, { side: "w", at: 300 }] },
-  { name: "Maszynownia",    section: 1, x: 1600, y: 600,  w: 340, h: 400,
-    doors: [{ side: "n", at: 170 }, { side: "s", at: 170 }] },
+  { name: "Medyczny",       section: 1, x: 60,   y: 600,  w: 320, h: 400 },
+  { name: "Kaplica",        section: 1, x: 420,  y: 600,  w: 400, h: 400 },
+  { name: "Warsztat",       section: 1, x: 860,  y: 600,  w: 340, h: 400 },
+  { name: "Kriokomory",     section: 1, x: 1240, y: 600,  w: 320, h: 400 },
+  { name: "Maszynownia",    section: 1, x: 1600, y: 600,  w: 340, h: 400 },
 
   // ---------------------------------------------------- act III, rdzeń
-  { name: "Reaktor",        section: 2, x: 60,   y: 1140, w: 380, h: 400,
-    doors: [{ side: "n", at: 190 }, { side: "e", at: 300 }] },
-  { name: "Archiwum",       section: 2, x: 480,  y: 1140, w: 320, h: 400,
-    doors: [{ side: "n", at: 160 }, { side: "w", at: 300 }] },
-  { name: "Śluza",          section: 2, x: 840,  y: 1140, w: 300, h: 400,
-    doors: [{ side: "n", at: 150 }] },
-  { name: "Serwerownia",    section: 2, x: 1180, y: 1140, w: 360, h: 400,
-    doors: [{ side: "n", at: 180 }, { side: "e", at: 300 }] },
-  { name: "Zbrojownia",     section: 2, x: 1580, y: 1140, w: 360, h: 400,
-    doors: [{ side: "n", at: 180 }, { side: "w", at: 300 }] }
+  { name: "Reaktor",        section: 2, x: 60,   y: 1140, w: 380, h: 400 },
+  { name: "Archiwum",       section: 2, x: 480,  y: 1140, w: 320, h: 400 },
+  { name: "Śluza",          section: 2, x: 840,  y: 1140, w: 300, h: 400 },
+  { name: "Serwerownia",    section: 2, x: 1180, y: 1140, w: 360, h: 400 },
+  { name: "Zbrojownia",     section: 2, x: 1580, y: 1140, w: 360, h: 400 },
+];
+
+/**
+ * The wreck's connectivity, declared rather than inferred.
+ *
+ * Every pair here becomes one airlock. Doors are derived from the geometry
+ * of the pair, so the two hatches always line up and no compartment can end
+ * up with a door that leads nowhere -- which is exactly what happened when
+ * doors were hand-placed and the space between rooms was open void.
+ *
+ * Each section is a chain, and three shafts run down between sections so a
+ * new act opens the deck below rather than a disconnected island.
+ */
+const LINKS = [
+  // deck by deck, west to east
+  ["Mostek", "Ładownia"], ["Ładownia", "Mesa"], ["Mesa", "Kwatery"],
+  ["Kwatery", "Obserwatorium"],
+  ["Medyczny", "Kaplica"], ["Kaplica", "Warsztat"], ["Warsztat", "Kriokomory"],
+  ["Kriokomory", "Maszynownia"],
+  ["Reaktor", "Archiwum"], ["Archiwum", "Śluza"], ["Śluza", "Serwerownia"],
+  ["Serwerownia", "Zbrojownia"],
+  // shafts down to the next deck
+  ["Mostek", "Medyczny"], ["Mesa", "Warsztat"], ["Obserwatorium", "Maszynownia"],
+  ["Medyczny", "Reaktor"], ["Warsztat", "Śluza"], ["Maszynownia", "Zbrojownia"]
 ];
 
 const BY_NAME = new Map(COMPARTMENTS.map((c) => [c.name, c]));
+
+/** Where the two hatches of a link sit, and which way you face going through. */
+function makeDoor(aName, bName, i) {
+  const a = BY_NAME.get(aName), b = BY_NAME.get(bName);
+  if (!a || !b) throw new Error(`link to nowhere: ${aName} - ${bName}`);
+  const horizontal = Math.abs((a.x + a.w / 2) - (b.x + b.w / 2)) >
+                     Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
+  if (horizontal) {
+    const left = a.x < b.x ? a : b, right = a.x < b.x ? b : a;
+    const y = Math.round(
+      (Math.max(left.y, right.y) + Math.min(left.y + left.h, right.y + right.h)) / 2
+    );
+    return {
+      id: i, a: left.name, b: right.name, axis: "x",
+      ax: left.x + left.w, ay: y, bx: right.x, by: y
+    };
+  }
+  const top = a.y < b.y ? a : b, bottom = a.y < b.y ? b : a;
+  const x = Math.round(
+    (Math.max(top.x, bottom.x) + Math.min(top.x + top.w, bottom.x + bottom.w)) / 2
+  );
+  return {
+    id: i, a: top.name, b: bottom.name, axis: "y",
+    ax: x, ay: top.y + top.h, bx: x, by: bottom.y
+  };
+}
+
+const DOORS = LINKS.map(([a, b], i) => makeDoor(a, b, i));
+
+/** Both hatches of every lock this compartment touches, with the far side. */
+function doorsOf(name) {
+  const out = [];
+  for (const d of DOORS) {
+    if (d.a === name) out.push({ door: d, x: d.ax, y: d.ay, to: d.b });
+    if (d.b === name) out.push({ door: d, x: d.bx, y: d.by, to: d.a });
+  }
+  return out;
+}
+
+/**
+ * The hatch this player is trying to walk through, if any.
+ *
+ * Walls are solid all the way round -- a hatch is not a gap you slip through
+ * but a thing you press against and are then sealed inside.
+ */
+function doorUnder(x, y, dx, dy, compName, reach) {
+  let best = null, bd = reach;
+  for (const h of doorsOf(compName)) {
+    const d = Math.hypot(h.x - x, h.y - y);
+    if (d > bd) continue;
+    // must actually be pushing outward through it, not brushing past
+    const nx = h.x - x, ny = h.y - y, l = Math.hypot(nx, ny) || 1;
+    if ((dx * nx + dy * ny) / l < 0.3) continue;
+    bd = d; best = h;
+  }
+  return best;
+}
 
 function compartment(name) {
   const c = BY_NAME.get(name);
@@ -862,40 +948,19 @@ function compartmentAt(x, y) {
 }
 
 /**
- * A compartment's walls as segments, with the door gaps cut out.
- * `sealed` closes the gaps -- that is Rygiel, Zawał, and the base's doors.
+ * A compartment's walls: four solid sides, no gaps.
+ *
+ * Hatches are not holes. You walk up to one, it takes you, and it puts you
+ * out the other side a couple of seconds later -- so there is nothing here
+ * for a body to slip through, and no void outside to slip into.
  */
-function wallsOf(c, sealed) {
-  const segs = [];
-  const sides = {
-    n: { fixed: c.y, from: c.x, to: c.x + c.w, horizontal: true },
-    s: { fixed: c.y + c.h, from: c.x, to: c.x + c.w, horizontal: true },
-    w: { fixed: c.x, from: c.y, to: c.y + c.h, horizontal: false },
-    e: { fixed: c.x + c.w, from: c.y, to: c.y + c.h, horizontal: false }
-  };
-  for (const [side, s] of Object.entries(sides)) {
-    const gaps = sealed
-      ? []
-      : c.doors.filter((d) => d.side === side)
-          .map((d) => {
-            const centre = s.from + d.at;
-            return [centre - DOOR_W / 2, centre + DOOR_W / 2];
-          })
-          .sort((a, b) => a[0] - b[0]);
-    let cursor = s.from;
-    for (const [gs, ge] of gaps) {
-      if (gs > cursor) segs.push(seg(s, cursor, gs));
-      cursor = ge;
-    }
-    if (cursor < s.to) segs.push(seg(s, cursor, s.to));
-  }
-  return segs;
-}
-
-function seg(s, from, to) {
-  return s.horizontal
-    ? { x1: from, y1: s.fixed, x2: to, y2: s.fixed }
-    : { x1: s.fixed, y1: from, x2: s.fixed, y2: to };
+function wallsOf(c) {
+  return [
+    { x1: c.x, y1: c.y, x2: c.x + c.w, y2: c.y },
+    { x1: c.x, y1: c.y + c.h, x2: c.x + c.w, y2: c.y + c.h },
+    { x1: c.x, y1: c.y, x2: c.x, y2: c.y + c.h },
+    { x1: c.x + c.w, y1: c.y, x2: c.x + c.w, y2: c.y + c.h }
+  ];
 }
 
 /**
@@ -908,12 +973,14 @@ function seg(s, from, to) {
  */
 function free(x, y, r, state) {
   if (x < r || y < r || x > W - r || y > H - r) return false;
+  // Only compartments are floor. Everything else is hull and vacuum, and a
+  // shove must not be able to put a body out there.
+  if (!compartmentAt(x, y)) return false;
   for (const c of COMPARTMENTS) {
     // cheap reject: only the compartments we are near can block us
     if (x < c.x - r - WALL || x > c.x + c.w + r + WALL) continue;
     if (y < c.y - r - WALL || y > c.y + c.h + r + WALL) continue;
-    const sealed = state && state.sealed && state.sealed.has(c.name);
-    for (const s of wallsOf(c, sealed)) {
+    for (const s of wallsOf(c)) {
       if (segmentHit(x, y, r + WALL / 2, s)) return false;
     }
   }
@@ -942,8 +1009,9 @@ function spawnIn(c, rand = Math.random) {
 }
 
 module.exports = {
-  COMPARTMENTS, WALL, DOOR_W,
-  compartment, compartmentAt, sectionOf, wallsOf, free, spawnIn
+  COMPARTMENTS, LINKS, DOORS, WALL, DOOR_W,
+  compartment, compartmentAt, sectionOf, wallsOf, free, spawnIn,
+  doorsOf, doorUnder, makeDoor
 };
 
 });
@@ -1509,7 +1577,7 @@ function makePlayer(id, name, ws) {
     input: { x: 0, y: 0 }, holding: false,
     stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
     slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
     disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
     itemCharges: 0, itemReadyAt: 0, vests: 0, usedRevive: false,
     lastPingAt: 0, loadoutReady: false
@@ -1609,7 +1677,7 @@ function startRound(room) {
       alive: true, down: false, ejected: false,
       stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
       slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
       disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
       vests: 0, usedRevive: false, lastPingAt: 0, input: { x: 0, y: 0 }, holding: false
     });
@@ -1682,6 +1750,7 @@ function charge(p, spellId) {
  */
 function beginCast(room, p, spellId, aim, now, extra = {}) {
   if (p.role !== "mage" || !p.alive || p.ejected) return { ok: false };
+  if (p.lock) return { ok: false, why: "Jesteś w śluzie." };
   if (room.phase !== "play") return { ok: false, why: "Nie teraz." };
   if (p.windup) return { ok: false, why: "Już rzucasz." };
   if (now < p.castReadyAt) return { ok: false, why: "Zaklęcia stygną." };
@@ -1701,8 +1770,12 @@ function beginCast(room, p, spellId, aim, now, extra = {}) {
   }
 
   c.charges--;                        // reserved: an interrupt keeps it spent
+  // How far to throw it, as a fraction of the spell's reach. A Mur is
+  // useless if it can only ever appear at maximum range -- the doorway you
+  // want to block is usually the one you are standing next to.
+  const dist = Math.max(0.15, Math.min(1, Number(extra.dist) || 1));
   p.windup = {
-    spellId, at: now + s.castMs, school: s.school,
+    spellId, at: now + s.castMs, school: s.school, dist,
     aim: aim || { x: 1, y: 0 }, comp: comp ? comp.name : null, extra
   };
   return { ok: true, castMs: s.castMs, school: s.school };
@@ -1733,8 +1806,10 @@ function resolveCast(room, p, now, api) {
 
 // ------------------------------------------------------------------ helpers
 
+/** Everyone a spell could reach: alive, not ejected, and not sealed in a
+ *  hatch. A body inside an airlock is out of the world for those seconds. */
 const livingOthers = (room, p) =>
-  [...room.players.values()].filter((o) => o.alive && !o.ejected && o.id !== p.id);
+  [...room.players.values()].filter((o) => o.alive && !o.ejected && !o.lock && o.id !== p.id);
 
 function aimPoint(p, aim, range) {
   const len = Math.hypot(aim.x, aim.y) || 1;
@@ -1754,7 +1829,13 @@ function nearestTarget(room, p, range) {
 
 function apply(room, p, s, w, now, api) {
   const range = s.range || CAST_RANGE_DEFAULT;
-  const at = aimPoint(p, w.aim, range);
+  // Only spells that land somewhere take the thrower's chosen distance. A
+  // projectile flies until it hits, a cone is a shape, and a targeted spell
+  // picks the nearest body -- none of them has a landing point to shorten.
+  const throwRange = (s.target === "point" && s.effect !== "projectile")
+    ? range * (w.dist || 1)
+    : range;
+  const at = aimPoint(p, w.aim, throwRange);
 
   switch (s.effect) {
     case "projectile": {
@@ -1910,7 +1991,8 @@ function stepProjectiles(room, now, api) {
   room.balls = room.balls.filter((b) => {
     b.x += b.vx; b.y += b.vy;
     const victim = [...room.players.values()].find(
-      (o) => o.alive && !o.ejected && o.id !== b.by && Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
+      (o) => o.alive && !o.ejected && !o.lock && o.id !== b.by &&
+        Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
     );
     const outside = b.x < 0 || b.y < 0 || b.x > W || b.y > H;
     const spent = now - b.born > BALL_LIFE;
@@ -1926,7 +2008,7 @@ function stepProjectiles(room, now, api) {
     if (now < d.at) return true;
     api.fx(room, d.school, d.x, d.y);
     for (const o of room.players.values()) {
-      if (!o.alive || o.ejected || o.id === d.by) continue;
+      if (!o.alive || o.ejected || o.lock || o.id === d.by) continue;
       if (Math.hypot(o.x - d.x, o.y - d.y) <= d.r) api.hit(room, o, room.players.get(d.by), d.school);
     }
     return false;
@@ -1955,10 +2037,10 @@ __def("actions", function (module, exports, require) {
 const {
   SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
-  PING_COOLDOWN, PING_MS, PING_KINDS
+  PING_COOLDOWN, PING_MS, PING_KINDS, LOCK_MS, DOOR_REACH
 } = require("./rules");
 const { findItem } = require("./classes");
-const { free, compartmentAt } = require("./map");
+const { free, compartmentAt, compartment, doorsOf, doorUnder } = require("./map");
 const { logTransit, makeCorpse } = require("./evidence");
 const { apparentClass, pushEvent, alive, hunters } = require("./room");
 const { interrupt } = require("./effects");
@@ -1981,6 +2063,7 @@ function collisionState(room, now) {
  * a corridor you cannot round a corner in is a corridor nobody uses.
  */
 function step(room, p, now) {
+  if (p.lock) { cycleLock(room, p, now); return; }
   if (now < p.stunUntil || now < p.proneUntil) { p.channel = null; return; }
 
   const ix = p.input.x, iy = p.input.y;
@@ -1994,6 +2077,12 @@ function step(room, p, now) {
   const nx = (ix / len) * sp, ny = (iy / len) * sp;
   const st = collisionState(room, now);
   const before = p.comp;
+
+  // pressing against a hatch takes you into the lock instead of nowhere
+  const hatch = before
+    ? doorUnder(p.x, p.y, ix / len, iy / len, before, DOOR_REACH)
+    : null;
+  if (hatch && enterLock(room, p, hatch, now)) return;
 
   if (free(p.x + nx, p.y + ny, 12, st)) { p.x += nx; p.y += ny; }
   else if (free(p.x + nx, p.y, 12, st)) { p.x += nx; }
@@ -2025,6 +2114,58 @@ function step(room, p, now) {
     }
     p.comp = name;
   }
+}
+
+/**
+ * Step into an airlock.
+ *
+ * You leave the room's log immediately -- the sensors saw you go -- but you
+ * do not appear in the next one until the far hatch opens. For those two and
+ * a half seconds you are nowhere: unreachable, and unable to reach anybody.
+ *
+ * A sealed compartment on either side refuses you, which is what makes
+ * Rygiel and Zawał worth a charge.
+ */
+function enterLock(room, p, hatch, now) {
+  const st = collisionState(room, now);
+  if (st.sealed.has(p.comp) || st.sealed.has(hatch.to)) return false;
+  if (room.round.sealed.has(hatch.to)) return false;
+
+  const target = compartment(hatch.to);
+  if (target.section > room.round.act) return false;   // that deck is not open yet
+
+  p.lock = { to: hatch.to, from: p.comp, until: now + LOCK_MS, x: hatch.x, y: hatch.y };
+  p.channel = null;
+  if (p.comp) {
+    logTransit(room.evidence, p.comp, {
+      realId: p.id, apparentClass: apparentClass(p), kind: "out",
+      act: room.round.act, t: now
+    });
+  }
+  p.comp = null;
+  return true;
+}
+
+/** Hold them until the far side opens, then put them just inside it. */
+function cycleLock(room, p, now) {
+  if (now < p.lock.until) return;
+  const to = p.lock.to;
+  const c = compartment(to);
+  const far = doorsOf(to).find((h) => h.to === p.lock.from);
+  // step in from the hatch, not onto the wall itself
+  const inx = c.x + c.w / 2, iny = c.y + c.h / 2;
+  let x = far ? far.x : inx, y = far ? far.y : iny;
+  const dx = inx - x, dy = iny - y, d = Math.hypot(dx, dy) || 1;
+  x += (dx / d) * 34; y += (dy / d) * 34;
+
+  p.x = Math.round(x); p.y = Math.round(y);
+  p.comp = to;
+  p.lock = null;
+  logTransit(room.evidence, to, {
+    realId: p.id, apparentClass: apparentClass(p), kind: "in",
+    act: room.round.act, t: now
+  });
+  fireSensors(room, p, to, now);
 }
 
 /** Zwiadowca's Czujnik ruchu. Reports a class, like everything else does. */
@@ -2088,7 +2229,7 @@ function hit(room, target, source, school, api) {
 // ------------------------------------------------------------------ taser
 
 function taser(room, p, aim, now) {
-  if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
+  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return { ok: false };
   if (now < p.taserReadyAt) return { ok: false, why: "Tazer się ładuje." };
   if (now < p.stunUntil || now < p.proneUntil) return { ok: false };
 
@@ -2098,7 +2239,7 @@ function taser(room, p, aim, now) {
 
   let best = null, bd = range;
   for (const o of room.players.values()) {
-    if (!o.alive || o.ejected || o.id === p.id) continue;
+    if (!o.alive || o.ejected || o.lock || o.id === p.id) continue;
     const d = dist(p, o);
     if (d > bd) continue;
     // must be roughly in front, so a taser is aimed rather than a radius
@@ -2127,12 +2268,13 @@ function taser(room, p, aim, now) {
  * All three break on movement, which is what makes them a commitment.
  */
 function hold(room, p, now) {
-  if (!p.alive || p.ejected || room.phase !== "play") return;
+  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return;
   if (now < p.stunUntil || now < p.proneUntil || now < p.silenceUntil) { p.channel = null; return; }
   if (p.channel) return;
 
   const stunnedNear = [...room.players.values()].find(
-    (o) => o.alive && !o.ejected && o.id !== p.id && o.stunUntil > now && dist(p, o) < 46
+    (o) => o.alive && !o.ejected && !o.lock && o.id !== p.id &&
+      o.stunUntil > now && dist(p, o) < 46
   );
   if (stunnedNear) {
     const can = T.canBind(room.tribunal, stunnedNear.id, now);
@@ -2205,7 +2347,10 @@ function finishChannel(room, p, now, api) {
 function useItem(room, p, payload, now) {
   if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
   const it = findItem(p.cls, p.item);
-  if (!it || it.kind !== "active") return { ok: false, why: "Ten przedmiot nie ma użyć." };
+  if (!it || it.kind !== "active") return { ok: false, why: "Ten przedmiot działa sam." };
+  // spent by holding over a body, so say that rather than falling through to
+  // the unknown-item branch and calling the player's own kit unrecognised
+  if (it.viaChannel) return { ok: false, why: "Stań nad rannym i przytrzymaj." };
   if (p.itemCharges <= 0) return { ok: false, why: "Zużyte." };
 
   const comp = compartmentAt(p.x, p.y);
@@ -2380,6 +2525,9 @@ function forLiving(room, me, now) {
   const actors = [];
   for (const o of room.players.values()) {
     if (!o.alive || o.ejected) continue;
+    // inside an airlock you are in neither room: nobody sees you, and you
+    // cannot be tasered, hit or bound until the far hatch opens
+    if (o.lock) continue;
     if (o.id === me.id) { actors.push(actorView(o, now)); continue; }
     if (o.invisibleUntil > now) continue;
     if (!near(o)) continue;
@@ -2396,7 +2544,8 @@ function forLiving(room, me, now) {
       // the book, with what is left in it -- only ever sent to its owner
       book: me.role === "mage" ? me.book.map((b) => ({ ...b })) : null,
       channel: me.channel ? { kind: me.channel.kind, start: me.channel.start, ms: me.channel.ms } : null,
-      windup: me.windup ? { spell: me.windup.spellId, at: me.windup.at } : null
+      windup: me.windup ? { spell: me.windup.spellId, at: me.windup.at } : null,
+      lock: me.lock ? { to: me.lock.to, until: me.lock.until } : null
     },
     actors,
     corpses: room.corpses.filter(near).map((c) => ({
@@ -2427,6 +2576,7 @@ function forBase(room, me, now) {
     const bodies = [];
     for (const o of room.players.values()) {
       if (!o.alive || o.ejected) continue;
+      if (o.lock) continue;                 // inside a hatch, off every camera
       if (o.invisibleUntil > now) continue;
       const comp = compartmentAt(o.x, o.y);
       if (!comp || comp.name !== name) continue;
@@ -2507,7 +2657,7 @@ const T = require("./tribunal");
 const B = require("./base");
 const { readLog, readResidue, readCorpse } = require("./evidence");
 const { snapshotFor } = require("./snapshot");
-const { compartmentAt, free, COMPARTMENTS, wallsOf } = require("./map");
+const { compartmentAt, free, COMPARTMENTS, DOORS, wallsOf } = require("./map");
 const { CLASSES, CLASS_NAMES, itemsOf } = require("./classes");
 const { SPELLS, SCHOOLS, PRESETS } = require("./spells");
 
@@ -2558,8 +2708,9 @@ function makeDriver(onMessage, opts) {
       spells: SPELLS, schools: SCHOOLS, presets: PRESETS, slots: RULES.BOOK_SLOTS,
       map: COMPARTMENTS.map((c) => ({
         name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
-        walls: wallsOf(c, false)
+        walls: wallsOf(c)
       })),
+      doors: DOORS,
       w: RULES.W, h: RULES.H, sandbox: true
     });
     broadcast({
@@ -2770,7 +2921,8 @@ function makeDriver(onMessage, opts) {
       }
       case "cast": {
         const r = E.beginCast(room, human, String(m.spell),
-          { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t, { cls: m.cls, school: m.school });
+          { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t,
+          { cls: m.cls, school: m.school, dist: m.d });
         if (!r.ok) { if (r.why) send(human, { t: "toast", msg: r.why }); break; }
         broadcast({ t: "windup", id: human.id, school: r.school, ms: r.castMs });
         break;
@@ -2934,7 +3086,10 @@ module.exports = { makeDriver };
         paintRole();
         break;
       case "act": actEndsAt = m.endsAt; break;
-      case "state": S = m; paintHud(); break;
+      // exposed for the browser harness. Safe by construction: this is the
+      // snapshot the server already decided this player may see, so reading
+      // it here reveals nothing a patched client could not read anyway.
+      case "state": S = m; window.__S = m; paintHud(); break;
       case "fx": fx.push({ x: m.x, y: m.y, school: m.school, born: Date.now() }); break;
       case "windup": fx.push({ x: 0, y: 0, school: m.school, born: Date.now(), tell: m.id }); break;
       case "log": showLog(m); break;
@@ -3125,6 +3280,29 @@ module.exports = { makeDriver };
     var mage = ROLE.role === "mage";
     $("tA").querySelector("span").textContent = mage ? "RZUĆ" : "TAZER";
     $("tB").querySelector("span").textContent = "PING";
+
+    var it = itemDef(ROLE.cls, ROLE.item);
+    var passive = it && it.kind !== "active";
+    // a passive has nothing to press; say so rather than offering a dead button
+    $("tC").querySelector("span").textContent = passive ? "—" : shortItem(it ? it.name : "SPRZĘT");
+    $("tC").disabled = !!passive;
+    $("tC").style.opacity = passive ? 0.3 : "";
+  }
+
+  function itemDef(cls, id) {
+    var c = DEF.classes.filter(function (x) { return x.name === cls; })[0];
+    if (!c) return null;
+    return c.items.filter(function (x) { return x.id === id; })[0] || null;
+  }
+
+  /** 64 px circles cannot hold "Plecak z kamizelkami". */
+  function shortItem(name) {
+    var map = {
+      "Plecak z kamizelkami": "KAMIZ.", "Tarcza szturmowa": "TARCZA",
+      "Czujnik ruchu": "CZUJNIK", "Kamera polowa": "KAMERA",
+      "Stabilizator": "MEDYK", "Zakłócacz": "ZAKŁÓC."
+    };
+    return (map[name] || name).toUpperCase().slice(0, 8);
   }
 
   function itemName(cls, id) {
@@ -3212,8 +3390,15 @@ module.exports = { makeDriver };
     var extra = {};
     if (s.pickClass) extra.cls = nearestSeenClass();
     if (s.pickSchool) extra.school = "ogien";
-    send({ t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y, cls: extra.cls, school: extra.school });
+    send({
+      t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y,
+      d: aimRatio, cls: extra.cls, school: extra.school
+    });
   }
+
+  /** How far along the spell's reach the throw lands. A Mur that can only
+   *  appear at maximum range cannot block the doorway you are standing in. */
+  var aimRatio = 1;
 
   function nearestSeenClass() {
     if (!S || !S.actors) return null;
@@ -3255,6 +3440,12 @@ module.exports = { makeDriver };
     var dy = (e.clientY - r.top) - cv.height / (2 * (window.devicePixelRatio || 1));
     var l = Math.hypot(dx, dy) || 1;
     lastAim = { x: dx / l, y: dy / l };
+    // on a mouse the cursor *is* the landing point, so the distance to it
+    // sets the throw directly
+    var s = (ROLE && ROLE.role === "mage" && S && S.me && S.me.book && S.me.book[selected])
+      ? spellById(S.me.book[selected].id) : null;
+    var reach = (s && s.range) || 210;
+    aimRatio = Math.max(0.15, Math.min(1, (l / ZOOM) / reach));
   });
   cv.addEventListener("mousedown", function (e) {
     e.preventDefault();
@@ -3262,6 +3453,11 @@ module.exports = { makeDriver };
     else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
   });
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function roomByName(n) {
+    for (var i = 0; i < DEF.map.length; i++) if (DEF.map[i].name === n) return DEF.map[i];
+    return null;
+  }
 
   function hereRoom() {
     if (!DEF || !S) return null;
@@ -3320,6 +3516,26 @@ module.exports = { makeDriver };
     bindHold($("tHold"));
     bindAim($("tA"));
     $("tB").onclick = function () { doPing("podejrzany"); };
+    // the item had a keyboard binding and no button at all, which made every
+    // hunter's one distinctive verb unusable on a phone
+    $("tC").onclick = function () {
+      send({ t: "item", aim: lastAim, room: hereRoom(), targetId: nearestSeenId() });
+    };
+  }
+
+  function nearestSeenId() {
+    var a = nearestSeenActor();
+    return a ? a.id : null;
+  }
+  function nearestSeenActor() {
+    if (!S || !S.actors) return null;
+    var me = meActor(), best = null, bd = 1e9;
+    S.actors.forEach(function (o) {
+      if (o.id === S.me.id) return;
+      var d = Math.hypot(o.x - me.x, o.y - me.y);
+      if (d < bd) { bd = d; best = o; }
+    });
+    return best;
   }
 
   /**
@@ -3346,7 +3562,11 @@ module.exports = { makeDriver };
         if (t.identifier !== aim.id) continue;
         aim.x = t.clientX - aim.ox; aim.y = t.clientY - aim.oy;
         var l = Math.hypot(aim.x, aim.y);
-        if (l > 12) lastAim = { x: aim.x / l, y: aim.y / l };
+        if (l > 12) {
+          lastAim = { x: aim.x / l, y: aim.y / l };
+          // pull short, throw short: the stick sets direction and distance
+          aimRatio = Math.max(0.15, Math.min(1, l / 46));
+        }
         e.preventDefault();
       }
     }, { passive: false });
@@ -3431,6 +3651,7 @@ module.exports = { makeDriver };
   function draw() {
     requestAnimationFrame(draw);
     if (!S || !S.me || S.me.base || !DEF) return;
+    if (S.me.lock) { drawLock(); return; }
     if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
 
     var me = meActor();
@@ -3463,6 +3684,31 @@ module.exports = { makeDriver };
       ctx.fillStyle = "rgba(150,170,210,0.32)";
       ctx.font = "11px system-ui";
       ctx.fillText(c.name, c.x + 8, c.y + 16);
+    });
+
+    // hatches: the only way between compartments, and the only thing on a
+    // wall worth walking at
+    (DEF.doors || []).forEach(function (d) {
+      var a = roomByName(d.a), b = roomByName(d.b);
+      if (!a || !b) return;
+      if (a.section > S.act && b.section > S.act) return;
+      var shut = sealed[d.a] || sealed[d.b];
+      [[d.ax, d.ay], [d.bx, d.by]].forEach(function (h) {
+        ctx.fillStyle = shut ? "#7a3a30" : "#2f4c74";
+        ctx.strokeStyle = shut ? "#b05a4a" : "#7fd8ff";
+        ctx.lineWidth = 2;
+        if (d.axis === "x") {
+          ctx.fillRect(h[0] - 5, h[1] - 26, 10, 52);
+          ctx.strokeRect(h[0] - 5, h[1] - 26, 10, 52);
+        } else {
+          ctx.fillRect(h[0] - 26, h[1] - 5, 52, 10);
+          ctx.strokeRect(h[0] - 26, h[1] - 5, 52, 10);
+        }
+      });
+      ctx.strokeStyle = shut ? "rgba(176,90,74,0.4)" : "rgba(127,216,255,0.22)";
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath(); ctx.moveTo(d.ax, d.ay); ctx.lineTo(d.bx, d.by); ctx.stroke();
+      ctx.setLineDash([]);
     });
 
     (S.walls || []).forEach(function (w) {
@@ -3638,8 +3884,11 @@ module.exports = { makeDriver };
         label(me.x, me.y - 44, s.name + " — nikogo w zasięgu");
       }
     } else {                                    // an area landing where you point
-      var reach3 = s.range || 210;
+      var reach3 = (s.range || 210) * aimRatio;
       var ax = me.x + dir.x * reach3, ay = me.y + dir.y * reach3;
+      ctx.globalAlpha = strong ? 0.16 : 0.06;
+      ring(me.x, me.y, s.range || 210);         // the reach you are working inside
+      ctx.globalAlpha = strong ? 0.75 : 0.22;
       ctx.globalAlpha = strong ? 0.22 : 0.09;
       ctx.beginPath(); ctx.arc(ax, ay, s.radius || 60, 0, 6.284); ctx.fill();
       ctx.globalAlpha = strong ? 0.8 : 0.25;
@@ -3674,6 +3923,43 @@ module.exports = { makeDriver };
       ctx.globalAlpha = 0.95;
       ctx.fillText(text, x - w / 2, y);
     }
+  }
+
+  /**
+   * Sealed in a hatch. You see nothing and nothing sees you -- so the screen
+   * shows the wait itself rather than pretending you still have a view. The
+   * two and a half seconds are the mechanic, not a loading spinner.
+   */
+  function drawLock() {
+    if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#05070c";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    var cx = cv.width / 2, cy = cv.height / 2;
+    var r0 = window.devicePixelRatio || 1;
+    var left = Math.max(0, S.me.lock.until - Date.now());
+    var k = 1 - Math.min(1, left / 2500);
+
+    ctx.strokeStyle = "rgba(127,216,255,0.28)";
+    ctx.lineWidth = 10 * r0;
+    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, 0, 6.284); ctx.stroke();
+    ctx.strokeStyle = "#7fd8ff";
+    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, -1.571, -1.571 + 6.284 * k); ctx.stroke();
+
+    ctx.fillStyle = "#e6ecfa";
+    ctx.textAlign = "center";
+    ctx.font = (15 * r0) + "px system-ui";
+    ctx.fillText("ŚLUZA", cx, cy - 128 * r0);
+    // above the ring, not below: the button cluster owns the lower third
+    ctx.font = (13 * r0) + "px system-ui";
+    ctx.fillStyle = "#8b9ac0";
+    ctx.fillText("Przejście do: " + S.me.lock.to, cx, cy - 106 * r0);
+    ctx.fillText("Nikt cię tu nie dosięgnie. I ty nikogo.", cx, cy - 86 * r0);
+    ctx.font = (22 * r0) + "px system-ui";
+    ctx.fillStyle = "#e6ecfa";
+    ctx.fillText((left / 1000).toFixed(1) + " s", cx, cy + 8 * r0);
+    ctx.textAlign = "left";
   }
 
   function drawActor(a) {

@@ -27,7 +27,7 @@ const T = require("./src/tribunal");
 const B = require("./src/base");
 const { readLog, readResidue, readCorpse } = require("./src/evidence");
 const { snapshotFor } = require("./src/snapshot");
-const { compartmentAt, free, COMPARTMENTS, wallsOf } = require("./src/map");
+const { compartmentAt, free, COMPARTMENTS, DOORS, wallsOf } = require("./src/map");
 const { CLASSES, CLASS_NAMES, itemsOf } = require("./src/classes");
 const { SPELLS, SCHOOLS, PRESETS } = require("./src/spells");
 
@@ -265,8 +265,9 @@ wss.on("connection", (ws) => {
         // about anybody in it, and the renderer needs the geometry
         map: COMPARTMENTS.map((c) => ({
           name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
-          walls: wallsOf(c, false)
+          walls: wallsOf(c)
         })),
+        doors: DOORS,
         w: RULES.W, h: RULES.H
       });
       broadcast(room, lobbyMsg(room));
@@ -318,7 +319,7 @@ wss.on("connection", (ws) => {
         const r = E.beginCast(
           room, player, String(m.spell),
           { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t,
-          { cls: m.cls, school: m.school }
+          { cls: m.cls, school: m.school, dist: m.d }
         );
         if (!r.ok) { if (r.why) send(player, { t: "toast", msg: r.why }); break; }
         // the tell: everyone with line of sight sees the bloom

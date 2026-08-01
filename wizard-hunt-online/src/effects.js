@@ -35,6 +35,7 @@ function charge(p, spellId) {
  */
 function beginCast(room, p, spellId, aim, now, extra = {}) {
   if (p.role !== "mage" || !p.alive || p.ejected) return { ok: false };
+  if (p.lock) return { ok: false, why: "Jesteś w śluzie." };
   if (room.phase !== "play") return { ok: false, why: "Nie teraz." };
   if (p.windup) return { ok: false, why: "Już rzucasz." };
   if (now < p.castReadyAt) return { ok: false, why: "Zaklęcia stygną." };
@@ -54,8 +55,12 @@ function beginCast(room, p, spellId, aim, now, extra = {}) {
   }
 
   c.charges--;                        // reserved: an interrupt keeps it spent
+  // How far to throw it, as a fraction of the spell's reach. A Mur is
+  // useless if it can only ever appear at maximum range -- the doorway you
+  // want to block is usually the one you are standing next to.
+  const dist = Math.max(0.15, Math.min(1, Number(extra.dist) || 1));
   p.windup = {
-    spellId, at: now + s.castMs, school: s.school,
+    spellId, at: now + s.castMs, school: s.school, dist,
     aim: aim || { x: 1, y: 0 }, comp: comp ? comp.name : null, extra
   };
   return { ok: true, castMs: s.castMs, school: s.school };
@@ -86,8 +91,10 @@ function resolveCast(room, p, now, api) {
 
 // ------------------------------------------------------------------ helpers
 
+/** Everyone a spell could reach: alive, not ejected, and not sealed in a
+ *  hatch. A body inside an airlock is out of the world for those seconds. */
 const livingOthers = (room, p) =>
-  [...room.players.values()].filter((o) => o.alive && !o.ejected && o.id !== p.id);
+  [...room.players.values()].filter((o) => o.alive && !o.ejected && !o.lock && o.id !== p.id);
 
 function aimPoint(p, aim, range) {
   const len = Math.hypot(aim.x, aim.y) || 1;
@@ -107,7 +114,13 @@ function nearestTarget(room, p, range) {
 
 function apply(room, p, s, w, now, api) {
   const range = s.range || CAST_RANGE_DEFAULT;
-  const at = aimPoint(p, w.aim, range);
+  // Only spells that land somewhere take the thrower's chosen distance. A
+  // projectile flies until it hits, a cone is a shape, and a targeted spell
+  // picks the nearest body -- none of them has a landing point to shorten.
+  const throwRange = (s.target === "point" && s.effect !== "projectile")
+    ? range * (w.dist || 1)
+    : range;
+  const at = aimPoint(p, w.aim, throwRange);
 
   switch (s.effect) {
     case "projectile": {
@@ -263,7 +276,8 @@ function stepProjectiles(room, now, api) {
   room.balls = room.balls.filter((b) => {
     b.x += b.vx; b.y += b.vy;
     const victim = [...room.players.values()].find(
-      (o) => o.alive && !o.ejected && o.id !== b.by && Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
+      (o) => o.alive && !o.ejected && !o.lock && o.id !== b.by &&
+        Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
     );
     const outside = b.x < 0 || b.y < 0 || b.x > W || b.y > H;
     const spent = now - b.born > BALL_LIFE;
@@ -279,7 +293,7 @@ function stepProjectiles(room, now, api) {
     if (now < d.at) return true;
     api.fx(room, d.school, d.x, d.y);
     for (const o of room.players.values()) {
-      if (!o.alive || o.ejected || o.id === d.by) continue;
+      if (!o.alive || o.ejected || o.lock || o.id === d.by) continue;
       if (Math.hypot(o.x - d.x, o.y - d.y) <= d.r) api.hit(room, o, room.players.get(d.by), d.school);
     }
     return false;

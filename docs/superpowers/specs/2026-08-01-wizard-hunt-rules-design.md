@@ -78,8 +78,21 @@ W każdym akcie cztery z pięciu przedziałów sekcji dostają artefakt.
 | Pokład dolny (akt II) | Medyczny, Kaplica, Warsztat, Kriokomory, Maszynownia |
 | Rdzeń (akt III) | Reaktor, Archiwum, Śluza, Serwerownia, Ładownia rdzenia |
 
-Przedział jest prostokątem z nazwą. Wejścia i wyjścia są logowane
-(patrz §5).
+Przedział jest szczelnym pudełkiem. **Między przedziałami nie ma podłogi** —
+na zewnątrz jest kadłub i próżnia, i nawet Podmuch nie wypchnie tam ciała.
+
+Pomieszczenia łączą **śluzy**. Wchodzisz we właz i zostajesz w nim zamknięty
+na 2.5 s, zanim otworzy się druga strona. W środku jesteś w żadnym z
+przedziałów: nikt cię nie widzi, nie ogłuszy, nie trafi i nie zwiąże — i ty
+też nikogo.
+
+To opóźnienie jest sensem mechaniki. Nikt nie wejdzie za tobą natychmiast,
+ucieczka z walki kosztuje ścigającego dokładnie tyle samo, a każda zmiana
+pomieszczenia jest aktem, który zapisuje **obie połówki rejestru**: wyjście w
+chwili, gdy właz cię bierze, i wejście dopiero gdy się otwiera.
+
+Rygiel i Zawał zamykają włazy przedziału — i to jest to, za co warto na nie
+wydać ładunek.
 
 ---
 

@@ -42,6 +42,25 @@ hunters' only road is the tribunal — the one road they can be wrong on. That
 is the mage's clock, and it is why stalling is a strategy for him rather than
 a failure to act.
 
+## Getting about
+
+Compartments are sealed boxes. There is no walkable space between them --
+the void outside is hull and vacuum, and a shove cannot put a body there.
+
+Rooms are joined by **airlocks**. Walk into a hatch and you are sealed in
+for two and a half seconds before the far side opens. While you are inside
+you are in neither room: nobody can see you, taser you, hit you or bind you,
+and you can do none of those things either.
+
+That delay is the point. Nobody follows you through instantly, fleeing a
+fight costs the pursuer nothing to match, and every room change is a
+committed act that writes both halves of the transit log -- you leave the
+first room's record the moment the hatch takes you, and appear in the
+second's only when it opens.
+
+Rygiel and Zawał shut the hatches of a compartment, which is what makes
+them worth a charge.
+
 ## The tribunal
 
 Tasering somebody and binding them freezes the round and puts every living

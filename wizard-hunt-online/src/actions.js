@@ -12,10 +12,10 @@
 const {
   SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
-  PING_COOLDOWN, PING_MS, PING_KINDS
+  PING_COOLDOWN, PING_MS, PING_KINDS, LOCK_MS, DOOR_REACH
 } = require("./rules");
 const { findItem } = require("./classes");
-const { free, compartmentAt } = require("./map");
+const { free, compartmentAt, compartment, doorsOf, doorUnder } = require("./map");
 const { logTransit, makeCorpse } = require("./evidence");
 const { apparentClass, pushEvent, alive, hunters } = require("./room");
 const { interrupt } = require("./effects");
@@ -38,6 +38,7 @@ function collisionState(room, now) {
  * a corridor you cannot round a corner in is a corridor nobody uses.
  */
 function step(room, p, now) {
+  if (p.lock) { cycleLock(room, p, now); return; }
   if (now < p.stunUntil || now < p.proneUntil) { p.channel = null; return; }
 
   const ix = p.input.x, iy = p.input.y;
@@ -51,6 +52,12 @@ function step(room, p, now) {
   const nx = (ix / len) * sp, ny = (iy / len) * sp;
   const st = collisionState(room, now);
   const before = p.comp;
+
+  // pressing against a hatch takes you into the lock instead of nowhere
+  const hatch = before
+    ? doorUnder(p.x, p.y, ix / len, iy / len, before, DOOR_REACH)
+    : null;
+  if (hatch && enterLock(room, p, hatch, now)) return;
 
   if (free(p.x + nx, p.y + ny, 12, st)) { p.x += nx; p.y += ny; }
   else if (free(p.x + nx, p.y, 12, st)) { p.x += nx; }
@@ -82,6 +89,58 @@ function step(room, p, now) {
     }
     p.comp = name;
   }
+}
+
+/**
+ * Step into an airlock.
+ *
+ * You leave the room's log immediately -- the sensors saw you go -- but you
+ * do not appear in the next one until the far hatch opens. For those two and
+ * a half seconds you are nowhere: unreachable, and unable to reach anybody.
+ *
+ * A sealed compartment on either side refuses you, which is what makes
+ * Rygiel and Zawał worth a charge.
+ */
+function enterLock(room, p, hatch, now) {
+  const st = collisionState(room, now);
+  if (st.sealed.has(p.comp) || st.sealed.has(hatch.to)) return false;
+  if (room.round.sealed.has(hatch.to)) return false;
+
+  const target = compartment(hatch.to);
+  if (target.section > room.round.act) return false;   // that deck is not open yet
+
+  p.lock = { to: hatch.to, from: p.comp, until: now + LOCK_MS, x: hatch.x, y: hatch.y };
+  p.channel = null;
+  if (p.comp) {
+    logTransit(room.evidence, p.comp, {
+      realId: p.id, apparentClass: apparentClass(p), kind: "out",
+      act: room.round.act, t: now
+    });
+  }
+  p.comp = null;
+  return true;
+}
+
+/** Hold them until the far side opens, then put them just inside it. */
+function cycleLock(room, p, now) {
+  if (now < p.lock.until) return;
+  const to = p.lock.to;
+  const c = compartment(to);
+  const far = doorsOf(to).find((h) => h.to === p.lock.from);
+  // step in from the hatch, not onto the wall itself
+  const inx = c.x + c.w / 2, iny = c.y + c.h / 2;
+  let x = far ? far.x : inx, y = far ? far.y : iny;
+  const dx = inx - x, dy = iny - y, d = Math.hypot(dx, dy) || 1;
+  x += (dx / d) * 34; y += (dy / d) * 34;
+
+  p.x = Math.round(x); p.y = Math.round(y);
+  p.comp = to;
+  p.lock = null;
+  logTransit(room.evidence, to, {
+    realId: p.id, apparentClass: apparentClass(p), kind: "in",
+    act: room.round.act, t: now
+  });
+  fireSensors(room, p, to, now);
 }
 
 /** Zwiadowca's Czujnik ruchu. Reports a class, like everything else does. */
@@ -145,7 +204,7 @@ function hit(room, target, source, school, api) {
 // ------------------------------------------------------------------ taser
 
 function taser(room, p, aim, now) {
-  if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
+  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return { ok: false };
   if (now < p.taserReadyAt) return { ok: false, why: "Tazer się ładuje." };
   if (now < p.stunUntil || now < p.proneUntil) return { ok: false };
 
@@ -155,7 +214,7 @@ function taser(room, p, aim, now) {
 
   let best = null, bd = range;
   for (const o of room.players.values()) {
-    if (!o.alive || o.ejected || o.id === p.id) continue;
+    if (!o.alive || o.ejected || o.lock || o.id === p.id) continue;
     const d = dist(p, o);
     if (d > bd) continue;
     // must be roughly in front, so a taser is aimed rather than a radius
@@ -184,12 +243,13 @@ function taser(room, p, aim, now) {
  * All three break on movement, which is what makes them a commitment.
  */
 function hold(room, p, now) {
-  if (!p.alive || p.ejected || room.phase !== "play") return;
+  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return;
   if (now < p.stunUntil || now < p.proneUntil || now < p.silenceUntil) { p.channel = null; return; }
   if (p.channel) return;
 
   const stunnedNear = [...room.players.values()].find(
-    (o) => o.alive && !o.ejected && o.id !== p.id && o.stunUntil > now && dist(p, o) < 46
+    (o) => o.alive && !o.ejected && !o.lock && o.id !== p.id &&
+      o.stunUntil > now && dist(p, o) < 46
   );
   if (stunnedNear) {
     const can = T.canBind(room.tribunal, stunnedNear.id, now);
@@ -262,7 +322,10 @@ function finishChannel(room, p, now, api) {
 function useItem(room, p, payload, now) {
   if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
   const it = findItem(p.cls, p.item);
-  if (!it || it.kind !== "active") return { ok: false, why: "Ten przedmiot nie ma użyć." };
+  if (!it || it.kind !== "active") return { ok: false, why: "Ten przedmiot działa sam." };
+  // spent by holding over a body, so say that rather than falling through to
+  // the unknown-item branch and calling the player's own kit unrecognised
+  if (it.viaChannel) return { ok: false, why: "Stań nad rannym i przytrzymaj." };
   if (p.itemCharges <= 0) return { ok: false, why: "Zużyte." };
 
   const comp = compartmentAt(p.x, p.y);

@@ -142,30 +142,68 @@ function bot(name, roomCode) {
       "a player outside vision must not be serialised at all");
   });
 
-  // ------------------------------------------------------------- movement + log
+  // ------------------------------------------------------------- airlocks
+  const M = require("../src/map");
+  const { readLog } = require("../src/evidence");
+  const { LOCK_MS } = require("../src/rules");
   const walker = [...room.players.values()].find((p) => p.role !== "mage");
-  const { compartmentAt } = require("../src/map");
-  const target = room.round.artifacts.find((a) => a.act === 0);
-  walker.x = target.x; walker.y = target.y - 60;
-  walker.comp = null;
-  await wait(200);
-  walker.input = { x: 0, y: 1 };
-  await wait(400);
-  walker.input = { x: 0, y: 0 };
-  await wait(120);
 
-  check("walking into a compartment writes a transit entry", () => {
-    const c = compartmentAt(walker.x, walker.y);
-    assert.ok(c, "the walker should be standing in a compartment");
-    const { readLog } = require("../src/evidence");
-    const entries = readLog(room.evidence, c.name, { act: 0, now: Date.now() });
-    assert.ok(entries.length > 0, "no transit entries were written");
-    assert.ok(entries.every((e) => !("realId" in e)), "an entry leaked a real id");
+  check("the void between compartments is not floor", () => {
+    const st = { sealed: new Set(), walls: [] };
+    // a point squarely in the gap between the first two rooms
+    const a = M.compartment("Mostek"), b = M.compartment("Ładownia");
+    const gapX = (a.x + a.w + b.x) / 2;
+    assert.strictEqual(M.free(gapX, a.y + a.h / 2, 12, st), false,
+      "a shove must not be able to put a body outside the hull");
+    assert.strictEqual(M.free(a.x + a.w / 2, a.y + a.h / 2, 12, st), true);
   });
+
+  const hatch = M.doorsOf("Mostek").find((h) => h.to === "Ładownia");
+  walker.comp = "Mostek";
+  walker.lock = null;
+  walker.x = hatch.x - 22; walker.y = hatch.y;
+  walker.input = { x: 1, y: 0 };
+  await wait(250);
+
+  check("pressing a hatch seals you into the lock", () => {
+    assert.ok(walker.lock, "the walker should be inside the airlock");
+    assert.strictEqual(walker.lock.to, "Ładownia");
+    assert.strictEqual(walker.comp, null, "you are in neither room while locked");
+  });
+
+  check("somebody in a lock is unreachable and invisible", () => {
+    const other = [...room.players.values()].find((p) => p.id !== walker.id && p.alive);
+    other.x = walker.x; other.y = walker.y;
+    const { snapshotFor } = require("../src/snapshot");
+    const s = snapshotFor(room, other, Date.now());
+    assert.ok(!s.actors.some((a) => a.id === walker.id),
+      "a body inside a lock must not be serialised onto the floor");
+  });
+
+  await wait(LOCK_MS + 400);
+
+  check("the far hatch opens into the next compartment", () => {
+    assert.strictEqual(walker.lock, null, "the lock should have cycled");
+    assert.strictEqual(walker.comp, "Ładownia");
+    const c = M.compartmentAt(walker.x, walker.y);
+    assert.ok(c && c.name === "Ładownia", "and it must put you inside, not on the wall");
+  });
+
+  check("the passage writes both halves of the transit log", () => {
+    const out = readLog(room.evidence, "Mostek", { act: 0, now: Date.now() });
+    const into = readLog(room.evidence, "Ładownia", { act: 0, now: Date.now() });
+    assert.ok(out.some((e) => e.kind === "out"), "leaving was not recorded");
+    assert.ok(into.some((e) => e.kind === "in"), "arriving was not recorded");
+    assert.ok(into.every((e) => !("realId" in e)), "an entry leaked a real id");
+  });
+
+  walker.input = { x: 0, y: 0 };
 
   // ------------------------------------------------------------- extraction
   const walkerBot = all.find((b) => b.id === walker.id);
+  const target = room.round.artifacts.find((a) => a.act === 0 && a.state === "open");
   walker.x = target.x; walker.y = target.y;
+  walker.comp = target.room;
   walkerBot.send({ t: "input", x: 0, y: 0, hold: true });
   await wait(3200);
   walkerBot.send({ t: "input", x: 0, y: 0, hold: false });

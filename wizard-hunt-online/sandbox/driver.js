@@ -22,7 +22,7 @@ const T = require("./tribunal");
 const B = require("./base");
 const { readLog, readResidue, readCorpse } = require("./evidence");
 const { snapshotFor } = require("./snapshot");
-const { compartmentAt, free, COMPARTMENTS, wallsOf } = require("./map");
+const { compartmentAt, free, COMPARTMENTS, DOORS, wallsOf } = require("./map");
 const { CLASSES, CLASS_NAMES, itemsOf } = require("./classes");
 const { SPELLS, SCHOOLS, PRESETS } = require("./spells");
 
@@ -73,8 +73,9 @@ function makeDriver(onMessage, opts) {
       spells: SPELLS, schools: SCHOOLS, presets: PRESETS, slots: RULES.BOOK_SLOTS,
       map: COMPARTMENTS.map((c) => ({
         name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
-        walls: wallsOf(c, false)
+        walls: wallsOf(c)
       })),
+      doors: DOORS,
       w: RULES.W, h: RULES.H, sandbox: true
     });
     broadcast({
@@ -285,7 +286,8 @@ function makeDriver(onMessage, opts) {
       }
       case "cast": {
         const r = E.beginCast(room, human, String(m.spell),
-          { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t, { cls: m.cls, school: m.school });
+          { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t,
+          { cls: m.cls, school: m.school, dist: m.d });
         if (!r.ok) { if (r.why) send(human, { t: "toast", msg: r.why }); break; }
         broadcast({ t: "windup", id: human.id, school: r.school, ms: r.castMs });
         break;

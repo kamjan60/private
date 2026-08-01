@@ -75,7 +75,10 @@
         paintRole();
         break;
       case "act": actEndsAt = m.endsAt; break;
-      case "state": S = m; paintHud(); break;
+      // exposed for the browser harness. Safe by construction: this is the
+      // snapshot the server already decided this player may see, so reading
+      // it here reveals nothing a patched client could not read anyway.
+      case "state": S = m; window.__S = m; paintHud(); break;
       case "fx": fx.push({ x: m.x, y: m.y, school: m.school, born: Date.now() }); break;
       case "windup": fx.push({ x: 0, y: 0, school: m.school, born: Date.now(), tell: m.id }); break;
       case "log": showLog(m); break;
@@ -266,6 +269,29 @@
     var mage = ROLE.role === "mage";
     $("tA").querySelector("span").textContent = mage ? "RZUĆ" : "TAZER";
     $("tB").querySelector("span").textContent = "PING";
+
+    var it = itemDef(ROLE.cls, ROLE.item);
+    var passive = it && it.kind !== "active";
+    // a passive has nothing to press; say so rather than offering a dead button
+    $("tC").querySelector("span").textContent = passive ? "—" : shortItem(it ? it.name : "SPRZĘT");
+    $("tC").disabled = !!passive;
+    $("tC").style.opacity = passive ? 0.3 : "";
+  }
+
+  function itemDef(cls, id) {
+    var c = DEF.classes.filter(function (x) { return x.name === cls; })[0];
+    if (!c) return null;
+    return c.items.filter(function (x) { return x.id === id; })[0] || null;
+  }
+
+  /** 64 px circles cannot hold "Plecak z kamizelkami". */
+  function shortItem(name) {
+    var map = {
+      "Plecak z kamizelkami": "KAMIZ.", "Tarcza szturmowa": "TARCZA",
+      "Czujnik ruchu": "CZUJNIK", "Kamera polowa": "KAMERA",
+      "Stabilizator": "MEDYK", "Zakłócacz": "ZAKŁÓC."
+    };
+    return (map[name] || name).toUpperCase().slice(0, 8);
   }
 
   function itemName(cls, id) {
@@ -353,8 +379,15 @@
     var extra = {};
     if (s.pickClass) extra.cls = nearestSeenClass();
     if (s.pickSchool) extra.school = "ogien";
-    send({ t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y, cls: extra.cls, school: extra.school });
+    send({
+      t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y,
+      d: aimRatio, cls: extra.cls, school: extra.school
+    });
   }
+
+  /** How far along the spell's reach the throw lands. A Mur that can only
+   *  appear at maximum range cannot block the doorway you are standing in. */
+  var aimRatio = 1;
 
   function nearestSeenClass() {
     if (!S || !S.actors) return null;
@@ -396,6 +429,12 @@
     var dy = (e.clientY - r.top) - cv.height / (2 * (window.devicePixelRatio || 1));
     var l = Math.hypot(dx, dy) || 1;
     lastAim = { x: dx / l, y: dy / l };
+    // on a mouse the cursor *is* the landing point, so the distance to it
+    // sets the throw directly
+    var s = (ROLE && ROLE.role === "mage" && S && S.me && S.me.book && S.me.book[selected])
+      ? spellById(S.me.book[selected].id) : null;
+    var reach = (s && s.range) || 210;
+    aimRatio = Math.max(0.15, Math.min(1, (l / ZOOM) / reach));
   });
   cv.addEventListener("mousedown", function (e) {
     e.preventDefault();
@@ -403,6 +442,11 @@
     else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
   });
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function roomByName(n) {
+    for (var i = 0; i < DEF.map.length; i++) if (DEF.map[i].name === n) return DEF.map[i];
+    return null;
+  }
 
   function hereRoom() {
     if (!DEF || !S) return null;
@@ -461,6 +505,26 @@
     bindHold($("tHold"));
     bindAim($("tA"));
     $("tB").onclick = function () { doPing("podejrzany"); };
+    // the item had a keyboard binding and no button at all, which made every
+    // hunter's one distinctive verb unusable on a phone
+    $("tC").onclick = function () {
+      send({ t: "item", aim: lastAim, room: hereRoom(), targetId: nearestSeenId() });
+    };
+  }
+
+  function nearestSeenId() {
+    var a = nearestSeenActor();
+    return a ? a.id : null;
+  }
+  function nearestSeenActor() {
+    if (!S || !S.actors) return null;
+    var me = meActor(), best = null, bd = 1e9;
+    S.actors.forEach(function (o) {
+      if (o.id === S.me.id) return;
+      var d = Math.hypot(o.x - me.x, o.y - me.y);
+      if (d < bd) { bd = d; best = o; }
+    });
+    return best;
   }
 
   /**
@@ -487,7 +551,11 @@
         if (t.identifier !== aim.id) continue;
         aim.x = t.clientX - aim.ox; aim.y = t.clientY - aim.oy;
         var l = Math.hypot(aim.x, aim.y);
-        if (l > 12) lastAim = { x: aim.x / l, y: aim.y / l };
+        if (l > 12) {
+          lastAim = { x: aim.x / l, y: aim.y / l };
+          // pull short, throw short: the stick sets direction and distance
+          aimRatio = Math.max(0.15, Math.min(1, l / 46));
+        }
         e.preventDefault();
       }
     }, { passive: false });
@@ -572,6 +640,7 @@
   function draw() {
     requestAnimationFrame(draw);
     if (!S || !S.me || S.me.base || !DEF) return;
+    if (S.me.lock) { drawLock(); return; }
     if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
 
     var me = meActor();
@@ -604,6 +673,31 @@
       ctx.fillStyle = "rgba(150,170,210,0.32)";
       ctx.font = "11px system-ui";
       ctx.fillText(c.name, c.x + 8, c.y + 16);
+    });
+
+    // hatches: the only way between compartments, and the only thing on a
+    // wall worth walking at
+    (DEF.doors || []).forEach(function (d) {
+      var a = roomByName(d.a), b = roomByName(d.b);
+      if (!a || !b) return;
+      if (a.section > S.act && b.section > S.act) return;
+      var shut = sealed[d.a] || sealed[d.b];
+      [[d.ax, d.ay], [d.bx, d.by]].forEach(function (h) {
+        ctx.fillStyle = shut ? "#7a3a30" : "#2f4c74";
+        ctx.strokeStyle = shut ? "#b05a4a" : "#7fd8ff";
+        ctx.lineWidth = 2;
+        if (d.axis === "x") {
+          ctx.fillRect(h[0] - 5, h[1] - 26, 10, 52);
+          ctx.strokeRect(h[0] - 5, h[1] - 26, 10, 52);
+        } else {
+          ctx.fillRect(h[0] - 26, h[1] - 5, 52, 10);
+          ctx.strokeRect(h[0] - 26, h[1] - 5, 52, 10);
+        }
+      });
+      ctx.strokeStyle = shut ? "rgba(176,90,74,0.4)" : "rgba(127,216,255,0.22)";
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath(); ctx.moveTo(d.ax, d.ay); ctx.lineTo(d.bx, d.by); ctx.stroke();
+      ctx.setLineDash([]);
     });
 
     (S.walls || []).forEach(function (w) {
@@ -779,8 +873,11 @@
         label(me.x, me.y - 44, s.name + " — nikogo w zasięgu");
       }
     } else {                                    // an area landing where you point
-      var reach3 = s.range || 210;
+      var reach3 = (s.range || 210) * aimRatio;
       var ax = me.x + dir.x * reach3, ay = me.y + dir.y * reach3;
+      ctx.globalAlpha = strong ? 0.16 : 0.06;
+      ring(me.x, me.y, s.range || 210);         // the reach you are working inside
+      ctx.globalAlpha = strong ? 0.75 : 0.22;
       ctx.globalAlpha = strong ? 0.22 : 0.09;
       ctx.beginPath(); ctx.arc(ax, ay, s.radius || 60, 0, 6.284); ctx.fill();
       ctx.globalAlpha = strong ? 0.8 : 0.25;
@@ -815,6 +912,43 @@
       ctx.globalAlpha = 0.95;
       ctx.fillText(text, x - w / 2, y);
     }
+  }
+
+  /**
+   * Sealed in a hatch. You see nothing and nothing sees you -- so the screen
+   * shows the wait itself rather than pretending you still have a view. The
+   * two and a half seconds are the mechanic, not a loading spinner.
+   */
+  function drawLock() {
+    if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#05070c";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    var cx = cv.width / 2, cy = cv.height / 2;
+    var r0 = window.devicePixelRatio || 1;
+    var left = Math.max(0, S.me.lock.until - Date.now());
+    var k = 1 - Math.min(1, left / 2500);
+
+    ctx.strokeStyle = "rgba(127,216,255,0.28)";
+    ctx.lineWidth = 10 * r0;
+    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, 0, 6.284); ctx.stroke();
+    ctx.strokeStyle = "#7fd8ff";
+    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, -1.571, -1.571 + 6.284 * k); ctx.stroke();
+
+    ctx.fillStyle = "#e6ecfa";
+    ctx.textAlign = "center";
+    ctx.font = (15 * r0) + "px system-ui";
+    ctx.fillText("ŚLUZA", cx, cy - 128 * r0);
+    // above the ring, not below: the button cluster owns the lower third
+    ctx.font = (13 * r0) + "px system-ui";
+    ctx.fillStyle = "#8b9ac0";
+    ctx.fillText("Przejście do: " + S.me.lock.to, cx, cy - 106 * r0);
+    ctx.fillText("Nikt cię tu nie dosięgnie. I ty nikogo.", cx, cy - 86 * r0);
+    ctx.font = (22 * r0) + "px system-ui";
+    ctx.fillStyle = "#e6ecfa";
+    ctx.fillText((left / 1000).toFixed(1) + " s", cx, cy + 8 * r0);
+    ctx.textAlign = "left";
   }
 
   function drawActor(a) {
