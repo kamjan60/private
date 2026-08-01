@@ -17,7 +17,7 @@ The full design and the reasoning behind each rule is in
 ```bash
 npm install
 npm start            # http://localhost:8080
-npm test             # 74 assertions, no browser needed
+npm test             # 78 assertions, no browser needed
 node test/browser.js # drives the real client on an emulated iPhone
 ```
 
@@ -148,7 +148,10 @@ Keyboard: `WSAD` move, `E` hold (extract · bind · stabilise), `Space` taser,
 the log here, `Z`/`X` ping.
 
 Touch: the joystick spawns wherever your left thumb lands; tapping the right
-half aims and fires; three buttons carry hold, taser/cast and ping.
+half aims and fires. Four buttons carry hold, taser/cast, ping and the class
+item. **Holding the fire button turns it into an aiming stick** — direction
+and, for spells that land somewhere, distance, with the landing point drawn
+on the floor before the charge is spent.
 
 ## Architecture
 
