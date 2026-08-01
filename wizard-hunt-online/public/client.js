@@ -1,96 +1,397 @@
-// Client for "I'm Not a Wizard, Harry".
-//
-// Rendering only - the server owns the simulation and already culls anything
-// outside your vision radius, so this file never learns where an unseen
-// player is. The dark overlay is presentation; the actual secrecy is that
-// the data is not in the socket.
+/* I'm Not a Wizard, Harry -- client.
+ *
+ * Renders whatever the server chose to send and nothing more. There is no
+ * shadow copy of the world here: if a body is outside your vision the
+ * snapshot simply does not contain it, so there is nothing for a patched
+ * client to reveal. The dark vignette is decoration over an absence.
+ *
+ * Touch-first. The joystick spawns wherever the left thumb lands, the right
+ * half aims, and the three round buttons carry whatever verbs the player's
+ * class and role actually have.
+ */
 (function () {
   "use strict";
 
-  var CLASS_ORDER = ["Strażnik", "Zwiadowca", "Strzelec", "Inkwizytor", "Chirurg", "Runarz"];
-  var COMPARTMENTS = [
-    { x: 60, y: 60, w: 380, h: 240, name: "Mostek" },
-    { x: 500, y: 60, w: 400, h: 200, name: "Ładownia" },
-    { x: 960, y: 60, w: 380, h: 260, name: "Reaktor" },
-    { x: 60, y: 360, w: 320, h: 240, name: "Medyczny" },
-    { x: 440, y: 320, w: 420, h: 280, name: "Kaplica" },
-    { x: 920, y: 380, w: 420, h: 220, name: "Warsztat" },
-    { x: 120, y: 660, w: 400, h: 180, name: "Kriokomory" },
-    { x: 580, y: 660, w: 380, h: 180, name: "Maszynownia" },
-    { x: 1020, y: 660, w: 320, h: 180, name: "Śluza" }
-  ];
-  var WORLD_W = 1400, WORLD_H = 900;
-  var SPR = 32, ZOOM = 2;
-  // Zoom follows the viewport: locked at 2 a handset shows less floor than
-  // its own vision radius, so you would be blind inside your own eyesight.
-  function fitZoom() { ZOOM = Math.max(1, Math.min(2, cv.width / 460)); }
-
+  var $ = function (id) { return document.getElementById(id); };
   var TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
-  var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
-  var lastAim = { x: 1, y: 0 };
+  if (TOUCH) document.body.classList.add("touch");
 
-  var sheets = {};
-  ["hunters", "fireball", "lightning", "sleep", "wizard"].forEach(function (k) {
-    var i = new Image(); i.src = "assets/" + k + ".png"; sheets[k] = i;
+  var ws = null, ME = null, ROOM = null, HOST = false;
+  var DEF = null;               // class/spell/map tables, sent once on join
+  var S = null;                 // latest snapshot
+  var ROLE = null;              // { role, cls, item, book, perk }
+  var SHEET = new Image();
+  SHEET.src = "assets/hunters.png";
+  var CLASS_ROW = {};
+
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var ZOOM = 2, CAM = { x: 0, y: 0 };
+
+  // ------------------------------------------------------------- screens
+  function screen(id) {
+    ["sEntry", "sLobby", "sLoadout", "sGame"].forEach(function (s) {
+      $(s).classList.toggle("on", s === id);
+    });
+  }
+  function over(id, on) { $(id).classList.toggle("on", !!on); }
+
+  var toastTimer = 0;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg;
+    el.style.opacity = 1;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.style.opacity = 0; }, 2200);
+  }
+
+  // ------------------------------------------------------------- socket
+  function connect(name, room) {
+    var proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(proto + "://" + location.host);
+    ws.onopen = function () { send({ t: "join", name: name, room: room || null }); };
+    ws.onmessage = function (e) { handle(JSON.parse(e.data)); };
+    ws.onclose = function () { $("err").textContent = "Rozłączono."; screen("sEntry"); };
+  }
+  function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+
+  function handle(m) {
+    switch (m.t) {
+      case "error": ($("err3").textContent = $("err2").textContent = $("err").textContent = m.msg); break;
+      case "toast": toast(m.msg); break;
+      case "joined":
+        ME = m.id; ROOM = m.room; HOST = m.host; DEF = m;
+        m.classes.forEach(function (c, i) { CLASS_ROW[c.name] = i; });
+        $("roomCode").textContent = ROOM;
+        screen("sLobby");
+        break;
+      case "lobby": renderLobby(m); break;
+      case "loadout": openLoadout(m); break;
+      case "loadoutOk": $("btnLo").textContent = "Czekam na resztę…"; $("btnLo").disabled = true; break;
+      case "ready": $("err3").textContent = "Gotowi: " + m.ready + "/" + m.of; break;
+      case "role":
+        ROLE = m;
+        screen("sGame");
+        over("oEnd", false); over("oBase", false);
+        paintRole();
+        break;
+      case "act": actEndsAt = m.endsAt; break;
+      case "state": S = m; paintHud(); break;
+      case "fx": fx.push({ x: m.x, y: m.y, school: m.school, born: Date.now() }); break;
+      case "windup": fx.push({ x: 0, y: 0, school: m.school, born: Date.now(), tell: m.id }); break;
+      case "log": showLog(m); break;
+      case "corpse": showCorpse(m); break;
+      case "tribunal": openTribunal(m); break;
+      case "verdict": showVerdict(m); break;
+      case "toBase": over("oBase", true); paintBase(); break;
+      case "watching": break;
+      case "end": showEnd(m); break;
+    }
+  }
+
+  // ------------------------------------------------------------- entry
+  $("btnJoin").onclick = function () {
+    var n = $("nick").value.trim();
+    if (!n) { $("err").textContent = "Podaj imię."; return; }
+    connect(n, $("rcode").value.trim().toUpperCase());
+  };
+  $("nick").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
+  $("rcode").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
+
+  function renderLobby(m) {
+    HOST = m.host === ME;
+    var ul = $("plist");
+    ul.innerHTML = "";
+    m.players.forEach(function (p) {
+      var li = document.createElement("li");
+      li.innerHTML = "<span>" + esc(p.name) + "</span>" +
+        (p.id === m.host ? "<small>host</small>" : "");
+      ul.appendChild(li);
+    });
+    $("lobbyHint").textContent = "Podaj kod znajomym. Od " + m.min + " do " + m.max + " graczy.";
+    $("btnStart").disabled = !HOST || m.players.length < m.min;
+    $("btnStart").textContent = HOST ? "Start rundy" : "Czekasz na hosta";
+    if (m.phase === "lobby") screen("sLobby");
+  }
+  $("btnStart").onclick = function () { send({ t: "start" }); };
+
+  // ------------------------------------------------------------- loadout
+  var pickedItem = null, pickedBook = [], loEndsAt = 0;
+
+  function openLoadout(m) {
+    screen("sLoadout");
+    pickedItem = null; pickedBook = [];
+    loEndsAt = m.endsAt;
+    $("btnLo").disabled = false; $("btnLo").textContent = "Gotowe";
+    $("err3").textContent = "";
+
+    var cls = DEF.classes.filter(function (c) { return c.name === m.cls; })[0];
+    $("loCls").textContent = m.cls;
+    $("loCls").style.color = m.role === "mage" ? "var(--mage)" : "";
+    $("loBlurb").innerHTML = esc(cls.blurb) +
+      (m.role === "mage"
+        ? "<br><b style='color:var(--mage)'>Jesteś magiem.</b> Ta klasa to twoja przykrywka — " +
+          "weź jej sprzęt i <b>umiej go odegrać</b>. Księga to cała amunicja na rundę."
+        : "");
+
+    var box = $("loItem");
+    box.innerHTML = "";
+    m.items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.className = "opt";
+      b.innerHTML = "<b>" + esc(it.name) + "</b><small>" + esc(it.desc) +
+        (it.kind === "active" ? " · " + it.charges + "×" : "") + "</small>";
+      b.onclick = function () {
+        pickedItem = it.id;
+        [].forEach.call(box.children, function (c) { c.classList.remove("on"); });
+        b.classList.add("on");
+      };
+      box.appendChild(b);
+    });
+
+    $("tabBook").style.display = m.role === "mage" ? "" : "none";
+    if (m.role === "mage") buildBook();
+    tab("item");
+  }
+
+  function tab(which) {
+    $("loItem").style.display = which === "item" ? "" : "none";
+    $("loBook").style.display = which === "book" ? "" : "none";
+    [].forEach.call($("loTabs").children, function (b) {
+      b.classList.toggle("on", b.dataset.tab === which);
+    });
+  }
+  [].forEach.call($("loTabs").children, function (b) {
+    b.onclick = function () { tab(b.dataset.tab); };
   });
-  var FXDEF = {
-    fire: { img: "fireball", w: 32, h: 32, frames: 6, ms: 80 },
-    bolt: { img: "lightning", w: 64, h: 32, frames: 8, ms: 70 },
-    sleep: { img: "sleep", w: 40, h: 48, frames: 8, ms: 200 }
+
+  function buildBook() {
+    var row = $("presetRow");
+    row.innerHTML = "";
+    Object.keys(DEF.presets).forEach(function (n) {
+      var b = document.createElement("button");
+      b.textContent = n;
+      b.onclick = function () { pickedBook = DEF.presets[n].slice(); paintBook(); };
+      row.appendChild(b);
+    });
+
+    var grid = $("bookGrid");
+    grid.innerHTML = "";
+    DEF.spells.forEach(function (s) {
+      var b = document.createElement("button");
+      b.className = "sp";
+      b.dataset.id = s.id;
+      var col = DEF.schools[s.school].colour;
+      b.innerHTML = "<span class='n'></span><b style='color:" + col + "'>" + esc(s.name) +
+        "</b><small>" + esc(s.desc) + "</small>";
+      b.onclick = function () {
+        if (pickedBook.length < DEF.slots) pickedBook.push(s.id);
+        else toast("Masz już " + DEF.slots + " slotów. Odejmij coś prawym / długim dotknięciem.");
+        paintBook();
+      };
+      // right click or long press removes one copy
+      b.oncontextmenu = function (e) { e.preventDefault(); dropOne(s.id); };
+      var t0 = 0;
+      b.addEventListener("touchstart", function () { t0 = Date.now(); }, { passive: true });
+      b.addEventListener("touchend", function (e) {
+        if (Date.now() - t0 > 450) { e.preventDefault(); dropOne(s.id); }
+      });
+      grid.appendChild(b);
+    });
+    paintBook();
+  }
+
+  function dropOne(id) {
+    var i = pickedBook.lastIndexOf(id);
+    if (i >= 0) pickedBook.splice(i, 1);
+    paintBook();
+  }
+
+  function paintBook() {
+    $("slotCount").textContent = pickedBook.length + "/" + DEF.slots;
+    var counts = {};
+    pickedBook.forEach(function (id) { counts[id] = (counts[id] || 0) + 1; });
+    [].forEach.call($("bookGrid").children, function (b) {
+      var n = counts[b.dataset.id] || 0;
+      b.classList.toggle("picked", n > 0);
+      b.querySelector(".n").textContent = n ? "×" + n : "";
+    });
+    // the signature: what his corpses will end up saying about him
+    var sig = {};
+    pickedBook.forEach(function (id) {
+      var s = spellById(id);
+      sig[s.school] = (sig[s.school] || 0) + s.charges;
+    });
+    var parts = Object.keys(sig).map(function (k) {
+      return "<b style='color:" + DEF.schools[k].colour + "'>" + DEF.schools[k].name +
+        " " + sig[k] + "</b>";
+    });
+    $("sig").innerHTML = parts.length
+      ? "Podpis, który zostawisz na zwłokach: " + parts.join(" · ")
+      : "Wybierz zaklęcia. Każdy trup zdradzi szkołę, która go zabiła.";
+  }
+
+  function spellById(id) {
+    for (var i = 0; i < DEF.spells.length; i++) if (DEF.spells[i].id === id) return DEF.spells[i];
+    return null;
+  }
+
+  $("btnLo").onclick = function () {
+    if (!pickedItem) { $("err3").textContent = "Wybierz wyposażenie."; tab("item"); return; }
+    if ($("tabBook").style.display !== "none" && pickedBook.length !== DEF.slots) {
+      $("err3").textContent = "Księga musi mieć dokładnie " + DEF.slots + " slotów.";
+      tab("book"); return;
+    }
+    send({ t: "loadout", item: pickedItem, book: pickedBook });
   };
 
-  var $ = function (id) { return document.getElementById(id); };
-  var cv = $("cv"), ctx = cv.getContext("2d");
-  var ws = null, me = null, roomId = null, isHost = false;
-  var state = null, role = null, myCls = null, myVision = 240;
-  var fx = [], shots = [], windups = [];
-  var keys = {}, over = false;
-  var mouse = { x: 0, y: 0 }, storms = [];
+  // ------------------------------------------------------------- hud
+  var actEndsAt = 0;
+  var ROMAN = ["I", "II", "III"];
 
-  // Aim is screen-relative: you are always dead centre of the view, so the
-  // vector from the middle of the canvas to the cursor is the throw
-  // direction. The server re-derives the target from it and never trusts a
-  // client-supplied position.
-  function aim() {
-    var dx = mouse.x - cv.width / 2, dy = mouse.y - cv.height / 2;
-    var d = Math.hypot(dx, dy) || 1;
-    return { x: dx / d, y: dy / d };
+  function paintRole() {
+    var mage = ROLE.role === "mage";
+    $("pRole").className = "pill" + (mage ? " role-mage" : "");
+    $("pRole").textContent = (mage ? "MAG · " : "ŁOWCA · ") + ROLE.cls;
+    $("pPerk").textContent = itemName(ROLE.cls, ROLE.item);
+    renderKeys();
+    paintBar();
   }
 
-  function resize() {
-    cv.width = cv.clientWidth || window.innerWidth;
-    cv.height = cv.clientHeight || window.innerHeight;
-    fitZoom();
-    ctx.imageSmoothingEnabled = false;
+  function itemName(cls, id) {
+    var c = DEF.classes.filter(function (x) { return x.name === cls; })[0];
+    if (!c) return "—";
+    var it = c.items.filter(function (x) { return x.id === id; })[0];
+    return it ? it.name : "—";
   }
-  window.addEventListener("resize", resize);
-  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
-  resize();
 
-  function aimVec() {
-    // On touch the last tap sets the heading, so the storm button fires along
-    // the same line as the last fireball rather than needing its own gesture.
-    if (TOUCH) return lastAim;
-    var dx = mouse.x - cv.width / 2, dy = mouse.y - cv.height / 2;
-    var d = Math.hypot(dx, dy) || 1;
-    return { x: dx / d, y: dy / d };
+  function paintHud() {
+    if (!S || !S.me) return;
+    if (S.me.base) { over("oBase", true); paintBase(); }
+    $("pAct").textContent = ROMAN[S.act] || "?";
+    var left = Math.max(0, (S.actEndsAt || actEndsAt) - Date.now());
+    $("pClock").textContent = Math.floor(left / 60000) + ":" +
+      ("0" + Math.floor(left / 1000) % 60).slice(-2);
+    $("pArt").textContent = S.secured + "/" + S.toWin;
+    $("pLost").innerHTML = "Stracone <b>" + S.lost + "</b>";
+    $("pLost").className = "pill" + (S.pathClosed ? " warn" : "");
+    if (S.pathClosed) $("pLost").innerHTML = "<b>Artefakty przepadły — zostaje trybunał</b>";
+
+    var log = $("log");
+    log.innerHTML = "";
+    (S.events || []).slice().reverse().forEach(function (e) {
+      var d = document.createElement("div");
+      d.className = "lg " + (e.kind || "");
+      d.textContent = e.msg;
+      log.appendChild(d);
+    });
+    paintBar();
+  }
+
+  // ------------------------------------------------------------- spell bar
+  var selected = 0;
+
+  function paintBar() {
+    var bar = $("bar");
+    if (!S || !S.me || !S.me.book) { bar.innerHTML = ""; return; }
+    bar.innerHTML = "";
+    S.me.book.forEach(function (e, i) {
+      var s = spellById(e.id);
+      var d = document.createElement("div");
+      d.className = "slot" + (i === selected ? " sel" : "") + (e.charges <= 0 ? " empty" : "");
+      d.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" + esc(s.name) +
+        "</b><span class='c'>" + e.charges + "</span>";
+      d.onclick = function () { selected = i; paintBar(); };
+      bar.appendChild(d);
+    });
+  }
+
+  function castSelected() {
+    if (!S || !S.me || !S.me.book || !S.me.book[selected]) return;
+    var e = S.me.book[selected];
+    if (e.charges <= 0) { toast("Brak ładunków."); return; }
+    var s = spellById(e.id);
+    var extra = {};
+    if (s.pickClass) extra.cls = nearestSeenClass();
+    if (s.pickSchool) extra.school = "ogien";
+    send({ t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y, cls: extra.cls, school: extra.school });
+  }
+
+  function nearestSeenClass() {
+    if (!S || !S.actors) return null;
+    var best = null, bd = 1e9;
+    S.actors.forEach(function (a) {
+      if (a.id === S.me.id) return;
+      var d = Math.hypot(a.x - meActor().x, a.y - meActor().y);
+      if (d < bd) { bd = d; best = a; }
+    });
+    return best ? best.cls : null;
+  }
+
+  function meActor() {
+    if (!S || !S.actors) return { x: 0, y: 0 };
+    for (var i = 0; i < S.actors.length; i++) if (S.actors[i].id === S.me.id) return S.actors[i];
+    return { x: 0, y: 0 };
+  }
+
+  // ------------------------------------------------------------- input
+  var keys = {}, lastAim = { x: 1, y: 0 };
+  var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+
+  window.addEventListener("keydown", function (e) {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === " ") { e.preventDefault(); send({ t: "taser", ax: lastAim.x, ay: lastAim.y }); }
+    if (e.key.toLowerCase() === "q") castSelected();
+    if (e.key.toLowerCase() === "f") send({ t: "item", aim: lastAim, room: hereRoom() });
+    if (e.key.toLowerCase() === "r") send({ t: "readLog" });
+    if (e.key.toLowerCase() === "z") doPing("podejrzany");
+    if (e.key.toLowerCase() === "x") doPing("czysto");
+    if (e.key >= "1" && e.key <= "9") { selected = +e.key - 1; paintBar(); }
+  });
+  window.addEventListener("keyup", function (e) { keys[e.key.toLowerCase()] = false; });
+
+  cv.addEventListener("mousemove", function (e) {
+    var r = cv.getBoundingClientRect();
+    var dx = (e.clientX - r.left) - cv.width / (2 * (window.devicePixelRatio || 1));
+    var dy = (e.clientY - r.top) - cv.height / (2 * (window.devicePixelRatio || 1));
+    var l = Math.hypot(dx, dy) || 1;
+    lastAim = { x: dx / l, y: dy / l };
+  });
+  cv.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    if (e.button === 2) doPing("podejrzany"); else if (ROLE && ROLE.role === "mage") castSelected();
+    else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+  });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function hereRoom() {
+    if (!DEF || !S) return null;
+    var me = meActor();
+    for (var i = 0; i < DEF.map.length; i++) {
+      var c = DEF.map[i];
+      if (me.x >= c.x && me.x <= c.x + c.w && me.y >= c.y && me.y <= c.y + c.h) return c.name;
+    }
+    return null;
+  }
+
+  function doPing(kind) {
+    var me = meActor();
+    send({ t: "ping", kind: kind, x: me.x + lastAim.x * 60, y: me.y + lastAim.y * 60 });
   }
 
   function setupTouch() {
-    document.body.classList.add("touch");
     cv.addEventListener("touchstart", function (e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
-        var t = e.changedTouches[i], r = cv.getBoundingClientRect();
-        var x = t.clientX - r.left, y = t.clientY - r.top;
-        if (x < cv.width * 0.45 && !stick.active) {
-          // floating stick anchored where the thumb lands - on a handset you
-          // cannot look down to find a fixed pad
+        var t = e.changedTouches[i];
+        if (t.clientX < window.innerWidth * 0.45 && !stick.active) {
           stick.active = true; stick.id = t.identifier;
-          stick.ox = x; stick.oy = y; stick.x = x; stick.y = y;
-        } else if (role === "mage" && ws && ws.readyState === 1) {
-          var dx = x - cv.width / 2, dy = y - cv.height / 2, d = Math.hypot(dx, dy) || 1;
-          lastAim = { x: dx / d, y: dy / d };
-          ws.send(JSON.stringify({ t: "ball", ax: lastAim.x, ay: lastAim.y }));
+          stick.ox = t.clientX; stick.oy = t.clientY; stick.x = 0; stick.y = 0;
+        } else {
+          var r = cv.getBoundingClientRect();
+          var dx = (t.clientX - r.left) - r.width / 2, dy = (t.clientY - r.top) - r.height / 2;
+          var l = Math.hypot(dx, dy) || 1;
+          lastAim = { x: dx / l, y: dy / l };
+          if (ROLE && ROLE.role === "mage") castSelected();
+          else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
         }
       }
       e.preventDefault();
@@ -99,473 +400,418 @@
     cv.addEventListener("touchmove", function (e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
-        if (t.identifier === stick.id) {
-          var r = cv.getBoundingClientRect();
-          stick.x = t.clientX - r.left; stick.y = t.clientY - r.top;
+        if (stick.active && t.identifier === stick.id) {
+          stick.x = t.clientX - stick.ox; stick.y = t.clientY - stick.oy;
         }
       }
       e.preventDefault();
     }, { passive: false });
 
-    function end(e) {
+    var end = function (e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === stick.id) { stick.active = false; stick.id = null; }
+        if (stick.active && e.changedTouches[i].identifier === stick.id) {
+          stick.active = false; stick.x = 0; stick.y = 0;
+        }
       }
-    }
+    };
     cv.addEventListener("touchend", end);
     cv.addEventListener("touchcancel", end);
 
-    bindBtn("tHold", null, function (d) { keys.KeyE = d; });
-    bindBtn("tA", function () {
-      if (!ws || ws.readyState !== 1) return;
-      if (role === "mage") { var a = aimVec(); ws.send(JSON.stringify({ t: "storm", ax: a.x, ay: a.y })); }
-      else ws.send(JSON.stringify({ t: "taser" }));
-    });
-    bindBtn("tB", function () {
-      if (!ws || ws.readyState !== 1) return;
-      if (role === "mage") ws.send(JSON.stringify({ t: "disguise" }));
-      else if (myCls === "Zwiadowca") ws.send(JSON.stringify({ t: "camera" }));
-    });
+    bindHold($("tHold"));
+    $("tA").onclick = function () {
+      if (ROLE && ROLE.role === "mage") castSelected();
+      else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+    };
+    $("tB").onclick = function () { doPing("podejrzany"); };
   }
 
-  function bindBtn(id, tap, hold) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener("touchstart", function (e) {
-      e.preventDefault(); e.stopPropagation();
-      el.classList.add("on");
-      if (hold) hold(true); else if (tap) tap();
-    }, { passive: false });
-    var off = function (e) {
-      e.preventDefault(); e.stopPropagation();
-      el.classList.remove("on");
-      if (hold) hold(false);
-    };
+  var holding = false;
+  function bindHold(el) {
+    var on = function (e) { e.preventDefault(); holding = true; el.classList.add("on"); };
+    var off = function () { holding = false; el.classList.remove("on"); };
+    el.addEventListener("touchstart", on, { passive: false });
     el.addEventListener("touchend", off);
     el.addEventListener("touchcancel", off);
+    el.addEventListener("mousedown", on);
+    window.addEventListener("mouseup", off);
   }
-
-  // --------------------------------------------------------------- network
-  function connect(name, room) {
-    var proto = location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(proto + "//" + location.host);
-    ws.onopen = function () { ws.send(JSON.stringify({ t: "join", name: name, room: room || null })); };
-    ws.onclose = function () { if (!over) showError("Rozłączono z serwerem."); };
-    ws.onmessage = function (e) { handle(JSON.parse(e.data)); };
-  }
-
-  function showError(msg) { $("err").textContent = msg; $("err2").textContent = msg; }
-
-  function handle(m) {
-    switch (m.t) {
-      case "error": showError(m.msg); break;
-      case "joined":
-        me = m.id; roomId = m.room; isHost = m.host;
-        $("join").style.display = "none";
-        $("lobby").style.display = "block";
-        $("roomCode").textContent = m.room;
-        break;
-      case "lobby":
-        isHost = m.host === me;
-        var ul = $("plist"); ul.innerHTML = "";
-        m.players.forEach(function (p) {
-          var li = document.createElement("li");
-          li.innerHTML = "<span>" + esc(p.name) + "</span>" +
-            (p.id === m.host ? "<small>host</small>" : "");
-          ul.appendChild(li);
-        });
-        $("btnStart").disabled = !isHost || m.players.length < 3;
-        $("btnStart").textContent = isHost
-          ? (m.players.length < 3 ? "Potrzeba min. 3 graczy" : "Start rundy")
-          : "Czekaj na hosta";
-        break;
-      case "role":
-        role = m.role; myCls = m.cls; myVision = m.vision; over = false;
-        $("entry").style.display = "none";
-        $("game").style.display = "block";
-        $("banner").style.display = "none";
-        var rp = $("pRole");
-        rp.className = "pill" + (m.role === "mage" ? " role-mage" : "");
-        rp.innerHTML = (m.role === "mage" ? "MAG" : "ŁOWCA") + " · <b>" + esc(m.cls) + "</b>";
-        $("pPerk").textContent = m.perk;
-        log(m.objective, m.role === "mage" ? "cast" : "start");
-        renderKeys();
-        break;
-      case "state": state = m; break;
-      case "event": log(m.ev.msg, m.ev.k); break;
-      case "fx":
-        fx.push({ def: FXDEF[m.spell] || FXDEF.fire, x: m.x, y: m.y, born: performance.now(), life: 1500 });
-        break;
-      case "windup":
-        windups.push({ x: m.x, y: m.y, born: performance.now(), life: 1300 });
-        break;
-      case "shot":
-        shots.push({ a: m.from, b: m.to, born: performance.now(), life: 260, ranged: m.ranged });
-        break;
-      case "storm":
-        storms.push({ x: m.x, y: m.y, r: m.r, hits: m.hits || [], born: performance.now(), life: 700 });
-        fx.push({ def: FXDEF.bolt, x: m.x, y: m.y, born: performance.now(), life: 900 });
-        break;
-      case "stunned": toast("Ogłuszony!"); break;
-      case "hurt": toast("Trafiony — pancerz wytrzymał."); break;
-      case "died": toast("Zginąłeś. Obserwujesz."); break;
-      case "revived": toast("Ustabilizowany."); break;
-      case "camera": toast("Kamery aktywne."); break;
-      case "toast": toast(m.msg); break;
-      case "end": endRound(m); break;
-    }
-  }
-
-  function endRound(m) {
-    over = true;
-    var win = (m.winner === "mage") === (role === "mage");
-    var b = $("banner");
-    b.style.display = "flex";
-    b.querySelector(".inner").className = "inner " + (win ? "win" : "lose");
-    $("bTitle").textContent = win ? "Wygrana" : "Porażka";
-    $("bText").textContent = m.msg + (m.mage ? " Magiem był " + m.mage.name + "." : "");
-    $("btnAgain").style.display = isHost ? "block" : "none";
-  }
-
-  // ----------------------------------------------------------------- input
-  var HELD = { up: 0, down: 0, left: 0, right: 0 };
-  document.addEventListener("keydown", function (e) {
-    if (keys[e.code]) return;
-    keys[e.code] = true;
-    if (!ws || ws.readyState !== 1) return;
-    if (e.code === "Space") { ws.send(JSON.stringify({ t: "taser" })); e.preventDefault(); }
-    if (e.code === "KeyQ" && role === "mage") ws.send(JSON.stringify({ t: "cast" }));
-    if (e.code === "KeyF" && role === "mage") ws.send(JSON.stringify({ t: "disguise" }));
-    if (e.code === "KeyR" && role === "mage") ws.send(JSON.stringify({ t: "blend" }));
-    if (e.code === "KeyC" && myCls === "Zwiadowca") ws.send(JSON.stringify({ t: "camera" }));
-  });
-  document.addEventListener("keyup", function (e) { keys[e.code] = false; });
-
-  cv.addEventListener("mousemove", function (e) {
-    var r = cv.getBoundingClientRect();
-    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
-  });
-  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-  cv.addEventListener("mousedown", function (e) {
-    e.preventDefault();
-    if (!ws || ws.readyState !== 1 || role !== "mage") return;
-    var a = aim();
-    if (e.button === 0) ws.send(JSON.stringify({ t: "ball", ax: a.x, ay: a.y }));
-    if (e.button === 2) ws.send(JSON.stringify({ t: "storm", ax: a.x, ay: a.y }));
-  });
-
-  setInterval(function () {
-    if (!ws || ws.readyState !== 1 || !role) return;
-    var x = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-    var y = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
-    if (stick.active) {
-      var sdx = stick.x - stick.ox, sdy = stick.y - stick.oy, sd = Math.hypot(sdx, sdy);
-      if (sd > 8) {                        // dead zone, or a resting thumb drifts
-        var cl = Math.min(1, sd / 56);
-        x = (sdx / sd) * cl; y = (sdy / sd) * cl;
-      }
-    }
-    ws.send(JSON.stringify({ t: "input", x: x, y: y, hold: !!keys.KeyE }));
-  }, 1000 / 20);
-
-  // ---------------------------------------------------------------- render
-  function draw() {
-    requestAnimationFrame(draw);
-    ctx.fillStyle = "#05070c";
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    if (!state || !state.you) return;
-
-    var camX = state.you.x * ZOOM - cv.width / 2;
-    var camY = state.you.y * ZOOM - cv.height / 2;
-    ctx.save();
-    ctx.translate(-camX, -camY);
-
-    drawStation();
-    drawArtifacts();
-    drawCorpses();
-    drawPlayers();
-    drawFx();
-    ctx.restore();
-
-    drawFog(camX, camY);
-    drawHud();
-  }
-
-  function drawStation() {
-    ctx.strokeStyle = "rgba(120,150,220,0.07)";
-    ctx.lineWidth = 1;
-    for (var gx = 0; gx <= WORLD_W; gx += 40) {
-      ctx.beginPath(); ctx.moveTo(gx * ZOOM, 0); ctx.lineTo(gx * ZOOM, WORLD_H * ZOOM); ctx.stroke();
-    }
-    for (var gy = 0; gy <= WORLD_H; gy += 40) {
-      ctx.beginPath(); ctx.moveTo(0, gy * ZOOM); ctx.lineTo(WORLD_W * ZOOM, gy * ZOOM); ctx.stroke();
-    }
-    COMPARTMENTS.forEach(function (c) {
-      ctx.fillStyle = "rgba(24,32,52,0.75)";
-      ctx.fillRect(c.x * ZOOM, c.y * ZOOM, c.w * ZOOM, c.h * ZOOM);
-      ctx.strokeStyle = "rgba(120,150,220,0.28)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(c.x * ZOOM, c.y * ZOOM, c.w * ZOOM, c.h * ZOOM);
-      ctx.fillStyle = "rgba(139,154,192,0.5)";
-      ctx.font = "11px system-ui";
-      ctx.fillText(c.name.toUpperCase(), c.x * ZOOM + 8, c.y * ZOOM + 18);
-    });
-  }
-
-  function drawArtifacts() {
-    (state.artifacts || []).forEach(function (a) {
-      var x = a.x * ZOOM, y = a.y * ZOOM;
-      var t = performance.now() / 400;
-      if (a.done) {
-        ctx.fillStyle = "rgba(124,232,168,0.5)";
-        ctx.fillRect(x - 5, y - 5, 10, 10);
-      } else {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(t % (Math.PI * 2));
-        ctx.fillStyle = "#c682ff";
-        ctx.fillRect(-6, -6, 12, 12);
-        ctx.restore();
-        ctx.strokeStyle = "rgba(198,130,255," + (0.3 + 0.25 * Math.sin(t * 2)) + ")";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.stroke();
-      }
-    });
-  }
-
-  function drawCorpses() {
-    (state.corpses || []).forEach(function (c) {
-      var row = CLASS_ORDER.indexOf(c.cls); if (row < 0) row = 0;
-      ctx.save();
-      ctx.globalAlpha = 0.75;
-      ctx.translate(c.x * ZOOM, c.y * ZOOM);
-      ctx.rotate(Math.PI / 2);
-      ctx.drawImage(sheets.hunters, 0, (row * 4) * SPR, SPR, SPR,
-        -SPR * ZOOM / 2, -SPR * ZOOM / 2, SPR * ZOOM, SPR * ZOOM);
-      ctx.restore();
-      ctx.fillStyle = "rgba(255,107,107,0.75)";
-      ctx.font = "11px system-ui";
-      ctx.fillText("✕ " + c.name, c.x * ZOOM - 16, c.y * ZOOM + 26);
-    });
-  }
-
-  function drawPlayers() {
-    (state.players || []).forEach(function (p) {
-      var row = CLASS_ORDER.indexOf(p.cls); if (row < 0) row = 0;
-      var sx = p.step * SPR, sy = (row * 4 + p.dir) * SPR;
-      var x = p.x * ZOOM - SPR * ZOOM / 2, y = p.y * ZOOM - SPR * ZOOM;
-
-      if (p.casting) {                       // the mage's tell, visible to all
-        var pu = 0.5 + 0.5 * Math.sin(performance.now() / 90);
-        ctx.strokeStyle = "rgba(198,130,255," + (0.4 + 0.5 * pu) + ")";
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(p.x * ZOOM, p.y * ZOOM - 20, 30 + pu * 8, 0, Math.PI * 2); ctx.stroke();
-      }
-      if (p.stun) {
-        ctx.strokeStyle = "rgba(255,195,92,0.85)"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(p.x * ZOOM, p.y * ZOOM - 20, 26, 0, Math.PI * 2); ctx.stroke();
-      }
-      ctx.drawImage(sheets.hunters, sx, sy, SPR, SPR, x, y, SPR * ZOOM, SPR * ZOOM);
-
-      ctx.font = "12px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillStyle = p.me ? "#7fd8ff" : "rgba(230,236,250,0.82)";
-      ctx.fillText(p.name, p.x * ZOOM, p.y * ZOOM - SPR * ZOOM - 4);
-      ctx.textAlign = "left";
-    });
-  }
-
-  function drawFx() {
-    var t = performance.now();
-    fx = fx.filter(function (f) { return t - f.born < f.life; });
-    fx.forEach(function (f) {
-      var d = f.def;
-      var frame = Math.floor((t - f.born) / d.ms) % d.frames;
-      ctx.drawImage(sheets[d.img], frame * d.w, 0, d.w, d.h,
-        f.x * ZOOM - d.w * ZOOM / 2, f.y * ZOOM - d.h * ZOOM / 2, d.w * ZOOM, d.h * ZOOM);
-    });
-
-    windups = windups.filter(function (w) { return t - w.born < w.life; });
-    windups.forEach(function (w) {
-      var k = (t - w.born) / w.life;
-      ctx.strokeStyle = "rgba(198,130,255," + (1 - k) + ")";
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(w.x * ZOOM, w.y * ZOOM, 10 + k * 60, 0, Math.PI * 2); ctx.stroke();
-    });
-
-    // fireballs in flight, rotated along their velocity
-    (state.balls || []).forEach(function (b) {
-      var d = FXDEF.fire, fr = Math.floor(t / d.ms) % d.frames;
-      ctx.save();
-      ctx.translate(b.x * ZOOM, b.y * ZOOM);
-      ctx.rotate(b.a);
-      ctx.drawImage(sheets.fireball, fr * d.w, 0, d.w, d.h,
-        -d.w * ZOOM / 2, -d.h * ZOOM / 2, d.w * ZOOM, d.h * ZOOM);
-      ctx.restore();
-    });
-
-    storms = storms.filter(function (s) { return t - s.born < s.life; });
-    storms.forEach(function (s) {
-      var k = 1 - (t - s.born) / s.life;
-      ctx.strokeStyle = "rgba(120,208,255," + k + ")";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(s.x * ZOOM, s.y * ZOOM, s.r * ZOOM * (1 - k * 0.15), 0, Math.PI * 2);
-      ctx.stroke();
-      // an arc to each victim, so the area stun reads as chain lightning
-      s.hits.forEach(function (h) {
-        ctx.beginPath();
-        ctx.moveTo(s.x * ZOOM, s.y * ZOOM);
-        var mx = (s.x + h.x) / 2 * ZOOM + (Math.random() - 0.5) * 26;
-        var my = (s.y + h.y) / 2 * ZOOM + (Math.random() - 0.5) * 26;
-        ctx.quadraticCurveTo(mx, my, h.x * ZOOM, h.y * ZOOM - 20);
-        ctx.stroke();
-      });
-    });
-
-    shots = shots.filter(function (s) { return t - s.born < s.life; });
-    shots.forEach(function (s) {
-      if (!s.b) return;
-      var k = 1 - (t - s.born) / s.life;
-      ctx.strokeStyle = (s.ranged ? "rgba(120,208,255," : "rgba(255,255,255,") + k + ")";
-      ctx.lineWidth = s.ranged ? 3 : 2;
-      ctx.beginPath();
-      ctx.moveTo(s.a.x * ZOOM, s.a.y * ZOOM - 20);
-      ctx.lineTo(s.b.x * ZOOM, s.b.y * ZOOM - 20);
-      ctx.stroke();
-    });
-  }
-
-  function drawFog(camX, camY) {
-    // Cosmetic only. The server has already withheld everything outside the
-    // radius, so this is a vignette over missing data, not the security.
-    if (state.you.seeAll) return;
-    var cx = state.you.x * ZOOM - camX, cy = state.you.y * ZOOM - camY;
-    var r = state.you.vision * ZOOM;
-    // One gradient is enough: canvas extends a radial gradient's last stop
-    // past its end radius, so everything beyond the vision circle is already
-    // opaque. Adding a second fill with an anticlockwise arc on top fought
-    // the gradient under nonzero winding and left a hard rectangular seam.
-    var g = ctx.createRadialGradient(cx, cy, r * 0.62, cx, cy, r);
-    g.addColorStop(0, "rgba(5,7,12,0)");
-    g.addColorStop(1, "rgba(5,7,12,0.985)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-  }
-
-  function drawHud() {
-    $("pArt").textContent = (state.total - state.left) + "/" + state.total;
-    $("pHunters").textContent = state.hunters;
-
-    var y = state.you;
-    if (y.ch > 0) {
-      var labels = { extract: "Ekstrakcja", capture: "Wiązanie", revive: "Stabilizacja" };
-      var w = 220, x0 = cv.width / 2 - w / 2, y0 = cv.height - 132;
-      ctx.fillStyle = "rgba(10,14,24,0.9)";
-      ctx.fillRect(x0, y0, w, 26);
-      ctx.fillStyle = "#7fd8ff";
-      ctx.fillRect(x0 + 3, y0 + 3, (w - 6) * y.ch, 20);
-      ctx.fillStyle = "#05070c";
-      ctx.font = "12px system-ui"; ctx.textAlign = "center";
-      ctx.fillText(labels[y.chKind] || "", cv.width / 2, y0 + 18);
-      ctx.textAlign = "left";
-    }
-    if (stick.active) {              // floating stick, drawn where it was placed
-      ctx.strokeStyle = "rgba(127,216,255,0.35)"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 56, 0, Math.PI * 2); ctx.stroke();
-      var sdx = stick.x - stick.ox, sdy = stick.y - stick.oy;
-      var sd = Math.hypot(sdx, sdy), cl = Math.min(1, sd / 56) * 56;
-      var nx = sd ? sdx / sd : 0, ny = sd ? sdy / sd : 0;
-      ctx.fillStyle = "rgba(127,216,255,0.55)";
-      ctx.beginPath(); ctx.arc(stick.ox + nx * cl, stick.oy + ny * cl, 22, 0, Math.PI * 2); ctx.fill();
-    }
-    if (role === "mage" && !TOUCH) {  // crosshair, so aiming reads as aiming
-      ctx.strokeStyle = "rgba(198,130,255,0.8)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 4, mouse.y);
-      ctx.moveTo(mouse.x + 4, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y);
-      ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 4);
-      ctx.moveTo(mouse.x, mouse.y + 4); ctx.lineTo(mouse.x, mouse.y + 14);
-      ctx.stroke();
-    }
-    if (y.windup > 0) {
-      ctx.fillStyle = "rgba(198,130,255,0.9)";
-      ctx.font = "14px system-ui"; ctx.textAlign = "center";
-      ctx.fillText("RZUCANIE… " + (y.windup / 1000).toFixed(1) + "s", cv.width / 2, 80);
-      ctx.textAlign = "left";
-    }
-    renderKeys();
-  }
+  if (TOUCH) setupTouch();
 
   function renderKeys() {
-    if (!state || !state.you) return;
-    var y = state.you, out = [];
-    if (TOUCH) {                     // labels live on the buttons instead
-      var A = document.getElementById("tA"), B = document.getElementById("tB");
-      if (A) {
-        A.querySelector("span").textContent = role === "mage" ? "PIORUN"
-          : (myCls === "Strzelec" ? "KARABIN" : "TAZER");
-        A.classList.toggle("cd", (role === "mage" ? y.storm : y.taser) > 0);
-      }
-      if (B) {
-        var show = role === "mage" || myCls === "Zwiadowca";
-        B.style.display = show ? "flex" : "none";
-        B.querySelector("span").textContent = role === "mage" ? "MASKA" : "KAMERY";
-        B.classList.toggle("cd", role === "mage" && y.disguise > 0);
-      }
-      $("keys").innerHTML = role === "mage"
-        ? '<div class="key">Dotknij po prawej — <b>fireball</b></div>'
-        : '<div class="key">Lewy kciuk — ruch</div>';
-      return;
-    }
-    out.push(k("WSAD", "ruch", 0));
-    out.push(k("E", "przytrzymaj: artefakt / wiązanie", 0));
-    out.push(k("SPACJA", myCls === "Strzelec" ? "karabin" : "tazer", y.taser));
-    if (role === "mage") {
-      out.push(k("LPM", "fireball", y.ball));
-      out.push(k("PPM", "piorun AoE", y.storm));
-      out.push(k("Q", "zaklęcie celowane", y.cast));
-      out.push(k("F", "przebranie" + (y.disguised ? " · " + y.disguised : ""), y.disguise));
-      out.push(k("R", "zmyłka", y.blend));
-    }
-    if (myCls === "Zwiadowca") out.push(k("C", "kamery", 0));
-    $("keys").innerHTML = out.join("");
-  }
-  function k(key, label, cd) {
-    return '<div class="key' + (cd > 0 ? " cd" : "") + '"><b>' + key + "</b> " + label +
-      (cd > 0 ? " (" + (cd / 1000).toFixed(1) + "s)" : "") + "</div>";
+    if (TOUCH) return;
+    var mage = ROLE && ROLE.role === "mage";
+    var rows = [
+      ["WSAD", "ruch"],
+      ["E / trzymaj", "artefakt · wiązanie · stabilizacja"],
+      ["Spacja", "tazer"],
+      mage ? ["Q / LPM", "rzuć wybrane zaklęcie"] : ["F", "użyj przedmiotu"],
+      ["1–9", "wybór slotu"],
+      ["Z / X", "ping: podejrzany / czysto"]
+    ];
+    $("keys").innerHTML = rows.map(function (r) {
+      return "<div class='key'><b>" + r[0] + "</b> — " + r[1] + "</div>";
+    }).join("");
   }
 
-  // ------------------------------------------------------------------ misc
-  function log(msg, kind) {
+  setInterval(function () {
+    if (!S || !S.me || S.me.base) return;
+    var x = 0, y = 0;
+    if (keys.a || keys.arrowleft) x -= 1;
+    if (keys.d || keys.arrowright) x += 1;
+    if (keys.w || keys.arrowup) y -= 1;
+    if (keys.s || keys.arrowdown) y += 1;
+    if (stick.active) {
+      var l = Math.hypot(stick.x, stick.y);
+      if (l > 8) {                       // dead zone, so a resting thumb does not creep
+        x = Math.max(-1, Math.min(1, stick.x / 56));
+        y = Math.max(-1, Math.min(1, stick.y / 56));
+        var al = Math.hypot(x, y) || 1;
+        lastAim = { x: x / al, y: y / al };
+      }
+    }
+    var hold = holding || !!keys.e;
+    send({ t: "input", x: x, y: y, hold: hold });
+  }, 50);
+
+  // ------------------------------------------------------------- render
+  var fx = [];
+
+  function fit() {
+    var r = window.devicePixelRatio || 1;
+    cv.width = Math.floor(cv.clientWidth * r);
+    cv.height = Math.floor(cv.clientHeight * r);
+    // a handset should see roughly the same slice of floor as a desktop,
+    // not a pixel-doubled keyhole
+    ZOOM = Math.max(1, Math.min(2.4, cv.width / 520));
+  }
+  window.addEventListener("resize", fit);
+
+  function draw() {
+    requestAnimationFrame(draw);
+    if (!S || !S.me || S.me.base || !DEF) return;
+    if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
+
+    var me = meActor();
+    CAM.x = me.x - cv.width / (2 * ZOOM);
+    CAM.y = me.y - cv.height / (2 * ZOOM);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#05070c";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(ZOOM, 0, 0, ZOOM, -CAM.x * ZOOM, -CAM.y * ZOOM);
+
+    var sealed = {}, lit = {}, doused = {};
+    (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
+    (S.lit || []).forEach(function (n) { lit[n] = 1; });
+    (S.doused || []).forEach(function (n) { doused[n] = 1; });
+
+    DEF.map.forEach(function (c) {
+      if (c.section > S.act) return;                 // locked sections stay dark
+      ctx.fillStyle = lit[c.name] ? "#141d2e" : doused[c.name] ? "#080a12" : "#0d1320";
+      ctx.fillRect(c.x, c.y, c.w, c.h);
+      ctx.strokeStyle = sealed[c.name] ? "#b05a4a" : "#223050";
+      ctx.lineWidth = sealed[c.name] ? 4 : 3;
+      c.walls.forEach(function (w) {
+        ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+      });
+      if (sealed[c.name]) {
+        ctx.strokeStyle = "#b05a4a";
+        ctx.strokeRect(c.x, c.y, c.w, c.h);
+      }
+      ctx.fillStyle = "rgba(150,170,210,0.32)";
+      ctx.font = "11px system-ui";
+      ctx.fillText(c.name, c.x + 8, c.y + 16);
+    });
+
+    (S.walls || []).forEach(function (w) {
+      ctx.strokeStyle = "#8b6b3a"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+    });
+
+    (S.artifacts || []).forEach(function (a) {
+      if (a.state === "secured") return;
+      ctx.fillStyle = a.state === "lost" ? "#4a3038" : a.sealed ? "#8ce0a8" : "#ffd27a";
+      ctx.beginPath(); ctx.arc(a.x, a.y, 7, 0, 6.284); ctx.fill();
+      if (a.state === "open") {
+        ctx.strokeStyle = "rgba(255,210,122,0.35)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(a.x, a.y, 13 + Math.sin(Date.now() / 300) * 2, 0, 6.284); ctx.stroke();
+      }
+    });
+
+    (S.corpses || []).forEach(function (c) {
+      ctx.fillStyle = "#5a2a34";
+      ctx.fillRect(c.x - 9, c.y - 4, 18, 8);
+      ctx.fillStyle = "rgba(230,120,140,0.7)";
+      ctx.font = "10px system-ui";
+      ctx.fillText(c.name, c.x - 14, c.y - 10);
+    });
+
+    (S.balls || []).forEach(function (b) {
+      var col = (DEF.schools[b.school] || {}).colour || "#ff7a3c";
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, 6.284); ctx.fill();
+    });
+
+    (S.actors || []).forEach(function (a) { drawActor(a); });
+
+    (S.pings || []).forEach(function (p) {
+      ctx.strokeStyle = p.kind === "podejrzany" ? "#ff6b6b" : "#7ce8a8";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, 6.284); ctx.stroke();
+      ctx.fillStyle = "rgba(230,236,250,0.8)";
+      ctx.font = "10px system-ui";
+      ctx.fillText(p.kind + " · " + (p.byName || ""), p.x - 24, p.y - 22);
+    });
+
+    var now = Date.now();
+    fx = fx.filter(function (f) { return now - f.born < 700; });
+    fx.forEach(function (f) {
+      if (f.tell) return;
+      var k = (now - f.born) / 700;
+      var col = (DEF.schools[f.school] || {}).colour || "#fff";
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 8 + k * 34, 0, 6.284); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+
+    // the fog: a single radial gradient. Canvas extends the last stop past
+    // its end radius, so one fill covers the whole viewport -- a second fill
+    // with a reversed arc fights the nonzero winding rule and seams.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var cx = cv.width / 2, cy = cv.height / 2, r = (S.me.vision || 240) * ZOOM;
+    var g = ctx.createRadialGradient(cx, cy, r * 0.45, cx, cy, r);
+    g.addColorStop(0, "rgba(5,7,12,0)");
+    g.addColorStop(0.75, "rgba(5,7,12,0.72)");
+    g.addColorStop(1, "rgba(5,7,12,0.97)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    if (TOUCH && stick.active) {
+      ctx.strokeStyle = "rgba(127,216,255,0.45)"; ctx.lineWidth = 2;
+      var r0 = (window.devicePixelRatio || 1);
+      ctx.beginPath(); ctx.arc(stick.ox * r0, stick.oy * r0, 46 * r0, 0, 6.284); ctx.stroke();
+      ctx.fillStyle = "rgba(127,216,255,0.35)";
+      ctx.beginPath();
+      ctx.arc((stick.ox + Math.max(-46, Math.min(46, stick.x))) * r0,
+              (stick.oy + Math.max(-46, Math.min(46, stick.y))) * r0, 18 * r0, 0, 6.284);
+      ctx.fill();
+    }
+  }
+
+  function drawActor(a) {
+    var row = CLASS_ROW[a.cls] || 0;
+    var dir = a.dir || 0;
+    if (SHEET.complete && SHEET.naturalWidth) {
+      ctx.drawImage(SHEET, (a.step ? 32 : 0), (row * 4 + dir) * 32, 32, 32,
+        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
+    } else {
+      ctx.fillStyle = "#8b9ac0";
+      ctx.fillRect(a.x - 8, a.y - 16, 16, 24);
+    }
+    if (a.casting) {
+      ctx.strokeStyle = "#c682ff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(a.x, a.y - 6, 20 + Math.sin(Date.now() / 90) * 3, 0, 6.284); ctx.stroke();
+    }
+    if (a.stunned) {
+      ctx.fillStyle = "#ffc35c"; ctx.font = "12px system-ui";
+      ctx.fillText("!", a.x - 2, a.y - 26);
+    }
+    if (a.channel) {
+      ctx.fillStyle = "rgba(127,216,255,0.85)";
+      ctx.fillRect(a.x - 12, a.y + 12, 24, 3);
+    }
+    ctx.fillStyle = a.id === (S.me && S.me.id) ? "#7fd8ff" : "rgba(200,214,240,0.75)";
+    ctx.font = "10px system-ui";
+    // stagger by id: bodies pile up constantly in this game and two labels
+    // at the same height read as one nonsense word
+    var lift = 28 + (parseInt(String(a.id).replace(/\D/g, ""), 10) % 3) * 9;
+    ctx.fillText(a.name, a.x - ctx.measureText(a.name).width / 2, a.y - lift);
+  }
+  requestAnimationFrame(draw);
+  fit();
+
+  // ------------------------------------------------------------- evidence
+  function showLog(m) {
+    var lines = m.entries.map(function (e) {
+      var d = new Date(e.t);
+      return (e.kind === "in" ? "→ " : "← ") + e.cls + "  " +
+        ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2);
+    });
+    var res = m.residue.length
+      ? "\nOsad: " + m.residue.map(function (s) { return DEF.schools[s].name; }).join(", ")
+      : "\nOsad: brak";
+    toast("Rejestr " + m.room + " — " + m.entries.length + " wpisów");
+    var log = $("log");
     var d = document.createElement("div");
-    d.className = "lg " + (kind || "");
-    d.textContent = msg;
-    var l = $("log");
-    l.insertBefore(d, l.firstChild);
-    while (l.childNodes.length > 12) l.removeChild(l.lastChild);
+    d.className = "lg start";
+    d.style.whiteSpace = "pre-line";
+    d.textContent = "REJESTR " + m.room + "\n" + (lines.join("\n") || "pusto") + res;
+    log.appendChild(d);
   }
-  var toastT = null;
-  function toast(msg) {
-    var el = $("toast");
-    el.textContent = msg; el.style.opacity = 1;
-    clearTimeout(toastT);
-    toastT = setTimeout(function () { el.style.opacity = 0; }, 2200);
+
+  function showCorpse(m) {
+    if (!m.read) { toast("Ślad wystygł."); return; }
+    var d = new Date(m.read.t);
+    toast("Szkoła: " + DEF.schools[m.read.school].name + " · " +
+      (m.read.exact ? "" : "około ") +
+      ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2));
   }
-  function esc(s) { return String(s).replace(/[<>&]/g, function (c) {
-    return { "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]; }); }
 
-  $("btnJoin").addEventListener("click", function () {
-    var n = $("nick").value.trim();
-    if (!n) { showError("Podaj imię."); return; }
-    connect(n, $("rcode").value.trim().toUpperCase());
-  });
-  $("rcode").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
-  $("nick").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
-  $("btnStart").addEventListener("click", function () { ws.send(JSON.stringify({ t: "start" })); });
-  $("btnAgain").addEventListener("click", function () { ws.send(JSON.stringify({ t: "start" })); });
+  // ------------------------------------------------------------- tribunal
+  var trEndsAt = 0, trTimer = 0, voterNames = {};
+  function openTribunal(m) {
+    trEndsAt = m.endsAt;
+    // the verdict names everyone who voted, including players the fog kept
+    // out of your snapshot -- so the roll has to come from here, not from
+    // the actors you happened to be able to see
+    voterNames = {};
+    (m.voters || []).forEach(function (v) { voterNames[v.id] = v.name; });
+    $("trText").innerHTML = "<b>" + esc(m.accused.name) + "</b> (" + esc(m.accused.cls) +
+      ") został związany przez <b>" + esc(m.accuser.name) + "</b> (" + esc(m.accuser.cls) + ").";
+    $("trMine").textContent = "";
+    over("oTribunal", true);
+    over("oVerdict", false);
+    clearInterval(trTimer);
+    trTimer = setInterval(function () {
+      var left = Math.max(0, trEndsAt - Date.now());
+      $("trClock").textContent = Math.ceil(left / 1000) + " s";
+      if (left <= 0) clearInterval(trTimer);
+    }, 200);
+  }
+  function vote(v, label) {
+    send({ t: "vote", vote: v });
+    $("trMine").textContent = "Twój głos: " + label;
+  }
+  $("vTak").onclick = function () { vote("tak", "mag"); };
+  $("vNie").onclick = function () { vote("nie", "niewinny"); };
+  $("vAbs").onclick = function () { vote("wstrzym", "wstrzymanie"); };
 
-  if (TOUCH) setupTouch();
-  draw();
+  function showVerdict(m) {
+    clearInterval(trTimer);
+    over("oTribunal", false);
+    $("vdTitle").textContent = m.convicted ? "Odesłany do bazy" : "Wypuszczony";
+    $("vdText").textContent = m.convicted
+      ? (m.accused ? m.accused.name : "Oskarżony") + " wypada z rundy. Jeśli to nie był mag, " +
+        "właśnie sami sobie odjęliście człowieka."
+      : "Głosów za było za mało. Trybunał stygnie dwie minuty.";
+    $("vdVotes").innerHTML = (m.cast || []).map(function (c) {
+      return "<span class='vt " + c.vote + "'>" + esc(nameOf(c.id)) + ": " +
+        (c.vote === "tak" ? "mag" : c.vote === "nie" ? "niewinny" : "—") + "</span>";
+    }).join("");
+    over("oVerdict", true);
+    setTimeout(function () { over("oVerdict", false); }, 6000);
+  }
+
+  function nameOf(id) {
+    if (voterNames[id]) return voterNames[id];
+    if (S && S.actors) {
+      for (var i = 0; i < S.actors.length; i++) if (S.actors[i].id === id) return S.actors[i].name;
+    }
+    return id;
+  }
+
+  // ------------------------------------------------------------- base
+  var watching = [];
+  function paintBase() {
+    if (!S || !S.base) return;
+    $("bCharges").textContent = S.base.charges;
+
+    var cams = $("bCams");
+    if (cams.children.length !== S.base.cameras.length) {
+      cams.innerHTML = "";
+      S.base.cameras.forEach(function (n) {
+        var b = document.createElement("button");
+        b.textContent = n;
+        b.onclick = function () {
+          var i = watching.indexOf(n);
+          if (i >= 0) watching.splice(i, 1);
+          else { watching.push(n); if (watching.length > 2) watching.shift(); }
+          send({ t: "watch", rooms: watching });
+          paintBase();
+        };
+        cams.appendChild(b);
+      });
+    }
+    [].forEach.call(cams.children, function (b) {
+      b.classList.toggle("on", watching.indexOf(b.textContent) >= 0);
+    });
+
+    var acts = $("bActs");
+    if (!acts.children.length) {
+      DEF.map.forEach(function (c) {
+        var b = document.createElement("button");
+        b.textContent = "⌁ " + c.name;
+        b.onclick = function () { send({ t: "light", room: c.name }); };
+        b.oncontextmenu = function (e) { e.preventDefault(); send({ t: "door", room: c.name }); };
+        acts.appendChild(b);
+      });
+    }
+
+    var box = $("feeds");
+    box.innerHTML = "";
+    (S.feeds || []).forEach(function (f) {
+      var d = document.createElement("div");
+      d.className = "feed";
+      d.innerHTML = "<h3>" + esc(f.room) + "</h3>";
+      var c = document.createElement("canvas");
+      c.width = 200; c.height = 120;
+      d.appendChild(c);
+      box.appendChild(d);
+      drawFeed(c, f);
+    });
+    if (!(S.feeds || []).length) {
+      box.innerHTML = "<div class='feed'><h3>Brak podglądu</h3></div>";
+    }
+  }
+
+  function drawFeed(c, f) {
+    var g = c.getContext("2d");
+    var room = null;
+    for (var i = 0; i < DEF.map.length; i++) if (DEF.map[i].name === f.room) room = DEF.map[i];
+    g.fillStyle = "#04060a"; g.fillRect(0, 0, c.width, c.height);
+    if (!room) return;
+    var sx = c.width / room.w, sy = c.height / room.h;
+    g.strokeStyle = "#223050"; g.strokeRect(1, 1, c.width - 2, c.height - 2);
+    f.bodies.forEach(function (b) {
+      var x = (b.x - room.x) * sx, y = (b.y - room.y) * sy;
+      var col = "#8b9ac0";
+      for (var i = 0; i < DEF.classes.length; i++) {
+        if (DEF.classes[i].name === b.cls) col = DEF.classes[i].glow;
+      }
+      g.fillStyle = col;
+      g.fillRect(x - 4, y - 7, 8, 14);
+      g.fillStyle = "rgba(200,214,240,0.75)";
+      g.font = "9px system-ui";
+      // a class, never a name: that is the entire contract with the base
+      g.fillText(b.cls, x - 16, y - 10);
+    });
+  }
+
+  // ------------------------------------------------------------- end
+  function showEnd(m) {
+    over("oTribunal", false); over("oVerdict", false); over("oBase", false);
+    var mine = ROLE && ROLE.role === "mage" ? "mage" : "hunters";
+    $("edTitle").textContent = m.winner === mine ? "Wygraliście" : "Przegraliście";
+    $("edTitle").style.color = m.winner === mine ? "var(--good)" : "var(--bad)";
+    $("edText").innerHTML = esc(m.msg) +
+      (m.mage ? "<br><br>Magiem był <b style='color:var(--mage)'>" + esc(m.mage.name) +
+        "</b> — " + esc(m.mage.cls) + "." : "");
+    over("oEnd", true);
+    $("btnAgain").disabled = !HOST;
+  }
+  $("btnAgain").onclick = function () { send({ t: "again" }); over("oEnd", false); };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  setInterval(function () {
+    if ($("sLoadout").classList.contains("on") && loEndsAt) {
+      var left = Math.max(0, loEndsAt - Date.now());
+      $("loClock").textContent = Math.ceil(left / 1000) + " s — potem losowo";
+    }
+  }, 250);
 })();

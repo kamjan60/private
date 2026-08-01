@@ -1,143 +1,173 @@
 # I'm Not a Wizard, Harry
 
-Online hidden-mage hunt on a derelict station. A squad of hunters sweeps the
-wreck for magic-tech artifacts; one of them is secretly a mage picking the
-rest off with spells.
+An online hidden-mage **investigation** on a derelict station. A squad sweeps
+the wreck for magic-tech artifacts; one of them is a mage picking the rest off
+with spells and passing as a hunter while he does it.
 
-Hunters do not have to kill the mage — they have to **capture** him: stun him
-with a taser, then bind him while he is down. That single rule is what makes
-the classes matter, because only the Marksman can land a stun at range and
-only the Guardian survives being wrong.
+The design is not a chase. It is a case. No single piece of evidence names the
+mage — each only narrows the field, and he has spells for corrupting every
+layer of it. Argument happens on voice; the game supplies pings, not a chat
+box, because typing on a phone mid-round does not work.
+
+The full design and the reasoning behind each rule is in
+[`docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md`](../docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md).
 
 ## Run it
 
 ```bash
 npm install
 npm start            # http://localhost:8080
+npm test             # 74 assertions, no browser needed
+node test/browser.js # drives the real client on an emulated iPhone
 ```
 
-Open the page, enter a name, leave the room code blank to create a room, and
-share the four-letter code. Minimum three players — but three is degenerate,
-because one kill already drops the hunters to one. **Five or more** is the
-real game.
+Five to eight players. Classes are unique within a round, and there are
+exactly eight of them, which is what sets the ceiling.
 
-Deploy anywhere that runs Node and allows WebSocket upgrades; `PORT` is read
-from the environment.
+## The round
 
-## Controls
+Three acts of ten minutes. The wreck goes dark as they pass: vision is
+multiplied by 1.0, then 0.75, then 0.5, and each act unlocks a new section
+holding four artifacts.
 
-| Key | Action |
-|---|---|
-| `WSAD` / arrows | move |
-| `E` (hold) | context: extract an artifact, bind a stunned player, stabilise a body |
-| `Space` | taser (Marksman: rifle, long range) |
-| Left mouse | *mage only* — **fireball**: a travelling projectile, aimed at the cursor |
-| Right mouse | *mage only* — **storm**: area stun where you aim, 130 px radius |
-| `Q` | *mage only* — targeted cast at the nearest hunter in range |
-| `F` | *mage only* — **disguise**: render as the nearest player's class for 14 s |
-| `R` | *mage only* — decoy bloom somewhere you are not |
-| `C` | *Scout only* — station cameras, brief full map vision |
+Artifacts not extracted before an act ends are **lost**, as are any the mage
+burns with Pożoga or buries with Zawał.
 
-### Touch
+* **Hunters win** by securing 9 of 12 artifacts, or by convicting the mage.
+* **Mage wins** when one hunter is left, or when thirty minutes pass with him
+  still in play.
 
-The page detects a touch device and swaps in an on-screen layer: a floating
-virtual joystick anywhere on the left 45% of the screen for movement, and
-three buttons bottom-right.
+Four lost artifacts puts nine out of reach for good. From that moment the
+hunters' only road is the tribunal — the one road they can be wrong on. That
+is the mage's clock, and it is why stalling is a strategy for him rather than
+a failure to act.
 
-| Control | Action |
-|---|---|
-| Left thumb, drag | move — the stick spawns where you press, 8 px dead zone |
-| Tap right half | fire in that direction: taser for a hunter, fireball for the mage |
-| `TRZYMAJ` | hold-to-channel: extract, bind, stabilise (`E`) |
-| `TAZER` / `PIORUN` | taser, or the mage's storm at the last aim point |
-| `KAMERY` / `MASKA` | Scout's cameras, or the mage's disguise — hidden for classes with neither |
+## The tribunal
 
-Aim comes from the last direction you tapped or moved, so a button press
-fires where you were already pointing. The camera zoom clamps to 1–2× off
-the viewport width so a phone shows roughly the same slice of floor as a
-desktop, not a pixel-doubled keyhole. The perk pill is hidden under 560 px
-because it collides with the stat pills and already reads on the role line.
+Tasering somebody and binding them freezes the round and puts every living
+player on a vote screen. It carries the accused and whoever bound them, and
+nothing else: the case is what people say out loud.
+
+A majority of the living convicts. Ties and abstentions release. Votes are
+published afterwards, because how somebody voted is itself evidence. Two
+minutes between sittings; a minute of immunity for anyone released.
+
+**The mage may bind and accuse too.** It is his only kill that costs no
+charges, and it makes "why did *you* catch him" a question worth asking.
+
+At three players a mage voting with one hunter against the other wins the
+round outright — so the fewer of you are left, the more accusing is suicide.
+
+## Evidence
+
+| Source | Says | Does not say |
+|---|---|---|
+| Compartment transit log | a class and a time | a name you can trust — a disguise writes somebody else's class |
+| Corpse | the school that killed it, time ±30 s | who cast |
+| Residue | a school was worked here, 90 s | by whom, or whether it was planted |
+
+Extracting an artifact hands over that compartment's log for the current act,
+so the errand and the evidence are the same errand. The Archiwista reads logs
+without an artifact; his Filtr still sees entries the mage erased.
 
 ## Classes
 
-Everyone carries a taser. The kit differs in reach, eyesight, toughness and
-one unique verb.
+Eight, one per seat, each picking one of three items before the round.
 
-| Class | Vision | Perk |
+| Class | Vision | Notes |
 |---|---|---|
-| Strażnik (Guardian) | 210 | survives the first spell hit; slower |
-| Zwiadowca (Scout) | 330 | longest sight, plus station cameras |
-| Strzelec (Marksman) | 250 | the only ranged stun (330 px) |
-| Inkwizytor (Inquisitor) | 240 | longer taser reach |
-| Chirurg (Surgeon) | 230 | stabilise one downed hunter per round |
-| Runarz (Runesmith) | 235 | extracts artifacts twice as fast |
+| Strażnik | 210 | survives a hit; slower |
+| Zwiadowca | 330 | longest sight, drones and sensors |
+| Strzelec | 250 | the only ranged stun, 330 px |
+| Inkwizytor | 240 | longer taser, reads bodies and residue |
+| Chirurg | 230 | revives one hunter, or times a death exactly |
+| Runarz | 235 | fast extraction, seals artifacts against destruction |
+| Archiwista | 225 | reads transit logs; erasure-proof filter |
+| Technik | 245 | light, field cameras, door locks |
 
-The mage is dealt a class and a full kit too. He has to pass as one of them,
-so he cannot be the only player without a loadout.
+## The book
 
-## Win conditions
+The mage fills **ten slots** from twenty-four spells across six schools —
+ogień, woda, powietrze, ziemia, mrok, światło. Duplicates stack charges. When
+a spell runs out it is gone for the round.
 
-* **Hunters** — secure all nine artifacts, or bind the mage.
-* **Mage** — reduce the hunters to one.
+Charges are the spine of the evidence game: he cannot change style halfway,
+and every corpse carries the school that killed it, so his loadout leaves a
+signature. Three presets ship, and they play as three different games:
 
-Binding an innocent removes them from the round, so a wrong read costs the
-squad a body as surely as the mage does.
+* **Rzeźnik** kills directly and writes a legible file about himself.
+* **Budowlaniec** need not kill at all — he walls artifacts off and wins on
+  the clock.
+* **Oszust** has *no lethal spell whatsoever* and can only win by tribunal,
+  framing hunters with their own hands.
 
-## Design notes
+Every cast has a wind-up that blooms for anyone with line of sight, and a
+taser landing inside it interrupts the cast **and eats the charge**. Without
+that tell the mage is unbeatable; with it, being seen is the risk he manages.
 
-**The mage throws, he does not select.** The fireball is a body that
-travels at 7.6 px/tick, so it can miss, be dodged, and it shows the caster's
-position for as long as it is in the air. The storm is an *area stun*, not
-area damage — it sets a kill up rather than being one, so the mage still has
-to close and commit. Both are integrated and hit-tested server-side; the
-client sends only a normalised aim vector and never a claimed hit.
+The mage also picks his cover class's item and has to be able to perform it.
+Claiming the Chirurg's Stabilizator and never reviving anybody is evidence.
 
-**Disguise swaps the body, not the name.** A disguised mage renders as
-another player's class to everyone else while keeping his own label, so a
-witness who only caught a silhouette down a corridor is wrong about who they
-saw. You always see your own real class.
+## The base
 
-**Casting has a visible wind-up.** The mage's kill is not instant: a
-1.3 s tell broadcasts a bloom at his position that anyone with line of sight
-can see, and a taser during the wind-up interrupts it. Without the tell the
-mage is unbeatable; with it, being *seen* is the risk he manages. The decoy
-(`R`) exists to muddy exactly that signal, so an FX sighting is evidence
-rather than proof.
+The dead and the ejected crew the station instead of watching. They get two
+camera feeds each from a shared set, plus doors and emergency lights out of a
+pool of six per act shared by the whole base.
+
+Feeds show **class silhouettes, never names**, so a disguise fools the base
+exactly as it fools the living, and nobody down there ever learns who the mage
+is. That is why they are free to keep talking on voice: at a thirty-minute
+round, asking half the table to sit silent for twenty-five minutes does not
+work, so their talking is made into the mechanic instead of a rule to enforce.
+
+Half the cameras fail in act III. The base grows in people and loses its eyes.
+
+## Controls
+
+Keyboard: `WSAD` move, `E` hold (extract · bind · stabilise), `Space` taser,
+`Q`/LMB cast the selected spell, `1`–`9` pick a slot, `F` use item, `R` read
+the log here, `Z`/`X` ping.
+
+Touch: the joystick spawns wherever your left thumb lands; tapping the right
+half aims and fires; three buttons carry hold, taser/cast and ping.
+
+## Architecture
+
+```
+server.js      http + websocket + tick loop, nothing else
+src/rules.js   every tuning number
+src/classes.js eight classes, twenty-four items
+src/spells.js  twenty-four spells as data
+src/map.js     fifteen compartments with walls and doors
+src/evidence.js logs, corpse traces, residue, and the forgeries
+src/round.js   acts, artifacts, win conditions
+src/tribunal.js capture, vote, verdict
+src/base.js    the dead crew
+src/room.js    phases and player state
+src/actions.js movement, taser, channels, items, pings
+src/effects.js wind-up, interrupt, spell effects
+src/snapshot.js per-player culling before serialisation
+```
 
 **The server is authoritative, and that includes the fog.** Movement is
-integrated from client input vectors, never from client-reported positions,
-so a patched client cannot teleport onto an artifact or into taser range.
-Vision is culled per player *before* the snapshot is serialised — the dark
-overlay in the renderer is a vignette over data the client was never sent,
-not the security itself. Stripping the fog client-side reveals nothing.
+integrated from input vectors, casts are hit-tested server-side, and every
+snapshot is culled per player *before* it is serialised. A body outside your
+vision is absent from the message, not hidden in it, so stripping the overlay
+client-side reveals nothing.
 
-**Artifacts sit inside named compartments** rather than scattered on open
-floor, so the sweep forces hunters to separate and enter enclosed rooms.
-That separation is what creates the isolated moments the mage needs.
-
-**Channels break on movement.** Extraction, binding and stabilising all
-require standing still, which is what makes them a commitment rather than a
-tap.
-
-## Assets
-
-Sprites and effects are generated procedurally — see `../pixel-art-toolkit`
-for the generators and the two skills (`fantasy-pixel-art`, `spell-fx`) that
-document the techniques. Regenerate the hunter sheet with:
+The class order in `src/classes.js` must match `CLASSES` in
+`../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`; the client indexes
+sheet rows by class position, so a reordering silently hands every player
+somebody else's body. Regenerate with:
 
 ```bash
 python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
 cp ../pixel-art-toolkit/examples/wizard-hunt/hunters.png public/assets/
 ```
 
-The class order in that script must match `CLASSES` in `server.js`; the
-client indexes sheet rows by class position, so a reordering silently hands
-every player somebody else's body.
-
 ## Not built yet
 
-* Discussion/vote meetings — the current loop is a live hunt, not a
-  round-table. Reporting a body and a timed vote would layer social deduction
-  on top.
-* Persistent lobbies and reconnect.
 * Sound.
+* Persistent lobbies and reconnect — a thirty-minute round on mobile data
+  needs this, but not in the first pass.
+* More than one mage, and interactions between schools.
