@@ -30,18 +30,26 @@ const modules = MODULES.map((name) =>
 const driver = `__def("driver", function (module, exports, require) {\n` +
   fs.readFileSync(path.join(ROOT, "sandbox", "driver.js"), "utf8") + `\n});`;
 
-const sheet = fs.readFileSync(path.join(ROOT, "public", "assets", "hunters.png")).toString("base64");
+// every asset the client asks for, inlined: an Artifact may not fetch
+const ASSET_FILES = {
+  hunters: "hunters.png", tiles: "tiles.png",
+  ogien: "fireball.png", powietrze: "lightning.png", woda: "sleep.png",
+  ziemia: "fx_earth.png", mrok: "fx_dark.png", swiatlo: "fx_light.png"
+};
+const assets = {};
+for (const [k, f] of Object.entries(ASSET_FILES)) {
+  assets[k] = "data:image/png;base64," +
+    fs.readFileSync(path.join(ROOT, "public", "assets", f)).toString("base64");
+}
 
 let client = fs.readFileSync(path.join(ROOT, "public", "client.js"), "utf8");
-client = client.replace('SHEET.src = "assets/hunters.png";',
-  'SHEET.src = "data:image/png;base64," + window.__SHEET;');
 
 let html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
 
 // ---------------------------------------------------------------- shim
 const shim = `
 <script>
-window.__SHEET = "${sheet}";
+window.__ASSETS = ${JSON.stringify(assets)};
 (function () {
   "use strict";
   var reg = {}, cache = {};
