@@ -254,7 +254,18 @@
     $("pRole").textContent = (mage ? "MAG · " : "ŁOWCA · ") + ROLE.cls;
     $("pPerk").textContent = itemName(ROLE.cls, ROLE.item);
     renderKeys();
+    paintTouchLabels();
     paintBar();
+  }
+
+  /* The middle button does different jobs for the two sides, so it has to
+     say which. A mage pressing "TAZER" and throwing a fireball is a lie the
+     interface tells him about his own kit. */
+  function paintTouchLabels() {
+    if (!TOUCH || !ROLE) return;
+    var mage = ROLE.role === "mage";
+    $("tA").querySelector("span").textContent = mage ? "RZUĆ" : "TAZER";
+    $("tB").querySelector("span").textContent = "PING";
   }
 
   function itemName(cls, id) {

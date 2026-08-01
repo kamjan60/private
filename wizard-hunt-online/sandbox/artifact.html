@@ -1,0 +1,3723 @@
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>I'm Not a Wizard, Harry</title>
+<!-- inline, so the browser's automatic /favicon.ico probe does not 404 -->
+<text y='14' font-size='14'>%F0%9F%94%AE</text></svg>" />
+<style>
+  :root{
+    --bg:#07090f; --panel:#111726; --panel2:#0c1120; --line:rgba(120,150,220,0.16);
+    --ink:#e6ecfa; --dim:#8b9ac0; --accent:#7fd8ff; --bad:#ff6b6b; --good:#7ce8a8;
+    --warn:#ffc35c; --mage:#c682ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    touch-action:none; overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  .screen{ position:fixed; inset:0; display:none; }
+  .screen.on{ display:block; }
+  /* .center must NOT set display: it has the same specificity as .screen and
+     sits below it, so `display:flex` here would win and every screen would be
+     on at once, the topmost swallowing every click. Layout only; the display
+     comes from .screen.on.center below. */
+  .center{ justify-content:center; padding:18px;
+    overflow-y:auto; background:radial-gradient(ellipse 80% 60% at 50% 15%, #141c30, #06080e); }
+  .screen.on.center{ display:flex; }
+  /* `margin:auto` centres the card, NOT `align-items:center` on the parent.
+     With align-items the overflowing top of a tall card is pushed above the
+     scroll origin and becomes unreachable -- which on a handset hides the
+     mage's whole book behind an edge that will not scroll. */
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:24px; width:100%; max-width:520px; margin:auto; }
+  h1{ margin:0 0 6px; font-size:22px; }
+  h2{ margin:0 0 10px; font-size:17px; }
+  .sub{ color:var(--dim); font-size:13.5px; line-height:1.55; margin:0 0 18px; }
+  label{ display:block; font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--dim); margin:14px 0 6px; }
+  input{ width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    font:inherit; font-size:15px; padding:10px 12px; border-radius:10px; }
+  input:focus{ outline:none; border-color:var(--accent); }
+  button{ background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    font:inherit; font-size:14px; padding:11px 14px; border-radius:10px; cursor:pointer; }
+  button:hover:not(:disabled){ border-color:var(--accent); color:var(--accent); }
+  button.primary{ background:rgba(127,216,255,0.12); border-color:rgba(127,216,255,0.4); color:var(--accent); }
+  button:disabled{ opacity:0.4; cursor:default; }
+  .row{ display:flex; gap:10px; margin-top:16px; }
+  .row button{ flex:1; }
+  .err{ color:var(--bad); font-size:13px; min-height:18px; margin-top:8px; }
+  .code{ font-size:32px; letter-spacing:0.2em; text-align:center; color:var(--accent); margin:6px 0 2px; }
+  .code-h{ text-align:center; color:var(--dim); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; }
+  ul.plain{ list-style:none; padding:0; margin:14px 0 0; display:flex; flex-direction:column; gap:6px; }
+  ul.plain li{ background:var(--panel2); border:1px solid var(--line); border-radius:9px;
+    padding:8px 12px; font-size:13.5px; display:flex; justify-content:space-between; }
+
+  /* ---------------- loadout ---------------- */
+  #sLoadout .card{ max-width:640px; }
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tabs button{ flex:1; font-size:13px; padding:9px; }
+  .tabs button.on{ border-color:var(--accent); color:var(--accent); }
+  .pick{ display:flex; flex-direction:column; gap:8px; }
+  .opt{ text-align:left; padding:12px 14px; line-height:1.45; }
+  .opt.on{ border-color:var(--accent); background:rgba(127,216,255,0.09); }
+  .opt b{ display:block; font-size:14px; margin-bottom:3px; }
+  .opt small{ color:var(--dim); font-size:12px; }
+  #bookGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; }
+  .sp{ text-align:left; padding:8px 10px; position:relative; }
+  .sp b{ display:block; font-size:12.5px; }
+  .sp small{ color:var(--dim); font-size:10.5px; display:block; line-height:1.35; }
+  .sp .n{ position:absolute; top:6px; right:8px; font-size:11px; color:var(--accent); }
+  .sp.picked{ border-color:var(--accent); }
+  .slots{ font-size:12.5px; color:var(--dim); margin:10px 0; }
+  .slots b{ color:var(--ink); }
+  .clock{ text-align:right; font-size:12px; color:var(--warn); }
+
+  /* ---------------- game ---------------- */
+  canvas#cv{ display:block; width:100%; height:100%; image-rendering:pixelated; }
+  .hud{ position:absolute; pointer-events:none; }
+  #topbar{ top:0; left:0; right:0; display:flex; gap:6px; padding:10px; flex-wrap:wrap; }
+  .pill{ background:rgba(10,14,24,0.86); border:1px solid var(--line); border-radius:9px;
+    padding:6px 11px; font-size:12px; color:var(--dim); }
+  .pill b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .pill.role-mage{ border-color:rgba(198,130,255,0.5); color:var(--mage); }
+  .pill.role-mage b{ color:var(--mage); }
+  .pill.warn{ border-color:rgba(255,107,107,0.5); color:var(--bad); }
+  #log{ position:absolute; left:10px; bottom:96px; width:min(330px,54%); max-height:150px;
+    overflow:hidden; display:flex; flex-direction:column-reverse; gap:4px; }
+  .lg{ background:rgba(10,14,24,0.8); border-left:2px solid var(--line); border-radius:0 6px 6px 0;
+    padding:5px 9px; font-size:11px; color:var(--dim); line-height:1.4; }
+  .lg.kill,.lg.bad{ color:var(--bad); border-color:var(--bad); }
+  .lg.good,.lg.artifact{ color:var(--good); border-color:var(--good); }
+  .lg.stun,.lg.hurt{ color:var(--warn); border-color:var(--warn); }
+  .lg.start,.lg.cast{ color:var(--accent); border-color:var(--accent); }
+  #toast{ position:absolute; top:52px; left:50%; transform:translateX(-50%);
+    background:rgba(10,14,24,0.92); border:1px solid var(--line); border-radius:10px;
+    padding:8px 16px; font-size:13px; opacity:0; transition:opacity .25s; }
+
+  /* the spell bar: charges are the whole resource game, so they stay visible */
+  #bar{ position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(10px + env(safe-area-inset-bottom)); display:flex; gap:5px;
+    pointer-events:auto; max-width:96vw; overflow-x:auto; padding:2px; }
+  .slot{ width:72px; flex:0 0 72px; background:rgba(10,14,24,0.9); border:1px solid var(--line);
+    border-radius:9px; padding:6px 6px; font-size:10.5px; color:var(--dim);
+    text-align:center; line-height:1.3; }
+  /* one line per name: two-line slots grow the bar into the log */
+  .slot b{ display:block; color:var(--ink); font-size:10.5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .slot .c{ color:var(--accent); font-variant-numeric:tabular-nums; }
+  .slot.sel{ border-color:var(--accent); }
+  .slot.empty{ opacity:0.28; }
+
+  #keys{ position:absolute; left:10px; bottom:10px; display:flex; gap:6px; flex-wrap:wrap; max-width:52%; }
+  .key{ background:rgba(10,14,24,0.86); border:1px solid var(--line); border-radius:8px;
+    padding:6px 10px; font-size:11px; color:var(--dim); }
+  .key b{ color:var(--ink); }
+
+  /* ---------------- touch ---------------- */
+  #touch{ display:none; }
+  body.touch #touch{ display:block; }
+  .tbtn{ position:absolute; pointer-events:auto; display:flex; align-items:center;
+    justify-content:center; text-align:center; background:rgba(16,22,38,0.9);
+    border:1px solid rgba(120,150,220,0.3); color:var(--ink); border-radius:50%;
+    font-size:10.5px; font-weight:600; padding:6px; }
+  .tbtn span{ pointer-events:none; }
+  .tbtn.on{ background:rgba(127,216,255,0.28); border-color:var(--accent); }
+  #tHold{ right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(150px + env(safe-area-inset-bottom)); width:88px; height:88px;
+    border-color:rgba(127,216,255,0.45); }
+  #tA{ right:calc(112px + env(safe-area-inset-right));
+    bottom:calc(108px + env(safe-area-inset-bottom)); width:76px; height:76px; }
+  #tB{ right:calc(24px + env(safe-area-inset-right));
+    bottom:calc(56px + env(safe-area-inset-bottom)); width:76px; height:76px; }
+  body.touch #keys{ display:none; }
+  /* the bar sits on the floor and the log stacks above it: overlapping them
+     put the spell names on top of the event feed */
+  body.touch #bar{ bottom:calc(14px + env(safe-area-inset-bottom)); left:10px; transform:none;
+    max-width:min(52vw,250px); }
+  body.touch #log{ bottom:calc(84px + env(safe-area-inset-bottom)); max-height:104px;
+    width:min(300px,52%); }
+  body.touch #topbar{ padding-top:calc(10px + env(safe-area-inset-top)); }
+
+  /* ---------------- overlays ---------------- */
+  /* same scroll trap as .center: centre the card with its own margin */
+  .over{ position:absolute; inset:0; display:none; justify-content:center;
+    background:rgba(5,7,12,0.9); pointer-events:auto; padding:18px; overflow-y:auto; }
+  .over.on{ display:flex; }
+  .votes{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .vt{ background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:5px 9px; font-size:12px; }
+  .vt.tak{ border-color:var(--bad); color:var(--bad); }
+  .vt.nie{ border-color:var(--good); color:var(--good); }
+
+  /* ---------------- base ---------------- */
+  #feeds{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+  .feed{ background:#05070c; border:1px solid var(--line); border-radius:10px; padding:8px; }
+  .feed h3{ margin:0 0 6px; font-size:12px; color:var(--dim); font-weight:600; }
+  .feed canvas{ width:100%; height:auto; background:#04060a; border-radius:6px;
+    image-rendering:pixelated; }
+  .roomlist{ display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:5px; }
+  .roomlist button{ font-size:11.5px; padding:7px 6px; }
+  .roomlist button.on{ border-color:var(--accent); color:var(--accent); }
+
+  @media (max-width:560px){
+    .pill{ font-size:10.5px; padding:5px 8px; }
+    #pPerk{ display:none; }
+    .card{ padding:18px 15px; }
+    h1{ font-size:19px; }
+    #feeds{ grid-template-columns:1fr; }
+  }
+</style>
+
+
+
+<!-- ------------------------------------------------------------- entry -->
+<div class="screen center on" id="sEntry">
+  <div class="card">
+    <h1>I'm Not a Wizard, Harry</h1>
+    <p class="sub">Opuszczony wrak. Drużyna przeczesuje go w poszukiwaniu artefaktów
+      magiczno-technologicznych. Jeden z was jest magiem. Żaden dowód nie wskaże go wprost —
+      każdy tylko zawęża krąg, a on ma czym je fałszować. Kto kogoś obezwładni i zwiąże,
+      odpala <b>trybunał</b>: tłum głosuje, a wyrok jest ostateczny, nawet jeśli był błędny.</p>
+    <label for="nick">Twoje imię</label>
+    <input id="nick" maxlength="16" placeholder="np. Kaz" />
+    <label for="rcode">Kod pokoju (puste = załóż nowy)</label>
+    <input id="rcode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
+    <div class="row"><button class="primary" id="btnJoin">Dołącz / Załóż</button></div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- lobby -->
+<div class="screen center" id="sLobby">
+  <div class="card">
+    <div class="code-h">Kod pokoju</div>
+    <div class="code" id="roomCode">----</div>
+    <p class="sub" style="text-align:center" id="lobbyHint">Podaj kod znajomym.</p>
+    <ul class="plain" id="plist"></ul>
+    <div class="row"><button class="primary" id="btnStart" disabled>Start rundy</button></div>
+    <div class="err" id="err2"></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- loadout -->
+<div class="screen center" id="sLoadout">
+  <div class="card">
+    <div class="clock" id="loClock"></div>
+    <h1 id="loCls">—</h1>
+    <p class="sub" id="loBlurb">—</p>
+    <div class="tabs" id="loTabs">
+      <button class="on" data-tab="item">Wyposażenie</button>
+      <button data-tab="book" id="tabBook" style="display:none">Księga</button>
+    </div>
+    <div id="loItem" class="pick"></div>
+    <div id="loBook" style="display:none">
+      <div class="slots">Sloty: <b id="slotCount">0/10</b> — duplikaty wolno, sumują ładunki.</div>
+      <div class="row" id="presetRow" style="margin-top:0"></div>
+      <div class="slots" id="sig"></div>
+      <div id="bookGrid"></div>
+    </div>
+    <div class="row"><button class="primary" id="btnLo">Gotowe</button></div>
+    <div class="err" id="err3"></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- game -->
+<div class="screen" id="sGame">
+  <canvas id="cv"></canvas>
+  <div class="hud" id="topbar">
+    <div class="pill" id="pRole">—</div>
+    <div class="pill" id="pPerk">—</div>
+    <div class="pill">Akt <b id="pAct">I</b> · <b id="pClock">10:00</b></div>
+    <div class="pill">Artefakty <b id="pArt">0/9</b></div>
+    <div class="pill" id="pLost">Stracone <b>0</b></div>
+  </div>
+  <div id="log"></div>
+  <div id="bar"></div>
+  <div id="keys"></div>
+  <div id="toast"></div>
+  <div id="touch">
+    <button class="tbtn" id="tHold"><span>TRZYMAJ</span></button>
+    <button class="tbtn" id="tA"><span>TAZER</span></button>
+    <button class="tbtn" id="tB"><span>PING</span></button>
+  </div>
+
+  <div class="over" id="oTribunal"><div class="card">
+    <h2>Trybunał</h2>
+    <p class="sub" id="trText">—</p>
+    <p class="sub" style="color:var(--warn)">Gra nie pokaże dowodów. Rozmawiajcie.</p>
+    <div class="clock" id="trClock"></div>
+    <div class="row">
+      <button id="vTak">Mag</button>
+      <button id="vNie">Niewinny</button>
+      <button id="vAbs">Wstrzymuję</button>
+    </div>
+    <div class="err" id="trMine"></div>
+  </div></div>
+
+  <div class="over" id="oVerdict"><div class="card">
+    <h2 id="vdTitle">—</h2>
+    <p class="sub" id="vdText">—</p>
+    <div class="votes" id="vdVotes"></div>
+  </div></div>
+
+  <div class="over" id="oBase"><div class="card">
+    <h2>Baza</h2>
+    <p class="sub">Nie żyjesz albo cię odesłano. Obsługujesz stację. Kamery pokazują
+      <b>sylwetki klas, nigdy imiona</b> — przebranie oszukuje was tak samo jak żywych.
+      Nikt tu nie wie, kto jest magiem. Gadajcie na głosie: to wasza rola, nie oszustwo.</p>
+    <div class="pill" style="display:inline-block">Moc bazy w tym akcie: <b id="bCharges">6</b></div>
+    <div id="feeds"></div>
+    <label>Podgląd — dwa naraz</label>
+    <div class="roomlist" id="bCams"></div>
+    <label>Drzwi i światło — z puli</label>
+    <div class="roomlist" id="bActs"></div>
+  </div></div>
+
+  <div class="over" id="oEnd"><div class="card" style="text-align:center">
+    <h1 id="edTitle">—</h1>
+    <p class="sub" id="edText">—</p>
+    <div class="row"><button class="primary" id="btnAgain">Nowa runda</button></div>
+  </div></div>
+</div>
+
+
+<script>
+window.__SHEET = "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";
+(function () {
+  "use strict";
+  var reg = {}, cache = {};
+  window.__def = function (name, fn) { reg[name] = fn; };
+  function req(id) {
+    var name = String(id).replace(/^\.\//, "");
+    if (cache[name]) return cache[name].exports;
+    if (!reg[name]) throw new Error("no module: " + name);
+    var m = { exports: {} };
+    cache[name] = m;
+    reg[name](m, m.exports, req);
+    return m.exports;
+  }
+  window.__require = req;
+})();
+</script>
+<script>__def("rules", function (module, exports, require) {
+"use strict";
+/**
+ * Every tuning number the round depends on, in one place.
+ *
+ * The spec these come from lives in
+ * docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md.
+ * When a number here disagrees with that document, the document is what
+ * we argued about, so fix the code.
+ */
+
+// ---------------------------------------------------------------- session
+const TICK_HZ = 15;
+const TICK_MS = 1000 / TICK_HZ;
+const MIN_PLAYERS = 5;
+const MAX_PLAYERS = 8;          // one unique class each, and there are eight
+
+// ---------------------------------------------------------------- world
+const W = 2000, H = 1600;
+const SPEED_BASE = 2.5;
+
+// ---------------------------------------------------------------- acts
+const ACTS = 3;
+const ACT_MS = 600000;                    // ten minutes each, thirty total
+const ACT_VISION = [1.0, 0.75, 0.5];      // the wreck goes dark
+const ARTIFACTS_PER_ACT = 4;
+const ARTIFACTS_TOTAL = ACTS * ARTIFACTS_PER_ACT;   // 12
+const ARTIFACTS_TO_WIN = 9;
+/**
+ * Losing this many closes the artifact path for good: 12 - 4 = 8, and 8 is
+ * short of the 9 hunters need. From that moment the tribunal is their only
+ * road, which is the road they can be wrong on. This is the mage's clock.
+ */
+const ARTIFACTS_LOST_TO_CLOSE = ARTIFACTS_TOTAL - ARTIFACTS_TO_WIN + 1;
+
+// ---------------------------------------------------------------- hunters
+const TASER_STUN_MS = 3600;     // long enough to close the distance and bind
+const TASER_COOLDOWN = 6000;
+const BIND_MS = 1800;           // channel that opens a tribunal
+const BIND_MS_SHACKLES = 900;   // Inkwizytor's Kajdany
+const EXTRACT_MS = 2800;
+const EXTRACT_MS_FAST = 1400;   // Runarz's Ekstraktor
+const MARKSMAN_RANGE = 330;
+
+// ---------------------------------------------------------------- tribunal
+const TRIBUNAL_VOTE_MS = 60000;
+const TRIBUNAL_COOLDOWN = 120000;   // between tribunals, room-wide
+const ACQUITTED_IMMUNE_MS = 60000;  // a released player cannot be re-bound
+
+// ---------------------------------------------------------------- mage
+const BOOK_SLOTS = 10;
+const CAST_GLOBAL_COOLDOWN = 3000;
+const CAST_RANGE_DEFAULT = 210;
+const BALL_SPEED = 7.6;         // px per tick
+const BALL_LIFE = 2400;
+const BALL_HIT_R = 22;
+
+// ---------------------------------------------------------------- evidence
+const LOG_WINDOW = "act";       // transit logs only show the current act
+const CORPSE_TRACE_MS = 120000;
+const CORPSE_TRACE_MS_INCENSE = 360000;   // Inkwizytor's Kadzidło
+const CORPSE_TIME_FUZZ_MS = 30000;        // ±30 s unless an autopsy is done
+const RESIDUE_MS = 90000;
+const FILTER_WINDOW_MS = 60000;           // Archiwista's Filtr
+
+// ---------------------------------------------------------------- base
+const BASE_CAMERA_VIEWS = 2;    // simultaneous feeds per person in the base
+const BASE_ACT_CHARGES = 6;     // doors + lights, shared by the whole base
+const BASE_LIGHT_MS = 20000;
+const BASE_CAMERAS_DEAD_IN_ACT3 = 0.5;    // half the cameras fail in act III
+
+// ---------------------------------------------------------------- pings
+const PING_COOLDOWN = 8000;
+const PING_MS = 20000;
+const PING_KINDS = ["podejrzany", "czysto", "bylem-tu", "zwloki"];
+
+// ---------------------------------------------------------------- lobby
+const LOADOUT_MS = 90000;       // then everyone undecided gets a random pick
+
+module.exports = {
+  TICK_HZ, TICK_MS, MIN_PLAYERS, MAX_PLAYERS,
+  W, H, SPEED_BASE,
+  ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
+  ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE,
+  TASER_STUN_MS, TASER_COOLDOWN, BIND_MS, BIND_MS_SHACKLES,
+  EXTRACT_MS, EXTRACT_MS_FAST, MARKSMAN_RANGE,
+  TRIBUNAL_VOTE_MS, TRIBUNAL_COOLDOWN, ACQUITTED_IMMUNE_MS,
+  BOOK_SLOTS, CAST_GLOBAL_COOLDOWN, CAST_RANGE_DEFAULT,
+  BALL_SPEED, BALL_LIFE, BALL_HIT_R,
+  LOG_WINDOW, CORPSE_TRACE_MS, CORPSE_TRACE_MS_INCENSE, CORPSE_TIME_FUZZ_MS,
+  RESIDUE_MS, FILTER_WINDOW_MS,
+  BASE_CAMERA_VIEWS, BASE_ACT_CHARGES, BASE_LIGHT_MS, BASE_CAMERAS_DEAD_IN_ACT3,
+  PING_COOLDOWN, PING_MS, PING_KINDS,
+  LOADOUT_MS
+};
+
+});
+__def("classes", function (module, exports, require) {
+"use strict";
+/**
+ * The eight hunter classes and the three loadout items each of them picks
+ * from before the round.
+ *
+ * ORDER MATTERS. The client indexes sprite-sheet rows by a class's position
+ * in CLASS_NAMES, so reordering this object silently hands every player
+ * somebody else's body. The generator that draws the sheet
+ * (pixel-art-toolkit/examples/wizard-hunt/make_hunters.py) carries the same
+ * list and has to be edited in step.
+ *
+ * Classes are unique within a round, which is why the table has exactly
+ * MAX_PLAYERS entries. A transit log entry naming a class therefore names a
+ * person -- but it names them as *present*, not as guilty, and the mage can
+ * write somebody else's class into it. See the spec, section 5.
+ */
+
+/**
+ * Item shapes:
+ *   kind "passive"   always on; `mods` is merged into the player's stats
+ *   kind "cooldown"  fires by itself when its condition is met, then rests
+ *   kind "active"    the player spends a charge on purpose
+ */
+const CLASSES = {
+  "Strażnik": {
+    vision: 210, taser: 62, hp: 2, speed: 0.86, glow: "#c4d2e8",
+    blurb: "Znosi trafienie, którego nikt inny by nie zniósł.",
+    items: [
+      { id: "tarcza", name: "Tarcza szturmowa", kind: "cooldown", cooldown: 20000,
+        desc: "Blokuje jedno zaklęcie od przodu, potem stygnie." },
+      { id: "kamizelki", name: "Plecak z kamizelkami", kind: "active", charges: 3,
+        desc: "Trzy kamizelki do rozdania. Każda zjada jedno trafienie." },
+      { id: "kotwica", name: "Kotwica", kind: "active", charges: 2, durationMs: 20000,
+        desc: "Barykada w przejściu na 20 s." }
+    ]
+  },
+  "Zwiadowca": {
+    vision: 330, taser: 58, hp: 1, speed: 1.14, glow: "#8cf096",
+    blurb: "Widzi najdalej i jako jedyny może zajrzeć tam, gdzie go nie ma.",
+    items: [
+      { id: "dron", name: "Dron", kind: "active", charges: 3, durationMs: 6000,
+        desc: "Odsłania wskazany przedział na 6 s." },
+      { id: "czujnik", name: "Czujnik ruchu", kind: "active", charges: 2,
+        desc: "Stawiasz czujnik. Pinguje wejścia klasą, nie imieniem." },
+      { id: "optyka", name: "Optyka", kind: "passive", mods: { vision: 70 },
+        desc: "Wzrok +70 na stałe." }
+    ]
+  },
+  "Strzelec": {
+    vision: 250, taser: 58, hp: 1, speed: 1.0, glow: "#78d0ff",
+    blurb: "Jedyny, kto ogłuszy z drugiego końca przedziału.",
+    items: [
+      { id: "karabin", name: "Karabin", kind: "active", charges: 3, range: 330,
+        desc: "Ogłuszenie z 330 px." },
+      { id: "siatka", name: "Siatka", kind: "active", charges: 2, radius: 90,
+        durationMs: 8000, desc: "Spowolnienie 60% w promieniu 90 na 8 s." },
+      { id: "znacznik", name: "Znacznik", kind: "active", charges: 3, durationMs: 20000,
+        desc: "Znacznik nad celem, widoczny dla wszystkich przez 20 s." }
+    ]
+  },
+  "Inkwizytor": {
+    vision: 240, taser: 70, hp: 1, speed: 1.0, glow: "#ffa848",
+    blurb: "Czyta trupy i wiąże szybciej, niż ktokolwiek zdąży zaprotestować.",
+    items: [
+      { id: "kadzidlo", name: "Kadzidło", kind: "passive", mods: { traceMs: 3 },
+        desc: "Ślad ze zwłok czytelny trzy razy dłużej." },
+      { id: "kajdany", name: "Kajdany", kind: "passive", mods: { bindFast: true },
+        desc: "Wiązanie o połowę szybsze." },
+      { id: "wykrywacz", name: "Wykrywacz", kind: "passive", mods: { residueAct: true },
+        desc: "Pokazuje, czy w przedziale rzucano w tym akcie." }
+    ]
+  },
+  "Chirurg": {
+    vision: 230, taser: 58, hp: 1, speed: 0.98, glow: "#d8e878",
+    blurb: "Raz na rundę odwraca to, co mag uznał za załatwione.",
+    items: [
+      // spent by holding over a body, not by a button: reviving is a
+      // channel that breaks on movement, like every other commitment
+      { id: "stabilizator", name: "Stabilizator", kind: "active", charges: 1,
+        viaChannel: true, desc: "Podnosi jednego rannego łowcę." },
+      { id: "stymulanty", name: "Stymulanty", kind: "active", charges: 2, durationMs: 10000,
+        desc: "+40% prędkości i −50% ogłuszenia na 10 s." },
+      { id: "autopsja", name: "Autopsja", kind: "passive", mods: { exactTime: true },
+        desc: "Ze zwłok czyta dokładny czas zgonu." }
+    ]
+  },
+  "Runarz": {
+    vision: 235, taser: 58, hp: 1, speed: 0.96, glow: "#c682ff",
+    blurb: "Wynosi artefakty szybciej, niż mag zdąży ich bronić.",
+    items: [
+      { id: "ekstraktor", name: "Ekstraktor", kind: "passive", mods: { extractFast: true },
+        desc: "Ekstrakcja dwa razy szybsza." },
+      { id: "pieczec", name: "Pieczęć", kind: "active", charges: 3,
+        desc: "Artefakt odporny na Pożogę i Zawał. Nadal trzeba go wyciągnąć." },
+      { id: "zaklocacz", name: "Zakłócacz", kind: "active", charges: 2, durationMs: 15000,
+        desc: "Blokuje rzucanie w przedziale na 15 s." }
+    ]
+  },
+  "Archiwista": {
+    vision: 225, taser: 58, hp: 1, speed: 0.94, glow: "#9fb4d8",
+    blurb: "Czyta rejestry, których nikt inny nie otworzy bez artefaktu.",
+    items: [
+      { id: "czytnik", name: "Czytnik", kind: "passive", mods: { readLogs: true },
+        desc: "Czyta rejestr przedziału bez wyciągania artefaktu." },
+      { id: "kopia", name: "Kopia", kind: "active", charges: 2,
+        desc: "Zapisuje jeden rejestr tak, że przeżyje zmianę aktu." },
+      { id: "filtr", name: "Filtr", kind: "passive", mods: { filterLogs: true },
+        desc: "Rejestr z ostatnich 60 s, ale odporny na Wymazanie." }
+    ]
+  },
+  "Technik": {
+    vision: 245, taser: 58, hp: 1, speed: 1.02, glow: "#ffd27a",
+    blurb: "Zapala światło tam, gdzie mag właśnie je zgasił.",
+    items: [
+      { id: "generator", name: "Generator", kind: "active", charges: 3, durationMs: 30000,
+        desc: "Pełne światło w przedziale na 30 s." },
+      { id: "kamera", name: "Kamera polowa", kind: "active", charges: 2,
+        desc: "Stawia kamerę, którą widzi baza." },
+      { id: "rygiel", name: "Rygiel", kind: "active", charges: 3, durationMs: 20000,
+        desc: "Zamyka drzwi przedziału na 20 s." }
+    ]
+  }
+};
+
+const CLASS_NAMES = Object.keys(CLASSES);
+
+/** Row index in the sprite sheet. Kept as a function so callers cannot
+ *  accidentally rely on a stale copy of the order. */
+function classRow(name) {
+  const i = CLASS_NAMES.indexOf(name);
+  if (i < 0) throw new Error(`unknown class: ${name}`);
+  return i;
+}
+
+function itemsOf(className) {
+  const c = CLASSES[className];
+  if (!c) throw new Error(`unknown class: ${className}`);
+  return c.items;
+}
+
+function findItem(className, itemId) {
+  return itemsOf(className).find((it) => it.id === itemId) || null;
+}
+
+/**
+ * Deal one unique class to each player. Fewer than eight players means some
+ * classes simply do not appear -- and their absence is itself information a
+ * careful hunter can use, which is intended.
+ */
+function dealClasses(count, rand = Math.random) {
+  if (count > CLASS_NAMES.length) {
+    throw new Error(`${count} players but only ${CLASS_NAMES.length} classes`);
+  }
+  const pool = CLASS_NAMES.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
+
+/** Stats after the chosen item's passive modifiers are folded in. */
+function statsFor(className, itemId) {
+  const c = CLASSES[className];
+  const it = itemId ? findItem(className, itemId) : null;
+  const mods = (it && it.kind === "passive" && it.mods) || {};
+  return {
+    vision: c.vision + (mods.vision || 0),
+    taser: c.taser,
+    hp: c.hp,
+    speed: c.speed,
+    glow: c.glow,
+    bindFast: !!mods.bindFast,
+    extractFast: !!mods.extractFast,
+    exactTime: !!mods.exactTime,
+    readLogs: !!mods.readLogs,
+    filterLogs: !!mods.filterLogs,
+    residueAct: !!mods.residueAct,
+    traceMult: mods.traceMs || 1
+  };
+}
+
+module.exports = {
+  CLASSES, CLASS_NAMES, classRow, itemsOf, findItem, dealClasses, statsFor
+};
+
+});
+__def("spells", function (module, exports, require) {
+"use strict";
+/**
+ * The book: twenty-four spells across six schools.
+ *
+ * A spell is data, not code. Adding one is a row in this table plus a case
+ * in the effect dispatcher -- that is the whole point of the shape, because
+ * the design wants the book to keep growing without the rules growing with it.
+ *
+ * The mage fills BOOK_SLOTS (10) slots from this table. Duplicates are
+ * allowed and stack their charges, so ten slots buy either a narrow, deep
+ * kit or a wide, shallow one.
+ *
+ * Charges are the spine of the evidence game. The mage cannot change style
+ * mid-round because he took what he took, and every corpse carries the
+ * school that killed it -- so his loadout leaves a signature.
+ *
+ *   target "point"        aimed with the cursor or a tap, within `range`
+ *   target "actor"        nearest valid player within `range`
+ *   target "self"         no aim
+ *   target "compartment"  the compartment the mage is standing in
+ *
+ * `castMs` is the wind-up. Throughout it the mage blooms an effect visible
+ * to anyone with line of sight, and a taser landing during it interrupts the
+ * cast AND eats the charge. Without that tell the mage is unbeatable; with
+ * it, being seen is the risk he manages.
+ */
+
+const SCHOOLS = {
+  ogien:     { name: "Ogień",     colour: "#ff7a3c", job: "obrażenia, pociski" },
+  woda:      { name: "Woda",      colour: "#4fc3f7", job: "spowolnienie, otępienie, sen" },
+  powietrze: { name: "Powietrze", colour: "#c9e8ff", job: "podmuch, przeskok, burza" },
+  ziemia:    { name: "Ziemia",    colour: "#b08050", job: "ściany, ryglowanie, wstrząs" },
+  mrok:      { name: "Mrok",      colour: "#6b4b8a", job: "gaszenie świateł, ukrycie, psucie śladów" },
+  swiatlo:   { name: "Światło",   colour: "#ffe9a8", job: "przebranie, sobowtór, kłamstwo o tożsamości" }
+};
+
+const SPELLS = [
+  // ------------------------------------------------------------- ogień
+  { id: "kula_ognia", name: "Kula ognia", school: "ogien", charges: 3, castMs: 900,
+    target: "point", effect: "projectile", lethal: true,
+    desc: "Pocisk. Leci, dopóki nie trafi albo nie zgaśnie." },
+  { id: "pochodnia", name: "Pochodnia", school: "ogien", charges: 2, castMs: 600,
+    target: "point", range: 120, effect: "cone", lethal: true,
+    desc: "Stożek ognia na 120 px. Zabija." },
+  { id: "zaplon", name: "Zapłon", school: "ogien", charges: 2, castMs: 700,
+    target: "point", delayMs: 3000, radius: 80, effect: "delayed_blast", lethal: true,
+    desc: "Znacznik w miejscu. Po 3 s wybucha i zabija w promieniu 80." },
+  { id: "pozoga", name: "Pożoga", school: "ogien", charges: 1, castMs: 1400,
+    target: "compartment", effect: "burn_artifact",
+    desc: "Niszczy artefakt w przedziale. Artefakt przepada." },
+
+  // ------------------------------------------------------------- woda
+  { id: "sen", name: "Sen", school: "woda", charges: 2, castMs: 1000,
+    target: "actor", durationMs: 4000, effect: "sleep",
+    desc: "Cel zasypia na 4 s." },
+  { id: "topiel", name: "Topiel", school: "woda", charges: 2, castMs: 800,
+    target: "point", radius: 140, durationMs: 6000, slow: 0.6, effect: "slow_area",
+    desc: "Spowolnienie 60% w promieniu 140 na 6 s." },
+  { id: "cisza", name: "Cisza", school: "woda", charges: 2, castMs: 700,
+    target: "actor", durationMs: 8000, effect: "silence",
+    desc: "Cel przez 8 s nie pinguje i nie kanałuje." },
+  { id: "zimna_krew", name: "Zimna krew", school: "woda", charges: 1, castMs: 800,
+    target: "self", effect: "stun_immunity",
+    desc: "Mag ignoruje najbliższe ogłuszenie tazerem." },
+
+  // ------------------------------------------------------------- powietrze
+  { id: "lancuch", name: "Łańcuch błyskawic", school: "powietrze", charges: 2, castMs: 1000,
+    target: "actor", jumps: 3, durationMs: 2500, effect: "chain_stun",
+    desc: "Ogłuszenie 2.5 s, przeskakuje do trzech celów." },
+  { id: "podmuch", name: "Podmuch", school: "powietrze", charges: 3, castMs: 500,
+    target: "actor", push: 200, effect: "shove",
+    desc: "Odrzuca cel o 200 px." },
+  { id: "ped", name: "Pęd", school: "powietrze", charges: 3, castMs: 400,
+    target: "self", durationMs: 5000, speed: 1.8, effect: "haste",
+    desc: "Mag +80% prędkości na 5 s." },
+  { id: "burza", name: "Burza", school: "powietrze", charges: 2, castMs: 1100,
+    target: "point", radius: 130, durationMs: 3200, effect: "stun_area",
+    desc: "Ogłuszenie 3.2 s w promieniu 130." },
+
+  // ------------------------------------------------------------- ziemia
+  { id: "mur", name: "Mur", school: "ziemia", charges: 3, castMs: 800,
+    target: "point", durationMs: 25000, effect: "wall",
+    desc: "Ściana w przejściu na 25 s." },
+  { id: "rygiel_z", name: "Rygiel", school: "ziemia", charges: 2, castMs: 900,
+    target: "compartment", durationMs: 20000, effect: "seal_doors",
+    desc: "Zamyka drzwi przedziału na 20 s." },
+  { id: "wstrzas", name: "Wstrząs", school: "ziemia", charges: 2, castMs: 1000,
+    target: "compartment", durationMs: 1500, effect: "quake",
+    desc: "Przerywa wszystkie kanały w przedziale i przewraca na 1.5 s." },
+  { id: "zawal", name: "Zawał", school: "ziemia", charges: 1, castMs: 2000,
+    target: "compartment", effect: "collapse",
+    desc: "Zamyka przedział na stałe. Jego artefakt przepada." },
+
+  // ------------------------------------------------------------- mrok
+  { id: "zgaszenie", name: "Zgaszenie", school: "mrok", charges: 3, castMs: 600,
+    target: "compartment", durationMs: 40000, effect: "douse",
+    desc: "Gasi światło w przedziale na 40 s." },
+  { id: "wymazanie", name: "Wymazanie", school: "mrok", charges: 2, castMs: 1200,
+    target: "compartment", effect: "erase_log",
+    desc: "Kasuje własne wpisy z rejestru przedziału w tym akcie." },
+  { id: "falszywy_slad", name: "Fałszywy ślad", school: "mrok", charges: 3, castMs: 800,
+    target: "compartment", effect: "plant_residue", pickSchool: true,
+    desc: "Podrzuca osad wybranej szkoły." },
+  { id: "cien", name: "Cień", school: "mrok", charges: 2, castMs: 500,
+    target: "self", durationMs: 5000, effect: "invisible",
+    desc: "Niewidzialny przez 5 s. Rejestr i tak go zapisuje." },
+
+  // ------------------------------------------------------------- światło
+  { id: "przebranie", name: "Przebranie", school: "swiatlo", charges: 2, castMs: 1000,
+    target: "self", durationMs: 14000, effect: "disguise",
+    desc: "Renderuje się jako inna klasa przez 14 s. Rejestr zapisuje tę klasę." },
+  { id: "sobowtor", name: "Sobowtór", school: "swiatlo", charges: 2, castMs: 900,
+    target: "point", durationMs: 8000, effect: "decoy",
+    desc: "Kopia maga odchodzi w bok na 8 s." },
+  { id: "oslepienie", name: "Oślepienie", school: "swiatlo", charges: 3, castMs: 600,
+    target: "actor", durationMs: 6000, vision: 0.25, effect: "blind",
+    desc: "Wzrok celu spada do 25% na 6 s." },
+  { id: "falszywa_sylwetka", name: "Fałszywa sylwetka", school: "swiatlo", charges: 2,
+    castMs: 1000, target: "compartment", durationMs: 15000, effect: "fake_silhouette",
+    pickClass: true,
+    desc: "Karmi kamery bazy wybraną klasą przez 15 s." }
+];
+
+const BY_ID = new Map(SPELLS.map((s) => [s.id, s]));
+
+/**
+ * Compartment-scoped spells act on wherever the mage is standing, so they
+ * need no aim. Kept as data rather than a hardcoded list in the dispatcher
+ * so a new spell declares its own targeting.
+ */
+const COMPARTMENT_TARGETED = SPELLS
+  .filter((s) => s.target === "compartment")
+  .map((s) => s.id);
+
+/** Ready-made books, because ten picks from twenty-four on a phone in
+ *  ninety seconds is more tapping than anyone wants. Each is a playable
+ *  answer to "how do I win", not a difficulty setting. */
+const PRESETS = {
+  "Rzeźnik": [
+    "kula_ognia", "kula_ognia", "pochodnia", "zaplon",
+    "sen", "sen", "topiel", "cisza",
+    "podmuch", "przebranie"
+  ],
+  "Budowlaniec": [
+    "mur", "mur", "rygiel_z", "zawal",
+    "pozoga", "wstrzas", "burza", "podmuch",
+    "ped", "przebranie"
+  ],
+  "Oszust": [
+    "przebranie", "przebranie", "sobowtor", "falszywa_sylwetka",
+    "wymazanie", "falszywy_slad", "zgaszenie", "cien",
+    "oslepienie", "zimna_krew"
+  ]
+};
+
+function spell(id) {
+  const s = BY_ID.get(id);
+  if (!s) throw new Error(`unknown spell: ${id}`);
+  return s;
+}
+
+/**
+ * Turn a list of BOOK_SLOTS spell ids into the mage's runtime book:
+ * one entry per distinct spell, with duplicate picks folded into charges.
+ */
+function buildBook(ids) {
+  const book = new Map();
+  for (const id of ids) {
+    const s = spell(id);
+    const have = book.get(id);
+    if (have) have.charges += s.charges;
+    else book.set(id, { id, charges: s.charges, school: s.school });
+  }
+  return [...book.values()];
+}
+
+/** A book's school mix -- what his corpses will end up saying about him. */
+function signature(book) {
+  const out = {};
+  for (const e of book) out[e.school] = (out[e.school] || 0) + e.charges;
+  return out;
+}
+
+module.exports = {
+  SCHOOLS, SPELLS, PRESETS, COMPARTMENT_TARGETED,
+  spell, buildBook, signature
+};
+
+});
+__def("map", function (module, exports, require) {
+"use strict";
+/**
+ * The wreck: fifteen compartments in three sections, one section per act.
+ *
+ * Compartments have solid walls and door gaps. That is new -- the previous
+ * build had no collision at all and compartments were only named rectangles.
+ * The Earth school needs walls to mean anything: Rygiel shuts a compartment's
+ * doors, Zawał shuts them for good, and neither is a threat in open space.
+ *
+ * Doors are declared as a side plus a centre offset along that side, so a
+ * compartment's geometry stays readable and the door positions move with the
+ * room if it is resized.
+ */
+
+const { W, H } = require("./rules");
+
+const WALL = 8;           // wall thickness, also the collision margin
+const DOOR_W = 70;
+
+/** side: "n" | "s" | "w" | "e"; at: centre of the gap along that side */
+const COMPARTMENTS = [
+  // ---------------------------------------------------- act I, pokład górny
+  { name: "Mostek",         section: 0, x: 60,   y: 60,   w: 340, h: 400,
+    doors: [{ side: "s", at: 170 }, { side: "e", at: 300 }] },
+  { name: "Ładownia",       section: 0, x: 440,  y: 60,   w: 380, h: 400,
+    doors: [{ side: "s", at: 190 }, { side: "w", at: 300 }] },
+  { name: "Mesa",           section: 0, x: 860,  y: 60,   w: 300, h: 400,
+    doors: [{ side: "s", at: 150 }, { side: "e", at: 260 }] },
+  { name: "Kwatery",        section: 0, x: 1200, y: 60,   w: 340, h: 400,
+    doors: [{ side: "s", at: 170 }, { side: "w", at: 260 }] },
+  { name: "Obserwatorium",  section: 0, x: 1580, y: 60,   w: 360, h: 400,
+    doors: [{ side: "s", at: 180 }] },
+
+  // ---------------------------------------------------- act II, pokład dolny
+  { name: "Medyczny",       section: 1, x: 60,   y: 600,  w: 320, h: 400,
+    doors: [{ side: "n", at: 160 }, { side: "e", at: 300 }] },
+  { name: "Kaplica",        section: 1, x: 420,  y: 600,  w: 400, h: 400,
+    doors: [{ side: "n", at: 200 }, { side: "s", at: 200 }] },
+  { name: "Warsztat",       section: 1, x: 860,  y: 600,  w: 340, h: 400,
+    doors: [{ side: "n", at: 170 }, { side: "e", at: 300 }] },
+  { name: "Kriokomory",     section: 1, x: 1240, y: 600,  w: 320, h: 400,
+    doors: [{ side: "n", at: 160 }, { side: "w", at: 300 }] },
+  { name: "Maszynownia",    section: 1, x: 1600, y: 600,  w: 340, h: 400,
+    doors: [{ side: "n", at: 170 }, { side: "s", at: 170 }] },
+
+  // ---------------------------------------------------- act III, rdzeń
+  { name: "Reaktor",        section: 2, x: 60,   y: 1140, w: 380, h: 400,
+    doors: [{ side: "n", at: 190 }, { side: "e", at: 300 }] },
+  { name: "Archiwum",       section: 2, x: 480,  y: 1140, w: 320, h: 400,
+    doors: [{ side: "n", at: 160 }, { side: "w", at: 300 }] },
+  { name: "Śluza",          section: 2, x: 840,  y: 1140, w: 300, h: 400,
+    doors: [{ side: "n", at: 150 }] },
+  { name: "Serwerownia",    section: 2, x: 1180, y: 1140, w: 360, h: 400,
+    doors: [{ side: "n", at: 180 }, { side: "e", at: 300 }] },
+  { name: "Zbrojownia",     section: 2, x: 1580, y: 1140, w: 360, h: 400,
+    doors: [{ side: "n", at: 180 }, { side: "w", at: 300 }] }
+];
+
+const BY_NAME = new Map(COMPARTMENTS.map((c) => [c.name, c]));
+
+function compartment(name) {
+  const c = BY_NAME.get(name);
+  if (!c) throw new Error(`unknown compartment: ${name}`);
+  return c;
+}
+
+function sectionOf(act) { return COMPARTMENTS.filter((c) => c.section === act); }
+
+/** Which compartment contains this point, or null for the corridors. */
+function compartmentAt(x, y) {
+  for (const c of COMPARTMENTS) {
+    if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) return c;
+  }
+  return null;
+}
+
+/**
+ * A compartment's walls as segments, with the door gaps cut out.
+ * `sealed` closes the gaps -- that is Rygiel, Zawał, and the base's doors.
+ */
+function wallsOf(c, sealed) {
+  const segs = [];
+  const sides = {
+    n: { fixed: c.y, from: c.x, to: c.x + c.w, horizontal: true },
+    s: { fixed: c.y + c.h, from: c.x, to: c.x + c.w, horizontal: true },
+    w: { fixed: c.x, from: c.y, to: c.y + c.h, horizontal: false },
+    e: { fixed: c.x + c.w, from: c.y, to: c.y + c.h, horizontal: false }
+  };
+  for (const [side, s] of Object.entries(sides)) {
+    const gaps = sealed
+      ? []
+      : c.doors.filter((d) => d.side === side)
+          .map((d) => {
+            const centre = s.from + d.at;
+            return [centre - DOOR_W / 2, centre + DOOR_W / 2];
+          })
+          .sort((a, b) => a[0] - b[0]);
+    let cursor = s.from;
+    for (const [gs, ge] of gaps) {
+      if (gs > cursor) segs.push(seg(s, cursor, gs));
+      cursor = ge;
+    }
+    if (cursor < s.to) segs.push(seg(s, cursor, s.to));
+  }
+  return segs;
+}
+
+function seg(s, from, to) {
+  return s.horizontal
+    ? { x1: from, y1: s.fixed, x2: to, y2: s.fixed }
+    : { x1: s.fixed, y1: from, x2: s.fixed, y2: to };
+}
+
+/**
+ * Can a body of radius `r` stand at (x, y)?
+ *
+ * `state` supplies what is currently shut: `state.sealed` is a Set of
+ * compartment names, `state.walls` is a list of temporary Mur / Kotwica
+ * segments. Only compartments in an unlocked section are solid -- locked
+ * sections are handled by keeping players out of them entirely.
+ */
+function free(x, y, r, state) {
+  if (x < r || y < r || x > W - r || y > H - r) return false;
+  for (const c of COMPARTMENTS) {
+    // cheap reject: only the compartments we are near can block us
+    if (x < c.x - r - WALL || x > c.x + c.w + r + WALL) continue;
+    if (y < c.y - r - WALL || y > c.y + c.h + r + WALL) continue;
+    const sealed = state && state.sealed && state.sealed.has(c.name);
+    for (const s of wallsOf(c, sealed)) {
+      if (segmentHit(x, y, r + WALL / 2, s)) return false;
+    }
+  }
+  for (const s of (state && state.walls) || []) {
+    if (segmentHit(x, y, r + WALL / 2, s)) return false;
+  }
+  return true;
+}
+
+function segmentHit(px, py, r, s) {
+  const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 ? ((px - s.x1) * dx + (py - s.y1) * dy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const cx = s.x1 + t * dx, cy = s.y1 + t * dy;
+  return (px - cx) ** 2 + (py - cy) ** 2 < r * r;
+}
+
+/** A spawn point inside a compartment, clear of its walls. */
+function spawnIn(c, rand = Math.random) {
+  const pad = 40;
+  return {
+    x: Math.round(c.x + pad + rand() * (c.w - pad * 2)),
+    y: Math.round(c.y + pad + rand() * (c.h - pad * 2))
+  };
+}
+
+module.exports = {
+  COMPARTMENTS, WALL, DOOR_W,
+  compartment, compartmentAt, sectionOf, wallsOf, free, spawnIn
+};
+
+});
+__def("evidence", function (module, exports, require) {
+"use strict";
+/**
+ * Everything the hunters can learn without being told: transit logs, the
+ * school of magic left on a corpse, and casting residue in a compartment.
+ *
+ * The rule the whole game hangs on: no single piece of evidence names the
+ * mage. A log entry proves somebody was *present*, not guilty. A corpse
+ * says which school killed it, never who cast. Residue says a school was
+ * cast here, never by whom. Only a stack of them, argued over out loud,
+ * convicts -- and the mage can forge every layer.
+ *
+ * Everything here is a pure function over an evidence state object, so the
+ * rules can be tested without a server, a socket, or a clock.
+ */
+
+const {
+  CORPSE_TRACE_MS, CORPSE_TRACE_MS_INCENSE, CORPSE_TIME_FUZZ_MS,
+  RESIDUE_MS, FILTER_WINDOW_MS
+} = require("./rules");
+
+function makeEvidence() {
+  return {
+    /** compartment name -> array of transit entries */
+    logs: new Map(),
+    /** compartment name -> array of residue marks */
+    residue: new Map(),
+    /** key `${comp}@${act}` -> frozen copy taken by Archiwista's Kopia */
+    copies: new Map()
+  };
+}
+
+// -------------------------------------------------------------- transit logs
+
+/**
+ * Record a player entering or leaving a compartment.
+ *
+ * `apparentClass` is what the station's sensors saw, which is not always
+ * what walked past: a disguised mage writes the class he is wearing. That
+ * single substitution is what stops the log from being a confession.
+ *
+ * `realId` is kept so Wymazanie can find the mage's own entries, and is
+ * never serialised to a client.
+ */
+function logTransit(ev, compName, { realId, apparentClass, kind, act, t }) {
+  if (!compName) return;
+  let arr = ev.logs.get(compName);
+  if (!arr) ev.logs.set(compName, (arr = []));
+  arr.push({ realId, cls: apparentClass, kind, act, t, erased: false });
+}
+
+/**
+ * Read a compartment's log.
+ *
+ *   act          only the current act is visible, per the design
+ *   filterLogs   Archiwista's Filtr: last 60 s only, but erasure-proof
+ *   now          needed by the filter window
+ *
+ * Returns entries stripped of anything the reader has no right to, which
+ * for a log means the real player id.
+ */
+function readLog(ev, compName, { act, filterLogs = false, now = Date.now() } = {}) {
+  const copied = ev.copies.get(`${compName}@${act}`);
+  const arr = copied || ev.logs.get(compName) || [];
+  return arr
+    .filter((e) => e.act === act)
+    .filter((e) => (filterLogs ? now - e.t <= FILTER_WINDOW_MS : !e.erased))
+    .map((e) => ({ cls: e.cls, kind: e.kind, t: e.t }));
+}
+
+/**
+ * Wymazanie. Marks the caster's own entries in this compartment and act as
+ * erased, and wipes the residue he left there.
+ *
+ * It marks rather than deletes on purpose: Archiwista's Filtr reads the
+ * last sixty seconds straight off the tape and so still sees them. A mage
+ * who cleans up in front of an Archiwista has left a different kind of
+ * evidence -- a hole -- which is exactly the trade the design wants.
+ */
+function eraseLog(ev, compName, { realId, act }) {
+  const arr = ev.logs.get(compName) || [];
+  let n = 0;
+  for (const e of arr) {
+    if (e.realId === realId && e.act === act && !e.erased) { e.erased = true; n++; }
+  }
+  ev.residue.set(compName, (ev.residue.get(compName) || []).filter((r) => r.realId !== realId));
+  return n;
+}
+
+/** Archiwista's Kopia: freeze this act's log so it survives the act change. */
+function copyLog(ev, compName, act) {
+  const arr = (ev.logs.get(compName) || []).filter((e) => e.act === act);
+  ev.copies.set(`${compName}@${act}`, arr.map((e) => ({ ...e })));
+  return arr.length;
+}
+
+/** Act rollover. Copies stay; live entries for old acts stop being readable
+ *  because readLog filters on act, so nothing needs deleting here. */
+function hasCopy(ev, compName, act) {
+  return ev.copies.has(`${compName}@${act}`);
+}
+
+// -------------------------------------------------------------- residue
+
+/** Casting leaves a mark of its school. `realId` lets Wymazanie find it. */
+function addResidue(ev, compName, { school, realId, t, fake = false }) {
+  if (!compName) return;
+  let arr = ev.residue.get(compName);
+  if (!arr) ev.residue.set(compName, (arr = []));
+  arr.push({ school, realId, t, fake });
+}
+
+/**
+ * What magic was worked here recently?
+ *
+ * `residueAct` is Inkwizytor's Wykrywacz: instead of the ninety-second
+ * window everyone else gets, he reads the whole act. Returns schools only --
+ * residue never carries a person, and a planted mark is indistinguishable
+ * from a real one, which is the point of Fałszywy ślad.
+ */
+function readResidue(ev, compName, { now = Date.now(), residueAct = false, actStart = 0 } = {}) {
+  const arr = ev.residue.get(compName) || [];
+  const cutoff = residueAct ? actStart : now - RESIDUE_MS;
+  const schools = new Set();
+  for (const r of arr) if (r.t >= cutoff) schools.add(r.school);
+  return [...schools];
+}
+
+// -------------------------------------------------------------- corpses
+
+function makeCorpse({ x, y, cls, name, id, school, t }) {
+  return { x, y, cls, name, id, school, t };
+}
+
+/**
+ * Read a body.
+ *
+ *   traceMult   Inkwizytor's Kadzidło keeps the trace legible three times
+ *               as long
+ *   exactTime   Chirurg's Autopsja gives the real time of death; everyone
+ *               else gets it fuzzed by up to thirty seconds
+ *
+ * Returns null once the trace is cold -- the body is still there to find,
+ * but it has stopped saying anything.
+ */
+function readCorpse(corpse, { now = Date.now(), traceMult = 1, exactTime = false } = {}) {
+  const window = (traceMult > 1 ? CORPSE_TRACE_MS_INCENSE : CORPSE_TRACE_MS);
+  if (now - corpse.t > window) return null;
+  if (exactTime) return { school: corpse.school, t: corpse.t, exact: true };
+  // Deterministic fuzz: the same body must not wobble between reads, or
+  // two hunters comparing notes would think they had found a contradiction.
+  const jitter = ((corpse.id * 2654435761) % (CORPSE_TIME_FUZZ_MS * 2)) - CORPSE_TIME_FUZZ_MS;
+  return { school: corpse.school, t: corpse.t + jitter, exact: false };
+}
+
+module.exports = {
+  makeEvidence,
+  logTransit, readLog, eraseLog, copyLog, hasCopy,
+  addResidue, readResidue,
+  makeCorpse, readCorpse
+};
+
+});
+__def("round", function (module, exports, require) {
+"use strict";
+/**
+ * Acts, artifacts and who won.
+ *
+ * The round is three ten-minute acts and the wreck goes dark as they pass.
+ * Each act puts four artifacts in its own section; anything not extracted
+ * before the act ends is lost for good, as is anything the mage burns or
+ * buries.
+ *
+ * Losing four closes the artifact path -- 12 total, 9 needed, so 8 reachable
+ * is not enough. From that moment the hunters can only win by convicting
+ * somebody, which is the only thing they can be wrong about. That is the
+ * mage's clock, and it is why stalling is a strategy for him rather than a
+ * failure to act.
+ */
+
+const {
+  ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
+  ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE
+} = require("./rules");
+const { sectionOf, spawnIn } = require("./map");
+
+function makeRound(now, rand = Math.random) {
+  const r = {
+    act: 0,
+    actStartedAt: now,
+    startedAt: now,
+    artifacts: [],
+    nextArtifactId: 0,
+    secured: 0,
+    lost: 0,
+    sealed: new Set(),      // compartments closed for good by Zawał
+    winner: null,
+    endMsg: null
+  };
+  layoutAct(r, 0, rand);
+  return r;
+}
+
+/** Four of the section's five compartments get an artifact. Which five are
+ *  empty is re-rolled every round so the sweep cannot be memorised. */
+function layoutAct(round, act, rand = Math.random) {
+  const rooms = sectionOf(act).slice();
+  for (let i = rooms.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [rooms[i], rooms[j]] = [rooms[j], rooms[i]];
+  }
+  for (const c of rooms.slice(0, ARTIFACTS_PER_ACT)) {
+    const p = spawnIn(c, rand);
+    round.artifacts.push({
+      id: round.nextArtifactId++, act, room: c.name,
+      x: p.x, y: p.y, state: "open", sealedByRune: false
+    });
+  }
+}
+
+const visionMult = (round) => ACT_VISION[round.act];
+const actEndsAt = (round) => round.actStartedAt + ACT_MS;
+const openArtifacts = (round) => round.artifacts.filter((a) => a.state === "open");
+const actArtifacts = (round, act) => round.artifacts.filter((a) => a.act === act);
+
+/**
+ * The artifact path is dead once too many are gone to reach nine. Hunters
+ * are told -- hiding it would only make them waste the rest of the round
+ * walking to rooms that cannot save them.
+ */
+const pathClosed = (round) => round.lost >= ARTIFACTS_LOST_TO_CLOSE;
+
+function secure(round, id) {
+  const a = round.artifacts.find((x) => x.id === id);
+  if (!a || a.state !== "open") return null;
+  a.state = "secured";
+  round.secured++;
+  return a;
+}
+
+/** Pożoga, Zawał, or an act running out with the artifact still in the room. */
+function lose(round, id, cause) {
+  const a = round.artifacts.find((x) => x.id === id);
+  if (!a || a.state !== "open") return null;
+  if (a.sealedByRune && (cause === "pozoga" || cause === "zawal")) return null;
+  a.state = "lost";
+  a.cause = cause;
+  round.lost++;
+  return a;
+}
+
+/** Runarz's Pieczęć. Does not extract it -- somebody still has to come back. */
+function sealWithRune(round, id) {
+  const a = round.artifacts.find((x) => x.id === id);
+  if (!a || a.state !== "open" || a.sealedByRune) return null;
+  a.sealedByRune = true;
+  return a;
+}
+
+/**
+ * Move to the next act. Everything still lying in the old section is lost,
+ * which is what makes the act timer bite.
+ */
+function advanceAct(round, now, rand = Math.random) {
+  if (round.act >= ACTS - 1) return null;
+  const stranded = actArtifacts(round, round.act).filter((a) => a.state === "open");
+  for (const a of stranded) lose(round, a.id, "czas");
+  round.act++;
+  round.actStartedAt = now;
+  layoutAct(round, round.act, rand);
+  return { act: round.act, stranded: stranded.length };
+}
+
+/** True when the current act is over: its artifacts are all resolved, or
+ *  its ten minutes are up. */
+function actOver(round, now) {
+  if (now >= actEndsAt(round)) return true;
+  return actArtifacts(round, round.act).every((a) => a.state !== "open");
+}
+
+const roundOver = (round, now) => now >= round.startedAt + ACTS * ACT_MS;
+
+/**
+ * Who won, if anybody has.
+ *
+ *   hunters   nine artifacts secured, or the mage convicted
+ *   mage      one hunter left, or the full thirty minutes survived
+ */
+function checkWin(round, { mageEjected, hunterCount, now }) {
+  if (round.winner) return null;
+  if (mageEjected) return end(round, "hunters", "Mag został schwytany.");
+  if (hunterCount <= 1) return end(round, "mage", "Zostało za mało łowców.");
+  if (round.secured >= ARTIFACTS_TO_WIN) {
+    return end(round, "hunters", "Artefakty zabezpieczone.");
+  }
+  if (roundOver(round, now)) {
+    return end(round, "mage", "Wrak pochłonął resztę. Mag przetrwał.");
+  }
+  return null;
+}
+
+function end(round, winner, msg) {
+  round.winner = winner;
+  round.endMsg = msg;
+  return { winner, msg };
+}
+
+module.exports = {
+  makeRound, layoutAct, advanceAct, actOver, roundOver,
+  secure, lose, sealWithRune, checkWin,
+  visionMult, actEndsAt, openArtifacts, actArtifacts, pathClosed,
+  ARTIFACTS_TOTAL, ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE
+};
+
+});
+__def("tribunal", function (module, exports, require) {
+"use strict";
+/**
+ * Capture, then judgement.
+ *
+ * Binding a stunned player freezes the round and puts everyone still alive
+ * on a vote screen. The screen carries the accused and whoever bound them,
+ * and nothing else: the evidence lives in what people say out loud, because
+ * a tribunal that shows the case would be an adding machine rather than an
+ * argument.
+ *
+ * The mage may bind and accuse like anybody else. That is deliberate -- it
+ * is the only kill he has that costs him no charges, and it makes "why did
+ * *you* catch him" a question worth asking.
+ */
+
+const { TRIBUNAL_VOTE_MS, TRIBUNAL_COOLDOWN, ACQUITTED_IMMUNE_MS } = require("./rules");
+
+const VOTES = ["tak", "nie", "wstrzym"];
+
+function makeTribunal() {
+  return {
+    active: null,           // { accusedId, accuserId, openedAt, votes: Map }
+    lastEndedAt: -Infinity,
+    immune: new Map()       // playerId -> timestamp until which they cannot be bound
+  };
+}
+
+/**
+ * Whether a bind may even start. Two brakes, both there to stop the round
+ * turning into a mill: the room rests two minutes between tribunals, and
+ * anyone the room just let go cannot be dragged back for a minute.
+ */
+function canBind(trib, targetId, now) {
+  if (trib.active) return { ok: false, why: "Trybunał już trwa." };
+  if (now - trib.lastEndedAt < TRIBUNAL_COOLDOWN) {
+    const left = Math.ceil((TRIBUNAL_COOLDOWN - (now - trib.lastEndedAt)) / 1000);
+    return { ok: false, why: `Trybunał stygnie jeszcze ${left} s.` };
+  }
+  const until = trib.immune.get(targetId) || 0;
+  if (now < until) {
+    return { ok: false, why: "Ten gracz został właśnie wypuszczony." };
+  }
+  return { ok: true };
+}
+
+function open(trib, { accusedId, accuserId, now }) {
+  trib.active = { accusedId, accuserId, openedAt: now, votes: new Map() };
+  return trib.active;
+}
+
+function vote(trib, voterId, choice) {
+  if (!trib.active) return false;
+  if (!VOTES.includes(choice)) return false;
+  trib.active.votes.set(voterId, choice);
+  return true;
+}
+
+const expired = (trib, now) => !!trib.active && now - trib.active.openedAt >= TRIBUNAL_VOTE_MS;
+
+/** Everyone alive has spoken, so there is nothing left to wait for. */
+function everyoneVoted(trib, livingIds) {
+  if (!trib.active) return false;
+  return livingIds.every((id) => trib.active.votes.has(id));
+}
+
+function tally(trib, livingIds) {
+  const counts = { tak: 0, nie: 0, wstrzym: 0 };
+  const cast = [];
+  for (const id of livingIds) {
+    const v = trib.active.votes.get(id) || "wstrzym";
+    counts[v]++;
+    cast.push({ id, vote: v });
+  }
+  return { counts, cast };
+}
+
+/**
+ * Resolve the vote.
+ *
+ * Conviction needs a majority of the living, so abstentions and a tie both
+ * release. Votes are published afterwards: how somebody voted is itself
+ * evidence, and the mage voting with the crowd is a tell worth having.
+ */
+function resolve(trib, livingIds, now) {
+  if (!trib.active) return null;
+  const { accusedId, accuserId } = trib.active;
+  const { counts, cast } = tally(trib, livingIds);
+  const convicted = counts.tak * 2 > livingIds.length;
+
+  trib.active = null;
+  trib.lastEndedAt = now;
+  if (!convicted) trib.immune.set(accusedId, now + ACQUITTED_IMMUNE_MS);
+
+  return { accusedId, accuserId, convicted, counts, cast };
+}
+
+module.exports = { makeTribunal, canBind, open, vote, resolve, tally, expired, everyoneVoted, VOTES };
+
+});
+__def("base", function (module, exports, require) {
+"use strict";
+/**
+ * The base: what the dead and the ejected do instead of watching.
+ *
+ * They crew the station -- cameras, doors, emergency lighting -- and the
+ * feeds show class silhouettes and never names, so a disguise fools the
+ * base exactly as it fools the living. Nobody down here ever learns who the
+ * mage is, which is the whole reason they are allowed to keep talking on
+ * voice: at a thirty-minute round the alternative is asking half the table
+ * to sit in silence for twenty-five minutes, and nobody does.
+ *
+ * The action pool is shared by everyone in the base and refills each act.
+ * Per-person charges would turn a fifth death into an air-traffic control
+ * tower, which is the opposite of the balance the design wants.
+ */
+
+const {
+  BASE_ACT_CHARGES, BASE_LIGHT_MS, BASE_CAMERA_VIEWS, BASE_CAMERAS_DEAD_IN_ACT3
+} = require("./rules");
+const { COMPARTMENTS } = require("./map");
+
+function makeBase() {
+  return {
+    charges: BASE_ACT_CHARGES,
+    act: 0,
+    /** compartment names with a working camera; act III kills half of them */
+    cameras: COMPARTMENTS.map((c) => c.name),
+    /** extra cameras dropped by the Technik, always live */
+    field: new Set(),
+    /** playerId -> [compartment, compartment] currently on their screens */
+    watching: new Map()
+  };
+}
+
+/** New act: the pool refills, and in the last act half the cameras fail.
+ *  The base grows in people as the round goes on but loses its eyes. */
+function onAct(base, act) {
+  base.act = act;
+  base.charges = BASE_ACT_CHARGES;
+  if (act === 2) {
+    const keep = Math.ceil(COMPARTMENTS.length * (1 - BASE_CAMERAS_DEAD_IN_ACT3));
+    const shuffled = COMPARTMENTS.map((c) => c.name);
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    base.cameras = shuffled.slice(0, keep);
+  }
+}
+
+const liveCameras = (base) => [...new Set([...base.cameras, ...base.field])];
+
+/** Watching costs nothing -- it is the one thing the base can always do. */
+function watch(base, playerId, comps) {
+  const live = new Set(liveCameras(base));
+  const picked = (comps || []).filter((c) => live.has(c)).slice(0, BASE_CAMERA_VIEWS);
+  base.watching.set(playerId, picked);
+  return picked;
+}
+
+function spend(base, n = 1) {
+  if (base.charges < n) return false;
+  base.charges -= n;
+  return true;
+}
+
+/** Doors and lights come out of the shared pool. */
+function toggleDoor(base, room, compName, now) {
+  if (!spend(base)) return { ok: false, why: "Baza nie ma już mocy w tym akcie." };
+  if (room.sealedTemp.has(compName)) {
+    room.sealedTemp.delete(compName);
+    return { ok: true, opened: true };
+  }
+  room.sealedTemp.set(compName, now + 20000);
+  return { ok: true, opened: false };
+}
+
+function light(base, room, compName, now) {
+  if (!spend(base)) return { ok: false, why: "Baza nie ma już mocy w tym akcie." };
+  room.lit.set(compName, now + BASE_LIGHT_MS);
+  return { ok: true };
+}
+
+function addFieldCamera(base, compName) { base.field.add(compName); }
+
+module.exports = {
+  makeBase, onAct, liveCameras, watch, toggleDoor, light, addFieldCamera, spend
+};
+
+});
+__def("room", function (module, exports, require) {
+"use strict";
+/**
+ * Room and player state, and the phases a round moves through:
+ *
+ *   lobby -> loadout -> play -> end
+ *
+ * with `play` briefly suspended whenever a tribunal is sitting. The world
+ * does not step while people are voting, so nobody loses a body because
+ * they were reading the screen.
+ */
+
+const {
+  MIN_PLAYERS, MAX_PLAYERS, LOADOUT_MS, TASER_COOLDOWN, BOOK_SLOTS
+} = require("./rules");
+const { CLASSES, dealClasses, statsFor, itemsOf } = require("./classes");
+const { PRESETS, buildBook, spell } = require("./spells");
+const { makeEvidence } = require("./evidence");
+const { makeTribunal } = require("./tribunal");
+const { makeRound } = require("./round");
+const { makeBase } = require("./base");
+const { compartmentAt, spawnIn, sectionOf } = require("./map");
+
+const now = () => Date.now();
+const rooms = new Map();
+
+function code() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let s;
+  do { s = Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join(""); }
+  while (rooms.has(s));
+  return s;
+}
+
+function makeRoom() {
+  const room = {
+    id: code(), phase: "lobby", players: new Map(), hostId: null, nextId: 1,
+    round: null, evidence: null, tribunal: makeTribunal(), base: null,
+    balls: [], delayed: [], walls: [], corpses: [], pings: [], markers: [],
+    sealedTemp: new Map(),   // compartment -> until (Rygiel, Kotwica, base doors)
+    doused: new Map(),       // compartment -> until (Zgaszenie)
+    lit: new Map(),          // compartment -> until (Generator, base lights)
+    events: [], loadoutEndsAt: 0, winner: null, tick: 0
+  };
+  rooms.set(room.id, room);
+  return room;
+}
+
+function makePlayer(id, name, ws) {
+  return {
+    id, name, ws, role: "hunter", cls: null, item: null, stats: null, book: null,
+    x: 0, y: 0, dir: 0, step: 0, phase: 0, comp: null,
+    hp: 1, alive: true, down: false, ejected: false,
+    input: { x: 0, y: 0 }, holding: false,
+    stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
+    slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
+    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+    disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
+    itemCharges: 0, itemReadyAt: 0, vests: 0, usedRevive: false,
+    lastPingAt: 0, loadoutReady: false
+  };
+}
+
+const list = (room) => [...room.players.values()];
+const connected = (room) => list(room).filter((p) => p.ws && p.ws.readyState === 1);
+const alive = (room) => list(room).filter((p) => p.alive && !p.ejected);
+const hunters = (room) => alive(room).filter((p) => p.role !== "mage");
+const theMage = (room) => list(room).find((p) => p.role === "mage");
+const inBase = (room) => list(room).filter((p) => !p.alive || p.ejected);
+
+function pushEvent(room, msg, kind) {
+  room.events.push({ msg, kind, at: now() });
+  if (room.events.length > 40) room.events.shift();
+}
+
+// ------------------------------------------------------------------ loadout
+
+/**
+ * Deal roles and unique classes, then open the loadout screen.
+ *
+ * The mage walks through exactly the same screen as everybody else plus a
+ * book tab, so the time somebody spends choosing gives nothing away.
+ */
+function startLoadout(room) {
+  const ps = list(room);
+  if (ps.length < MIN_PLAYERS || ps.length > MAX_PLAYERS) {
+    return { ok: false, why: `Potrzeba od ${MIN_PLAYERS} do ${MAX_PLAYERS} graczy.` };
+  }
+  const classes = dealClasses(ps.length);
+  const mageIdx = Math.floor(Math.random() * ps.length);
+  ps.forEach((p, i) => {
+    p.cls = classes[i];
+    p.role = i === mageIdx ? "mage" : "hunter";
+    p.item = null;
+    p.book = null;
+    p.loadoutReady = false;
+  });
+  room.phase = "loadout";
+  room.loadoutEndsAt = now() + LOADOUT_MS;
+  return { ok: true };
+}
+
+function chooseLoadout(room, p, { itemId, book }) {
+  if (room.phase !== "loadout") return false;
+  const item = itemsOf(p.cls).find((it) => it.id === itemId);
+  if (!item) return false;
+  p.item = item.id;
+  if (p.role === "mage") {
+    const ids = Array.isArray(book) ? book.slice(0, BOOK_SLOTS) : [];
+    if (ids.length !== BOOK_SLOTS) return false;
+    try { p.book = buildBook(ids); } catch { return false; }
+  }
+  p.loadoutReady = true;
+  return true;
+}
+
+/** Nobody blocks seven other people because they cannot make up their mind. */
+function fillMissingLoadouts(room) {
+  for (const p of list(room)) {
+    if (p.loadoutReady) continue;
+    const items = itemsOf(p.cls);
+    p.item = items[Math.floor(Math.random() * items.length)].id;
+    if (p.role === "mage") {
+      const names = Object.keys(PRESETS);
+      p.book = buildBook(PRESETS[names[Math.floor(Math.random() * names.length)]]);
+    }
+    p.loadoutReady = true;
+  }
+}
+
+const loadoutDone = (room) =>
+  list(room).every((p) => p.loadoutReady) || now() >= room.loadoutEndsAt;
+
+// ------------------------------------------------------------------ round
+
+function startRound(room) {
+  fillMissingLoadouts(room);
+  room.round = makeRound(now());
+  room.evidence = makeEvidence();
+  room.tribunal = makeTribunal();
+  room.base = makeBase();
+  room.balls = []; room.delayed = []; room.walls = []; room.corpses = [];
+  room.pings = []; room.markers = []; room.events = [];
+  room.sealedTemp.clear(); room.doused.clear(); room.lit.clear();
+  room.winner = null;
+  room.phase = "play";
+
+  const rooms0 = sectionOf(0);
+  for (const p of list(room)) {
+    const c = rooms0[Math.floor(Math.random() * rooms0.length)];
+    const s = spawnIn(c);
+    Object.assign(p, {
+      x: s.x, y: s.y, dir: 0, step: 0, phase: 0, comp: c.name,
+      alive: true, down: false, ejected: false,
+      stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
+      slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
+      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
+      disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
+      vests: 0, usedRevive: false, lastPingAt: 0, input: { x: 0, y: 0 }, holding: false
+    });
+    p.stats = statsFor(p.cls, p.item);
+    p.hp = p.stats.hp;
+    const it = itemsOf(p.cls).find((i) => i.id === p.item);
+    p.itemCharges = it && it.kind === "active" ? it.charges : 0;
+    p.itemReadyAt = 0;
+    p.taserReadyAt = now();
+  }
+  pushEvent(room, "Wrak otwarty. Akt I — Rozpoznanie.", "start");
+  return room.round;
+}
+
+/** The apparent class: what the sensors and everybody else's eyes report.
+ *  You always see your own real class. */
+function apparentClass(p) {
+  return p.disguisedAs && now() < p.disguiseUntil ? p.disguisedAs : p.cls;
+}
+
+function endRound(room, winner, msg) {
+  room.phase = "end";
+  room.winner = winner;
+  const m = theMage(room);
+  return { t: "end", winner, msg, mage: m ? { id: m.id, name: m.name, cls: m.cls } : null };
+}
+
+module.exports = {
+  rooms, now, makeRoom, makePlayer, list, connected, alive, hunters, theMage, inBase,
+  pushEvent, startLoadout, chooseLoadout, fillMissingLoadouts, loadoutDone,
+  startRound, endRound, apparentClass
+};
+
+});
+__def("effects", function (module, exports, require) {
+"use strict";
+/**
+ * Casting: the wind-up, the interrupt, and what each of the twenty-four
+ * spells actually does.
+ *
+ * Every cast is a spend. Ten slots is the whole round's ammunition, so the
+ * mage cannot change style halfway -- and since a corpse carries the school
+ * that killed it, his book leaves a signature the hunters can read.
+ *
+ * Every cast is also a tell. The wind-up blooms at the mage's position for
+ * anyone with line of sight, and a taser landing inside it interrupts the
+ * cast AND eats the charge. Without that the mage is unbeatable; with it,
+ * being seen is the risk he manages.
+ */
+
+const {
+  CAST_GLOBAL_COOLDOWN, CAST_RANGE_DEFAULT, BALL_SPEED, BALL_LIFE, BALL_HIT_R,
+  W, H
+} = require("./rules");
+const { spell } = require("./spells");
+const { compartmentAt } = require("./map");
+const { addResidue, eraseLog, makeCorpse } = require("./evidence");
+const R = require("./round");
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function charge(p, spellId) {
+  return (p.book || []).find((b) => b.id === spellId) || null;
+}
+
+/**
+ * Begin a cast. Fails loudly enough for the client to explain itself, and
+ * silently commits nothing until the wind-up resolves -- except the charge,
+ * which is reserved now so an interrupt can eat it.
+ */
+function beginCast(room, p, spellId, aim, now, extra = {}) {
+  if (p.role !== "mage" || !p.alive || p.ejected) return { ok: false };
+  if (room.phase !== "play") return { ok: false, why: "Nie teraz." };
+  if (p.windup) return { ok: false, why: "Już rzucasz." };
+  if (now < p.castReadyAt) return { ok: false, why: "Zaklęcia stygną." };
+  if (now < p.stunUntil || now < p.proneUntil) return { ok: false, why: "Nie możesz." };
+  if (now < p.silenceUntil) return { ok: false, why: "Cisza." };
+
+  const comp = compartmentAt(p.x, p.y);
+  if (comp && room.jammed && (room.jammed.get(comp.name) || 0) > now) {
+    return { ok: false, why: "Zakłócacz blokuje magię." };
+  }
+
+  const s = spell(spellId);
+  const c = charge(p, spellId);
+  if (!c || c.charges <= 0) return { ok: false, why: "Brak ładunków." };
+  if (s.target === "compartment" && !comp) {
+    return { ok: false, why: "To zaklęcie działa tylko w przedziale." };
+  }
+
+  c.charges--;                        // reserved: an interrupt keeps it spent
+  p.windup = {
+    spellId, at: now + s.castMs, school: s.school,
+    aim: aim || { x: 1, y: 0 }, comp: comp ? comp.name : null, extra
+  };
+  return { ok: true, castMs: s.castMs, school: s.school };
+}
+
+/** A taser landing during the wind-up. The charge is already gone. */
+function interrupt(p) {
+  if (!p.windup) return null;
+  const id = p.windup.spellId;
+  p.windup = null;
+  return id;
+}
+
+function resolveCast(room, p, now, api) {
+  const w = p.windup;
+  if (!w) return null;
+  p.windup = null;
+  p.castReadyAt = now + CAST_GLOBAL_COOLDOWN;
+
+  const s = spell(w.spellId);
+  // Casting stains the room with its school. This is the residue hunters
+  // read, and it is why a mage who fights in the open writes his own file.
+  addResidue(room.evidence, w.comp, { school: s.school, realId: p.id, t: now });
+
+  apply(room, p, s, w, now, api);
+  return { spell: s, comp: w.comp };
+}
+
+// ------------------------------------------------------------------ helpers
+
+const livingOthers = (room, p) =>
+  [...room.players.values()].filter((o) => o.alive && !o.ejected && o.id !== p.id);
+
+function aimPoint(p, aim, range) {
+  const len = Math.hypot(aim.x, aim.y) || 1;
+  return { x: p.x + (aim.x / len) * range, y: p.y + (aim.y / len) * range };
+}
+
+function nearestTarget(room, p, range) {
+  let best = null, bd = range;
+  for (const o of livingOthers(room, p)) {
+    const d = dist(p, o);
+    if (d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
+
+// ------------------------------------------------------------------ dispatch
+
+function apply(room, p, s, w, now, api) {
+  const range = s.range || CAST_RANGE_DEFAULT;
+  const at = aimPoint(p, w.aim, range);
+
+  switch (s.effect) {
+    case "projectile": {
+      const len = Math.hypot(w.aim.x, w.aim.y) || 1;
+      room.balls.push({
+        x: p.x, y: p.y, vx: (w.aim.x / len) * BALL_SPEED, vy: (w.aim.y / len) * BALL_SPEED,
+        by: p.id, school: s.school, born: now
+      });
+      break;
+    }
+    case "cone": {
+      for (const o of livingOthers(room, p)) {
+        if (dist(p, o) > range) continue;
+        const dx = o.x - p.x, dy = o.y - p.y;
+        const dot = (dx * w.aim.x + dy * w.aim.y) / ((Math.hypot(dx, dy) || 1) * (Math.hypot(w.aim.x, w.aim.y) || 1));
+        if (dot > 0.6) api.hit(room, o, p, s.school);
+      }
+      break;
+    }
+    case "delayed_blast":
+      room.delayed.push({ x: at.x, y: at.y, at: now + s.delayMs, r: s.radius, by: p.id, school: s.school });
+      break;
+    case "burn_artifact": {
+      const a = room.round.artifacts.find((x) => x.room === w.comp && x.state === "open");
+      if (a && R.lose(room.round, a.id, "pozoga")) api.artifactLost(room, a, "spalony");
+      break;
+    }
+    case "sleep": {
+      const t = nearestTarget(room, p, range);
+      if (t) api.stun(t, s.durationMs, now);
+      break;
+    }
+    case "slow_area":
+      for (const o of livingOthers(room, p)) {
+        if (Math.hypot(o.x - at.x, o.y - at.y) <= s.radius) {
+          o.slowUntil = now + s.durationMs; o.slowMul = 1 - s.slow;
+        }
+      }
+      break;
+    case "silence": {
+      const t = nearestTarget(room, p, range);
+      if (t) { t.silenceUntil = now + s.durationMs; t.channel = null; }
+      break;
+    }
+    case "stun_immunity":
+      p.stunImmune = true;
+      break;
+    case "chain_stun": {
+      let from = p, hit = 0;
+      const done = new Set([p.id]);
+      while (hit < s.jumps) {
+        let best = null, bd = range;
+        for (const o of livingOthers(room, p)) {
+          if (done.has(o.id)) continue;
+          const d = dist(from, o);
+          if (d < bd) { bd = d; best = o; }
+        }
+        if (!best) break;
+        api.stun(best, s.durationMs, now);
+        done.add(best.id); from = best; hit++;
+      }
+      break;
+    }
+    case "shove": {
+      const t = nearestTarget(room, p, range);
+      if (t) {
+        const dx = t.x - p.x, dy = t.y - p.y, len = Math.hypot(dx, dy) || 1;
+        api.move(t, t.x + (dx / len) * s.push, t.y + (dy / len) * s.push);
+      }
+      break;
+    }
+    case "haste":
+      p.hasteUntil = now + s.durationMs; p.hasteMul = s.speed;
+      break;
+    case "stun_area":
+      for (const o of livingOthers(room, p)) {
+        if (Math.hypot(o.x - at.x, o.y - at.y) <= s.radius) api.stun(o, s.durationMs, now);
+      }
+      break;
+    case "wall": {
+      const len = Math.hypot(w.aim.x, w.aim.y) || 1;
+      const nx = -w.aim.y / len, ny = w.aim.x / len;   // across the aim, not along it
+      room.walls.push({
+        x1: at.x - nx * 55, y1: at.y - ny * 55,
+        x2: at.x + nx * 55, y2: at.y + ny * 55,
+        until: now + s.durationMs
+      });
+      break;
+    }
+    case "seal_doors":
+      room.sealedTemp.set(w.comp, now + s.durationMs);
+      break;
+    case "quake":
+      for (const o of livingOthers(room, p)) {
+        const c = compartmentAt(o.x, o.y);
+        if (c && c.name === w.comp) { o.channel = null; o.proneUntil = now + s.durationMs; }
+      }
+      break;
+    case "collapse": {
+      room.round.sealed.add(w.comp);
+      const a = room.round.artifacts.find((x) => x.room === w.comp && x.state === "open");
+      if (a && R.lose(room.round, a.id, "zawal")) api.artifactLost(room, a, "zasypany");
+      break;
+    }
+    case "douse":
+      room.doused.set(w.comp, now + s.durationMs);
+      break;
+    case "erase_log":
+      eraseLog(room.evidence, w.comp, { realId: p.id, act: room.round.act });
+      break;
+    case "plant_residue":
+      addResidue(room.evidence, w.comp, {
+        school: w.extra.school || "ogien", realId: p.id, t: now, fake: true
+      });
+      break;
+    case "invisible":
+      p.invisibleUntil = now + s.durationMs;
+      break;
+    case "disguise": {
+      const other = livingOthers(room, p)
+        .filter((o) => o.cls !== p.cls)
+        .sort((a, b) => dist(p, a) - dist(p, b))[0];
+      const asCls = w.extra.cls || (other && other.cls);
+      if (asCls) { p.disguisedAs = asCls; p.disguiseUntil = now + s.durationMs; }
+      break;
+    }
+    case "decoy":
+      room.markers.push({
+        kind: "decoy", x: Math.round(at.x), y: Math.round(at.y),
+        cls: p.disguisedAs || p.cls, until: now + s.durationMs
+      });
+      break;
+    case "blind": {
+      const t = nearestTarget(room, p, range);
+      if (t) t.blindUntil = now + s.durationMs;
+      break;
+    }
+    case "fake_silhouette":
+      room.markers.push({
+        kind: "fake-silhouette", room: w.comp,
+        x: Math.round(p.x), y: Math.round(p.y),
+        cls: w.extra.cls || "Zwiadowca", until: now + s.durationMs
+      });
+      break;
+    default:
+      throw new Error(`spell ${s.id} has no effect handler: ${s.effect}`);
+  }
+}
+
+/** Fireballs and delayed blasts, integrated here so a client can never
+ *  claim a hit it did not land. */
+function stepProjectiles(room, now, api) {
+  room.balls = room.balls.filter((b) => {
+    b.x += b.vx; b.y += b.vy;
+    const victim = [...room.players.values()].find(
+      (o) => o.alive && !o.ejected && o.id !== b.by && Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
+    );
+    const outside = b.x < 0 || b.y < 0 || b.x > W || b.y > H;
+    const spent = now - b.born > BALL_LIFE;
+    if (victim || outside || spent) {
+      api.fx(room, b.school, b.x, b.y);
+      if (victim) api.hit(room, victim, room.players.get(b.by), b.school);
+      return false;
+    }
+    return true;
+  });
+
+  room.delayed = room.delayed.filter((d) => {
+    if (now < d.at) return true;
+    api.fx(room, d.school, d.x, d.y);
+    for (const o of room.players.values()) {
+      if (!o.alive || o.ejected || o.id === d.by) continue;
+      if (Math.hypot(o.x - d.x, o.y - d.y) <= d.r) api.hit(room, o, room.players.get(d.by), d.school);
+    }
+    return false;
+  });
+
+  room.walls = room.walls.filter((w) => w.until > now);
+  room.markers = room.markers.filter((m) => m.until > now);
+  room.pings = room.pings.filter((p) => p.until > now);
+}
+
+module.exports = { beginCast, interrupt, resolveCast, stepProjectiles, charge };
+
+});
+__def("actions", function (module, exports, require) {
+"use strict";
+/**
+ * What a body can do: move, taser, channel, use its one item, and ping.
+ *
+ * Movement is integrated here from input vectors, never from client-reported
+ * positions, so a patched client cannot walk onto an artifact or into taser
+ * range. Crossing a compartment threshold writes a transit entry -- that
+ * write is the single most important line in the file, because it is where
+ * the evidence game gets its raw material and where a disguise poisons it.
+ */
+
+const {
+  SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
+  BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
+  PING_COOLDOWN, PING_MS, PING_KINDS
+} = require("./rules");
+const { findItem } = require("./classes");
+const { free, compartmentAt } = require("./map");
+const { logTransit, makeCorpse } = require("./evidence");
+const { apparentClass, pushEvent, alive, hunters } = require("./room");
+const { interrupt } = require("./effects");
+const T = require("./tribunal");
+const R = require("./round");
+const B = require("./base");
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// ------------------------------------------------------------------ movement
+
+function collisionState(room, now) {
+  const sealed = new Set(room.round.sealed);
+  for (const [c, until] of room.sealedTemp) if (until > now) sealed.add(c);
+  return { sealed, walls: room.walls };
+}
+
+/**
+ * Step one player. Slides along walls rather than sticking to them, because
+ * a corridor you cannot round a corner in is a corridor nobody uses.
+ */
+function step(room, p, now) {
+  if (now < p.stunUntil || now < p.proneUntil) { p.channel = null; return; }
+
+  const ix = p.input.x, iy = p.input.y;
+  const len = Math.hypot(ix, iy);
+  if (len <= 0.01) return;
+
+  let sp = SPEED_BASE * p.stats.speed;
+  if (p.hasteUntil > now) sp *= p.hasteMul;
+  if (p.slowUntil > now) sp *= p.slowMul;
+
+  const nx = (ix / len) * sp, ny = (iy / len) * sp;
+  const st = collisionState(room, now);
+  const before = p.comp;
+
+  if (free(p.x + nx, p.y + ny, 12, st)) { p.x += nx; p.y += ny; }
+  else if (free(p.x + nx, p.y, 12, st)) { p.x += nx; }
+  else if (free(p.x, p.y + ny, 12, st)) { p.y += ny; }
+  else return;
+
+  p.dir = Math.abs(nx) > Math.abs(ny) ? (nx < 0 ? 1 : 2) : (ny < 0 ? 3 : 0);
+  p.phase += sp;
+  p.step = Math.floor(p.phase / 10) % 2;
+  if (p.channel) p.channel = null;   // channels break on movement, always
+
+  const comp = compartmentAt(p.x, p.y);
+  const name = comp ? comp.name : null;
+  if (name !== before) {
+    // The sensors log what they saw, and a disguised mage is seen as
+    // somebody else. This is the forgery the whole investigation runs on.
+    if (before) {
+      logTransit(room.evidence, before, {
+        realId: p.id, apparentClass: apparentClass(p), kind: "out",
+        act: room.round.act, t: now
+      });
+    }
+    if (name) {
+      logTransit(room.evidence, name, {
+        realId: p.id, apparentClass: apparentClass(p), kind: "in",
+        act: room.round.act, t: now
+      });
+      fireSensors(room, p, name, now);
+    }
+    p.comp = name;
+  }
+}
+
+/** Zwiadowca's Czujnik ruchu. Reports a class, like everything else does. */
+function fireSensors(room, p, compName, now) {
+  for (const s of room.markers) {
+    if (s.kind !== "sensor" || s.room !== compName || s.until <= now) continue;
+    if (s.by === p.id) continue;
+    room.pings.push({
+      kind: "czujnik", by: s.by, byName: "Czujnik", room: compName,
+      x: s.x, y: s.y, cls: apparentClass(p), until: now + PING_MS
+    });
+  }
+}
+
+// ------------------------------------------------------------------ damage
+
+/** Zimna krew, vests and the Guardian's second wind all live here. */
+function stun(p, ms, now) {
+  if (p.stunImmune) { p.stunImmune = false; return false; }
+  p.stunUntil = Math.max(p.stunUntil, now + ms);
+  p.channel = null;
+  interrupt(p);
+  return true;
+}
+
+function hit(room, target, source, school, api) {
+  const now = Date.now();
+  if (!target.alive || target.ejected) return;
+
+  if (target.vests > 0) {
+    target.vests--;
+    pushEvent(room, `${target.name} stracił kamizelkę.`, "hurt");
+    return;
+  }
+  if (target.item === "tarcza" && now >= target.itemReadyAt) {
+    const it = findItem(target.cls, "tarcza");
+    target.itemReadyAt = now + it.cooldown;
+    pushEvent(room, `${target.name} przyjął zaklęcie na tarczę.`, "hurt");
+    return;
+  }
+
+  target.hp--;
+  if (target.hp > 0) {
+    pushEvent(room, `${target.name} przyjął zaklęcie i utrzymał się na nogach.`, "hurt");
+    return;
+  }
+
+  target.down = true;
+  target.alive = false;
+  target.channel = null;
+  room.corpses.push(makeCorpse({
+    x: Math.round(target.x), y: Math.round(target.y),
+    cls: target.cls, name: target.name,
+    id: Number(String(target.id).replace(/\D/g, "")) || 1,
+    school, t: now
+  }));
+  pushEvent(room, `${target.name} przestał odpowiadać.`, "kill");
+  api.toBase(room, target);
+}
+
+// ------------------------------------------------------------------ taser
+
+function taser(room, p, aim, now) {
+  if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
+  if (now < p.taserReadyAt) return { ok: false, why: "Tazer się ładuje." };
+  if (now < p.stunUntil || now < p.proneUntil) return { ok: false };
+
+  const rifle = p.item === "karabin" && p.itemCharges > 0;
+  const range = rifle ? MARKSMAN_RANGE : p.stats.taser;
+  const len = Math.hypot(aim.x, aim.y) || 1;
+
+  let best = null, bd = range;
+  for (const o of room.players.values()) {
+    if (!o.alive || o.ejected || o.id === p.id) continue;
+    const d = dist(p, o);
+    if (d > bd) continue;
+    // must be roughly in front, so a taser is aimed rather than a radius
+    const dot = ((o.x - p.x) * aim.x + (o.y - p.y) * aim.y) / ((d || 1) * len);
+    if (dot < 0.35 && d > 40) continue;
+    bd = d; best = o;
+  }
+
+  p.taserReadyAt = now + TASER_COOLDOWN;
+  if (rifle) p.itemCharges--;
+  if (!best) return { ok: true, hit: null };
+
+  const casting = !!best.windup;
+  const landed = stun(best, TASER_STUN_MS, now);
+  if (casting && landed) {
+    pushEvent(room, `${best.name} został przerwany w pół gestu.`, "cast");
+  }
+  return { ok: true, hit: best.id, interrupted: casting, landed };
+}
+
+// ------------------------------------------------------------------ channels
+
+/**
+ * One button, three jobs, decided by what you are standing next to:
+ * extract an artifact, bind a stunned player, stabilise a downed hunter.
+ * All three break on movement, which is what makes them a commitment.
+ */
+function hold(room, p, now) {
+  if (!p.alive || p.ejected || room.phase !== "play") return;
+  if (now < p.stunUntil || now < p.proneUntil || now < p.silenceUntil) { p.channel = null; return; }
+  if (p.channel) return;
+
+  const stunnedNear = [...room.players.values()].find(
+    (o) => o.alive && !o.ejected && o.id !== p.id && o.stunUntil > now && dist(p, o) < 46
+  );
+  if (stunnedNear) {
+    const can = T.canBind(room.tribunal, stunnedNear.id, now);
+    if (!can.ok) return { blocked: can.why };
+    const ms = p.stats.bindFast ? BIND_MS_SHACKLES : BIND_MS;
+    p.channel = { kind: "bind", targetId: stunnedNear.id, start: now, ms };
+    return;
+  }
+
+  const art = room.round.artifacts.find(
+    (a) => a.state === "open" && a.act <= room.round.act && dist(p, a) < 44
+  );
+  if (art) {
+    const ms = p.stats.extractFast ? EXTRACT_MS_FAST : EXTRACT_MS;
+    p.channel = { kind: "extract", targetId: art.id, start: now, ms };
+    return;
+  }
+
+  if (p.item === "stabilizator" && p.itemCharges > 0) {
+    const body = room.corpses.find((c) => dist(p, c) < 44);
+    if (body) {
+      const target = [...room.players.values()].find((o) => o.name === body.name);
+      if (target && !target.alive && !target.ejected) {
+        p.channel = { kind: "stabilise", targetId: target.id, start: now, ms: 2600 };
+      }
+    }
+  }
+}
+
+function finishChannel(room, p, now, api) {
+  const ch = p.channel;
+  p.channel = null;
+  if (!ch) return null;
+
+  if (ch.kind === "extract") {
+    const a = R.secure(room.round, ch.targetId);
+    if (!a) return null;
+    pushEvent(room, `${p.name} zabezpieczył artefakt: ${a.room}.`, "artifact");
+    // Extraction dumps the compartment's log for this act. The errand and
+    // the evidence are the same errand, which is why nobody has to make a
+    // second trip to a terminal.
+    return { kind: "extract", artifact: a, log: a.room };
+  }
+
+  if (ch.kind === "bind") {
+    const target = room.players.get(ch.targetId);
+    if (!target || !target.alive || target.ejected) return null;
+    const can = T.canBind(room.tribunal, target.id, now);
+    if (!can.ok) return null;
+    T.open(room.tribunal, { accusedId: target.id, accuserId: p.id, now });
+    room.phase = "tribunal";
+    pushEvent(room, `${p.name} związał ${target.name}. Trybunał.`, "start");
+    return { kind: "tribunal", accused: target, accuser: p };
+  }
+
+  if (ch.kind === "stabilise") {
+    const target = room.players.get(ch.targetId);
+    if (!target || target.alive || target.ejected) return null;
+    p.itemCharges--;
+    target.alive = true; target.down = false; target.hp = 1;
+    room.corpses = room.corpses.filter((c) => c.name !== target.name);
+    pushEvent(room, `${p.name} postawił ${target.name} na nogi.`, "good");
+    return { kind: "stabilise", target };
+  }
+  return null;
+}
+
+// ------------------------------------------------------------------ items
+
+function useItem(room, p, payload, now) {
+  if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
+  const it = findItem(p.cls, p.item);
+  if (!it || it.kind !== "active") return { ok: false, why: "Ten przedmiot nie ma użyć." };
+  if (p.itemCharges <= 0) return { ok: false, why: "Zużyte." };
+
+  const comp = compartmentAt(p.x, p.y);
+  const spend = () => { p.itemCharges--; };
+
+  switch (p.item) {
+    case "kamizelki": {
+      const near = [...room.players.values()].find(
+        (o) => o.alive && !o.ejected && o.id !== p.id && dist(p, o) < 60
+      );
+      if (!near) return { ok: false, why: "Nikogo obok." };
+      near.vests++; spend();
+      pushEvent(room, `${p.name} dał kamizelkę: ${near.name}.`, "good");
+      return { ok: true };
+    }
+    case "kotwica": {
+      const a = payload.aim || { x: 1, y: 0 };
+      const len = Math.hypot(a.x, a.y) || 1;
+      const nx = -a.y / len, ny = a.x / len;
+      room.walls.push({
+        x1: p.x - nx * 50, y1: p.y - ny * 50, x2: p.x + nx * 50, y2: p.y + ny * 50,
+        until: now + it.durationMs
+      });
+      spend(); return { ok: true };
+    }
+    case "dron":
+      if (!payload.room) return { ok: false, why: "Wskaż przedział." };
+      room.markers.push({ kind: "drone", room: payload.room, by: p.id, until: now + it.durationMs });
+      spend(); return { ok: true };
+    case "czujnik":
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      room.markers.push({
+        kind: "sensor", room: comp.name, by: p.id,
+        x: Math.round(p.x), y: Math.round(p.y), until: now + 600000
+      });
+      spend(); return { ok: true };
+    case "siatka": {
+      const at = payload.aim
+        ? { x: p.x + payload.aim.x * 120, y: p.y + payload.aim.y * 120 } : { x: p.x, y: p.y };
+      for (const o of room.players.values()) {
+        if (!o.alive || o.ejected || o.id === p.id) continue;
+        if (Math.hypot(o.x - at.x, o.y - at.y) <= it.radius) {
+          o.slowUntil = now + it.durationMs; o.slowMul = 0.4;
+        }
+      }
+      spend(); return { ok: true };
+    }
+    case "znacznik": {
+      const t = room.players.get(payload.targetId);
+      if (!t || !t.alive || t.ejected) return { ok: false, why: "Brak celu." };
+      room.markers.push({
+        kind: "tag", targetId: t.id, by: p.id, until: now + it.durationMs
+      });
+      spend(); return { ok: true };
+    }
+    case "stymulanty":
+      p.hasteUntil = now + it.durationMs; p.hasteMul = 1.4;
+      spend(); return { ok: true };
+    case "pieczec": {
+      const a = room.round.artifacts.find(
+        (x) => x.state === "open" && x.act <= room.round.act && dist(p, x) < 44
+      );
+      if (!a) return { ok: false, why: "Brak artefaktu obok." };
+      if (!R.sealWithRune(room.round, a.id)) return { ok: false, why: "Już opieczętowany." };
+      spend(); return { ok: true };
+    }
+    case "zaklocacz":
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      if (!room.jammed) room.jammed = new Map();
+      room.jammed.set(comp.name, now + it.durationMs);
+      spend(); return { ok: true };
+    case "kopia": {
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      require("./evidence").copyLog(room.evidence, comp.name, room.round.act);
+      spend(); return { ok: true, copied: comp.name };
+    }
+    case "generator":
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      room.lit.set(comp.name, now + it.durationMs);
+      spend(); return { ok: true };
+    case "kamera":
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      B.addFieldCamera(room.base, comp.name);
+      spend(); return { ok: true };
+    case "rygiel":
+      if (!comp) return { ok: false, why: "Musisz stać w przedziale." };
+      room.sealedTemp.set(comp.name, now + it.durationMs);
+      spend(); return { ok: true };
+    case "karabin":
+      return { ok: false, why: "Karabin strzela tazerem." };
+    default:
+      return { ok: false, why: "Nieznany przedmiot." };
+  }
+}
+
+// ------------------------------------------------------------------ pings
+
+function ping(room, p, { kind, x, y, targetId }, now) {
+  if (!PING_KINDS.includes(kind)) return { ok: false };
+  if (now < p.lastPingAt + PING_COOLDOWN) return { ok: false, why: "Za szybko." };
+  if (now < p.silenceUntil) return { ok: false, why: "Cisza." };
+  p.lastPingAt = now;
+  const comp = compartmentAt(x, y);
+  room.pings.push({
+    kind, by: p.id, byName: p.name, targetId: targetId || null,
+    x: Math.round(x), y: Math.round(y), room: comp ? comp.name : null,
+    until: now + PING_MS
+  });
+  return { ok: true };
+}
+
+module.exports = { step, stun, hit, taser, hold, finishChannel, useItem, ping, collisionState };
+
+});
+__def("snapshot", function (module, exports, require) {
+"use strict";
+/**
+ * What each player is allowed to know, built fresh for every one of them.
+ *
+ * The dark overlay in the renderer is a vignette over data the client was
+ * never sent -- it is not the security. Culling happens here, before
+ * anything is serialised, so stripping the fog client-side reveals nothing
+ * and a patched client learns no more than an honest one.
+ *
+ * Two things never leave this file under any circumstances: who the mage is,
+ * and the real player id behind a transit-log entry.
+ */
+
+const { W, H } = require("./rules");
+const { visionMult } = require("./round");
+const { apparentClass } = require("./room");
+const { liveCameras } = require("./base");
+const { compartmentAt } = require("./map");
+
+/** How far this player can see right now, after the act, the lights and
+ *  whatever has been done to their eyes. */
+function visionOf(room, p, now) {
+  let r = p.stats.vision * visionMult(room.round);
+  if (p.blindUntil > now) r *= 0.25;
+  const comp = compartmentAt(p.x, p.y);
+  if (comp) {
+    if ((room.doused.get(comp.name) || 0) > now) r *= 0.45;
+    if ((room.lit.get(comp.name) || 0) > now) r = p.stats.vision;   // full, act aside
+  }
+  return r;
+}
+
+/** A body as somebody else sees it: apparent class, no role, no book. */
+function actorView(o, now) {
+  return {
+    id: o.id, name: o.name, cls: apparentClass(o),
+    x: Math.round(o.x), y: Math.round(o.y), dir: o.dir, step: o.step,
+    stunned: o.stunUntil > now, down: o.down,
+    channel: o.channel ? o.channel.kind : null,
+    casting: !!o.windup
+  };
+}
+
+/** A camera feed: silhouettes only. The base is told a class and a position
+ *  and nothing that would let it put a name to either. */
+function silhouette(o) {
+  return {
+    cls: apparentClass(o), x: Math.round(o.x), y: Math.round(o.y),
+    dir: o.dir, step: o.step
+  };
+}
+
+function forLiving(room, me, now) {
+  const r = visionOf(room, me, now);
+  const near = (o) => Math.hypot(o.x - me.x, o.y - me.y) <= r;
+
+  const actors = [];
+  for (const o of room.players.values()) {
+    if (!o.alive || o.ejected) continue;
+    if (o.id === me.id) { actors.push(actorView(o, now)); continue; }
+    if (o.invisibleUntil > now) continue;
+    if (!near(o)) continue;
+    actors.push(actorView(o, now));
+  }
+
+  return {
+    me: {
+      id: me.id, cls: me.cls, role: me.role, item: me.item,
+      hp: me.hp, vests: me.vests, vision: Math.round(r),
+      stunUntil: me.stunUntil, silenceUntil: me.silenceUntil,
+      itemCharges: me.itemCharges, itemReadyAt: me.itemReadyAt,
+      taserReadyAt: me.taserReadyAt, castReadyAt: me.castReadyAt,
+      // the book, with what is left in it -- only ever sent to its owner
+      book: me.role === "mage" ? me.book.map((b) => ({ ...b })) : null,
+      channel: me.channel ? { kind: me.channel.kind, start: me.channel.start, ms: me.channel.ms } : null,
+      windup: me.windup ? { spell: me.windup.spellId, at: me.windup.at } : null
+    },
+    actors,
+    corpses: room.corpses.filter(near).map((c) => ({
+      id: c.id, x: c.x, y: c.y, cls: c.cls, name: c.name
+    })),
+    artifacts: room.round.artifacts
+      .filter((a) => a.act <= room.round.act && near(a))
+      .map((a) => ({ id: a.id, x: a.x, y: a.y, state: a.state, sealed: a.sealedByRune })),
+    balls: room.balls.filter(near).map((b) => ({ x: Math.round(b.x), y: Math.round(b.y), school: b.school })),
+    walls: room.walls.map((w) => ({ ...w })),
+    markers: room.markers.filter((m) => m.until > now).map((m) => ({ ...m })),
+    pings: room.pings.filter((p) => p.until > now).map((p) => ({ ...p })),
+    sealed: [...room.sealedTemp.entries()].filter(([, u]) => u > now).map(([c]) => c)
+      .concat([...room.round.sealed]),
+    doused: [...room.doused.entries()].filter(([, u]) => u > now).map(([c]) => c),
+    lit: [...room.lit.entries()].filter(([, u]) => u > now).map(([c]) => c)
+  };
+}
+
+/**
+ * The base sees only what its cameras see. It gets no `me` body, no artifact
+ * positions it has not got a lens on, and above all no roles.
+ */
+function forBase(room, me, now) {
+  const live = new Set(liveCameras(room.base));
+  const watching = (room.base.watching.get(me.id) || []).filter((c) => live.has(c));
+  const feeds = watching.map((name) => {
+    const bodies = [];
+    for (const o of room.players.values()) {
+      if (!o.alive || o.ejected) continue;
+      if (o.invisibleUntil > now) continue;
+      const comp = compartmentAt(o.x, o.y);
+      if (!comp || comp.name !== name) continue;
+      bodies.push(silhouette(o));
+    }
+    // Fałszywa sylwetka: the mage feeds the base a class that is not there
+    for (const f of room.markers) {
+      if (f.kind === "fake-silhouette" && f.room === name && f.until > now) {
+        bodies.push({ cls: f.cls, x: f.x, y: f.y, dir: 0, step: 0 });
+      }
+    }
+    return { room: name, bodies };
+  });
+
+  return {
+    me: { id: me.id, cls: me.cls, role: "base", base: true },
+    base: {
+      charges: room.base.charges,
+      cameras: liveCameras(room.base),
+      watching
+    },
+    feeds,
+    corpses: room.corpses.map((c) => ({ id: c.id, x: c.x, y: c.y, cls: c.cls, name: c.name })),
+    artifacts: room.round.artifacts
+      .filter((a) => a.act <= room.round.act)
+      .map((a) => ({ id: a.id, x: a.x, y: a.y, state: a.state, room: a.room })),
+    sealed: [...room.sealedTemp.entries()].filter(([, u]) => u > now).map(([c]) => c)
+      .concat([...room.round.sealed]),
+    lit: [...room.lit.entries()].filter(([, u]) => u > now).map(([c]) => c)
+  };
+}
+
+/** The parts of the round everybody may see, dead or alive. */
+function common(room, now) {
+  return {
+    t: "state", tick: room.tick, phase: room.phase,
+    act: room.round.act, actEndsAt: room.round.actStartedAt + require("./rules").ACT_MS,
+    secured: room.round.secured, lost: room.round.lost,
+    toWin: require("./rules").ARTIFACTS_TO_WIN,
+    pathClosed: require("./round").pathClosed(room.round),
+    hunters: [...room.players.values()].filter((p) => p.alive && !p.ejected).length,
+    events: room.events.slice(-6),
+    w: W, h: H
+  };
+}
+
+function snapshotFor(room, me, now) {
+  const base = common(room, now);
+  const view = (!me.alive || me.ejected) ? forBase(room, me, now) : forLiving(room, me, now);
+  return Object.assign(base, view);
+}
+
+module.exports = { snapshotFor, visionOf, forLiving, forBase, common };
+
+});</script>
+<script>__def("driver", function (module, exports, require) {
+"use strict";
+/**
+ * Single-player driver: the real rules, in the page, with no server.
+ *
+ * An Artifact cannot hold the online game -- its CSP blocks outbound
+ * WebSockets and there is no shared state between viewers. So instead of
+ * reimplementing the game in a toy, this bundles the actual src/ modules and
+ * speaks the same message protocol the client already knows, with a local
+ * tick loop and bots in the other seats.
+ *
+ * That means the range is not an approximation. The evidence, the charges,
+ * the wind-up, the tribunal arithmetic and the fog culling are the shipped
+ * code; only the transport is fake.
+ */
+
+const RULES = require("./rules");
+const Room = require("./room");
+const A = require("./actions");
+const E = require("./effects");
+const R = require("./round");
+const T = require("./tribunal");
+const B = require("./base");
+const { readLog, readResidue, readCorpse } = require("./evidence");
+const { snapshotFor } = require("./snapshot");
+const { compartmentAt, free, COMPARTMENTS, wallsOf } = require("./map");
+const { CLASSES, CLASS_NAMES, itemsOf } = require("./classes");
+const { SPELLS, SCHOOLS, PRESETS } = require("./spells");
+
+const BOT_NAMES = ["Vessel", "Corvid", "Marrow", "Halden", "Tocsin", "Quill", "Aster"];
+
+function makeDriver(onMessage, opts) {
+  opts = opts || {};
+  const room = Room.makeRoom();
+  const outbox = [];
+  let human = null;
+  let timer = null;
+
+  const now = Room.now;
+  const send = (p, m) => { if (p === human) outbox.push(m); };
+  const broadcast = (m) => outbox.push(m);
+  const flush = () => { while (outbox.length) onMessage(outbox.shift()); };
+
+  const api = {
+    hit: (rm, target, source, school) => A.hit(rm, target, source, school, api),
+    stun: (p, ms, t) => A.stun(p, ms, t),
+    move: (p, x, y) => {
+      const st = A.collisionState(room, now());
+      if (free(x, y, 12, st)) { p.x = x; p.y = y; }
+    },
+    fx: (rm, school, x, y) => broadcast({ t: "fx", school, x: Math.round(x), y: Math.round(y) }),
+    artifactLost: (rm, a, how) => Room.pushEvent(rm, `Artefakt w ${a.room} — ${how}.`, "bad"),
+    toBase: (rm, p) => { send(p, { t: "toBase" }); B.watch(rm.base, p.id, []); }
+  };
+
+  // ------------------------------------------------------------ seats
+  function seat(name) {
+    const p = Room.makePlayer("p" + room.nextId++, name, null);
+    p.room = room;
+    room.players.set(p.id, p);
+    if (!room.hostId) room.hostId = p.id;
+    return p;
+  }
+
+  human = seat(opts.name || "Ty");
+  const count = Math.max(RULES.MIN_PLAYERS, Math.min(RULES.MAX_PLAYERS, opts.players || 6));
+  for (let i = 1; i < count; i++) seat(BOT_NAMES[(i - 1) % BOT_NAMES.length]);
+  const bots = () => Room.list(room).filter((p) => p !== human);
+
+  function hello() {
+    send(human, {
+      t: "joined", id: human.id, room: room.id, host: true,
+      classes: CLASS_NAMES.map((n) => ({ name: n, ...CLASSES[n], items: itemsOf(n) })),
+      spells: SPELLS, schools: SCHOOLS, presets: PRESETS, slots: RULES.BOOK_SLOTS,
+      map: COMPARTMENTS.map((c) => ({
+        name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
+        walls: wallsOf(c, false)
+      })),
+      w: RULES.W, h: RULES.H, sandbox: true
+    });
+    broadcast({
+      t: "lobby", host: human.id, phase: "lobby",
+      min: RULES.MIN_PLAYERS, max: RULES.MAX_PLAYERS,
+      players: Room.list(room).map((p) => ({ id: p.id, name: p.name }))
+    });
+    flush();
+  }
+
+  // ------------------------------------------------------------ loadout
+  function begin(forceRole) {
+    const r = Room.startLoadout(room);
+    if (!r.ok) { send(human, { t: "error", msg: r.why }); flush(); return; }
+
+    // The range exists so you can try being the mage on purpose; a one-in-six
+    // roll would make that a chore rather than a choice.
+    if (forceRole === "mage" && human.role !== "mage") swapMage(human);
+    if (forceRole === "hunter" && human.role === "mage") swapMage(bots()[0]);
+
+    send(human, {
+      t: "loadout", cls: human.cls, role: human.role, items: itemsOf(human.cls),
+      endsAt: room.loadoutEndsAt, slots: RULES.BOOK_SLOTS
+    });
+    flush();
+  }
+
+  function swapMage(to) {
+    const old = Room.theMage(room);
+    if (old) old.role = "hunter";
+    to.role = "mage";
+  }
+
+  function choose(itemId, book) {
+    if (!Room.chooseLoadout(room, human, { itemId, book })) {
+      send(human, { t: "error", msg: "Zły wybór wyposażenia." });
+      flush(); return;
+    }
+    send(human, { t: "loadoutOk" });
+    Room.fillMissingLoadouts(room);
+    start();
+  }
+
+  function start() {
+    Room.startRound(room);
+    send(human, {
+      t: "role", role: human.role, cls: human.cls, item: human.item,
+      book: human.role === "mage" ? human.book : null, perk: CLASSES[human.cls].blurb
+    });
+    broadcast({ t: "act", act: 0, endsAt: room.round.actStartedAt + RULES.ACT_MS });
+    flush();
+    if (timer) clearInterval(timer);
+    timer = setInterval(tick, RULES.TICK_MS);
+  }
+
+  // ------------------------------------------------------------ bots
+  const wander = new Map();
+
+  function driveBots(t) {
+    for (const p of bots()) {
+      if (!p.alive || p.ejected) continue;
+      let w = wander.get(p.id);
+      if (!w || t > w.until) {
+        // head for an unclaimed artifact when there is one, otherwise drift
+        const art = room.round.artifacts.filter(
+          (a) => a.state === "open" && a.act <= room.round.act
+        )[0];
+        const tx = art ? art.x : Math.random() * RULES.W;
+        const ty = art ? art.y : Math.random() * RULES.H;
+        w = { tx, ty, until: t + 2500 + Math.random() * 2500 };
+        wander.set(p.id, w);
+      }
+      const dx = w.tx - p.x, dy = w.ty - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d < 40) {
+        p.input.x = 0; p.input.y = 0;
+        p.holding = true;                 // stand on it and extract
+      } else {
+        p.input.x = dx / d; p.input.y = dy / d;
+        p.holding = false;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ tick
+  function tick() {
+    const t = now();
+
+    if (room.phase === "tribunal") {
+      const living = Room.alive(room).map((p) => p.id);
+      // bots make up their minds quickly and at random: this is a range, not
+      // an opponent, and a real read is what the voice channel is for
+      for (const p of bots()) {
+        if (!p.alive || p.ejected) continue;
+        if (!room.tribunal.active.votes.has(p.id)) {
+          T.vote(room.tribunal, p.id, Math.random() < 0.45 ? "tak" : "nie");
+        }
+      }
+      if (T.expired(room.tribunal, t) || T.everyoneVoted(room.tribunal, living)) verdict(living, t);
+      flush();
+      return;
+    }
+    if (room.phase !== "play") { flush(); return; }
+
+    room.tick++;
+    driveBots(t);
+
+    for (const p of room.players.values()) {
+      if (!p.alive || p.ejected) continue;
+      if (p.windup && t >= p.windup.at) {
+        const done = E.resolveCast(room, p, t, api);
+        if (done) broadcast({ t: "fx", school: done.spell.school, x: Math.round(p.x), y: Math.round(p.y) });
+      }
+      A.step(room, p, t);
+      if (p.holding) A.hold(room, p, t); else p.channel = null;
+      if (p.channel && t - p.channel.start >= p.channel.ms) {
+        const out = A.finishChannel(room, p, t, api);
+        if (out && out.kind === "extract" && p === human) sendLog(out.log, t);
+        if (out && out.kind === "tribunal") { openTribunal(out, t); flush(); return; }
+      }
+      if (p.disguiseUntil && t > p.disguiseUntil) { p.disguisedAs = null; p.disguiseUntil = 0; }
+    }
+
+    E.stepProjectiles(room, t, api);
+
+    if (R.actOver(room.round, t)) {
+      const adv = R.advanceAct(room.round, t);
+      if (adv) {
+        B.onAct(room.base, adv.act);
+        const names = ["I — Rozpoznanie", "II — Awaria", "III — Ciemność"];
+        Room.pushEvent(room, `Akt ${names[adv.act]}. Straconych: ${room.round.lost}.`, "start");
+        broadcast({ t: "act", act: adv.act, endsAt: room.round.actStartedAt + RULES.ACT_MS });
+      }
+    }
+
+    const w = R.checkWin(room.round, {
+      mageEjected: false, hunterCount: Room.hunters(room).length, now: t
+    });
+    if (w) { broadcast(Room.endRound(room, w.winner, w.msg)); clearInterval(timer); }
+
+    send(human, snapshotFor(room, human, t));
+    flush();
+  }
+
+  function sendLog(compName, t) {
+    send(human, {
+      t: "log", room: compName, act: room.round.act,
+      entries: readLog(room.evidence, compName, {
+        act: room.round.act, filterLogs: human.stats.filterLogs, now: t
+      }),
+      residue: readResidue(room.evidence, compName, {
+        now: t, residueAct: human.stats.residueAct, actStart: room.round.actStartedAt
+      })
+    });
+  }
+
+  function openTribunal(out, t) {
+    broadcast({
+      t: "tribunal",
+      accused: { id: out.accused.id, name: out.accused.name, cls: out.accused.cls },
+      accuser: { id: out.accuser.id, name: out.accuser.name, cls: out.accuser.cls },
+      endsAt: t + RULES.TRIBUNAL_VOTE_MS,
+      voters: Room.alive(room).map((p) => ({ id: p.id, name: p.name }))
+    });
+  }
+
+  function verdict(living, t) {
+    const res = T.resolve(room.tribunal, living, t);
+    room.phase = "play";
+    if (!res) return;
+    const accused = room.players.get(res.accusedId);
+    let mageEjected = false;
+    if (res.convicted && accused) {
+      accused.ejected = true; accused.alive = false; accused.channel = null;
+      mageEjected = accused.role === "mage";
+      Room.pushEvent(room, `${accused.name} odesłany do bazy.`, mageEjected ? "good" : "bad");
+      api.toBase(room, accused);
+    } else if (accused) {
+      Room.pushEvent(room, `${accused.name} wypuszczony.`, "stun");
+    }
+    broadcast({
+      t: "verdict", convicted: res.convicted,
+      accused: accused ? { id: accused.id, name: accused.name } : null,
+      counts: res.counts, cast: res.cast
+    });
+    const w = R.checkWin(room.round, {
+      mageEjected, hunterCount: Room.hunters(room).length, now: t
+    });
+    if (w) { broadcast(Room.endRound(room, w.winner, w.msg)); clearInterval(timer); }
+  }
+
+  // ------------------------------------------------------------ inbox
+  function handle(m) {
+    const t = now();
+    switch (m.t) {
+      case "join": hello(); break;
+      case "start": begin(m.as); break;
+      case "loadout": choose(m.item, m.book); break;
+      case "input":
+        human.input.x = Math.max(-1, Math.min(1, Number(m.x) || 0));
+        human.input.y = Math.max(-1, Math.min(1, Number(m.y) || 0));
+        human.holding = !!m.hold;
+        break;
+      case "taser": {
+        const r = A.taser(room, human, { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t);
+        if (r && r.why) send(human, { t: "toast", msg: r.why });
+        break;
+      }
+      case "cast": {
+        const r = E.beginCast(room, human, String(m.spell),
+          { x: Number(m.ax) || 1, y: Number(m.ay) || 0 }, t, { cls: m.cls, school: m.school });
+        if (!r.ok) { if (r.why) send(human, { t: "toast", msg: r.why }); break; }
+        broadcast({ t: "windup", id: human.id, school: r.school, ms: r.castMs });
+        break;
+      }
+      case "item": {
+        const r = A.useItem(room, human, m, t);
+        if (r && r.why) send(human, { t: "toast", msg: r.why });
+        break;
+      }
+      case "ping": {
+        const r = A.ping(room, human, {
+          kind: String(m.kind), x: Number(m.x) || 0, y: Number(m.y) || 0, targetId: m.targetId
+        }, t);
+        if (r && r.why) send(human, { t: "toast", msg: r.why });
+        break;
+      }
+      case "readLog": {
+        if (!human.stats || !human.stats.readLogs) break;
+        const c = compartmentAt(human.x, human.y);
+        if (c) sendLog(c.name, t);
+        break;
+      }
+      case "readCorpse": {
+        const body = room.corpses.find((c) => c.id === Number(m.id));
+        if (!body || !human.stats) break;
+        send(human, {
+          t: "corpse", id: body.id,
+          read: readCorpse(body, {
+            now: t, traceMult: human.stats.traceMult, exactTime: human.stats.exactTime
+          })
+        });
+        break;
+      }
+      case "vote":
+        if (room.phase === "tribunal") T.vote(room.tribunal, human.id, String(m.vote));
+        break;
+      case "watch":
+        if (!human.alive || human.ejected) {
+          send(human, { t: "watching", rooms: B.watch(room.base, human.id, m.rooms || []) });
+        }
+        break;
+      case "door": if (!human.alive || human.ejected) B.toggleDoor(room.base, room, String(m.room), t); break;
+      case "light": if (!human.alive || human.ejected) B.light(room.base, room, String(m.room), t); break;
+      case "again": if (timer) clearInterval(timer); reset(); break;
+    }
+    flush();
+  }
+
+  function reset() {
+    room.phase = "lobby";
+    for (const p of room.players.values()) {
+      p.alive = true; p.ejected = false; p.down = false; p.loadoutReady = false;
+    }
+    broadcast({
+      t: "lobby", host: human.id, phase: "lobby",
+      min: RULES.MIN_PLAYERS, max: RULES.MAX_PLAYERS,
+      players: Room.list(room).map((p) => ({ id: p.id, name: p.name }))
+    });
+    flush();
+  }
+
+  return { handle, room, human };
+}
+
+module.exports = { makeDriver };
+
+});</script>
+<script>
+/* The client talks to a WebSocket. Here that socket is the game itself,
+   running in the same page, so client.js needs no sandbox-specific branch. */
+(function () {
+  "use strict";
+  window.WebSocket = function () {
+    var self = this;
+    self.readyState = 1;
+    var drv = window.__require("./driver").makeDriver(function (m) {
+      if (self.onmessage) self.onmessage({ data: JSON.stringify(m) });
+    }, { name: "Ty", players: 6 });
+    self.send = function (raw) { drv.handle(JSON.parse(raw)); };
+    self.close = function () { self.readyState = 3; };
+    setTimeout(function () { if (self.onopen) self.onopen(); }, 0);
+  };
+})();
+</script>
+<script>
+/* I'm Not a Wizard, Harry -- client.
+ *
+ * Renders whatever the server chose to send and nothing more. There is no
+ * shadow copy of the world here: if a body is outside your vision the
+ * snapshot simply does not contain it, so there is nothing for a patched
+ * client to reveal. The dark vignette is decoration over an absence.
+ *
+ * Touch-first. The joystick spawns wherever the left thumb lands, the right
+ * half aims, and the three round buttons carry whatever verbs the player's
+ * class and role actually have.
+ */
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  if (TOUCH) document.body.classList.add("touch");
+
+  var ws = null, ME = null, ROOM = null, HOST = false;
+  var DEF = null;               // class/spell/map tables, sent once on join
+  var S = null;                 // latest snapshot
+  var ROLE = null;              // { role, cls, item, book, perk }
+  var SHEET = new Image();
+  SHEET.src = "data:image/png;base64," + window.__SHEET;
+  var CLASS_ROW = {};
+
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var ZOOM = 2, CAM = { x: 0, y: 0 };
+
+  // ------------------------------------------------------------- screens
+  function screen(id) {
+    ["sEntry", "sLobby", "sLoadout", "sGame"].forEach(function (s) {
+      $(s).classList.toggle("on", s === id);
+    });
+  }
+  function over(id, on) { $(id).classList.toggle("on", !!on); }
+
+  var toastTimer = 0;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg;
+    el.style.opacity = 1;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.style.opacity = 0; }, 2200);
+  }
+
+  // ------------------------------------------------------------- socket
+  function connect(name, room) {
+    var proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(proto + "://" + location.host);
+    ws.onopen = function () { send({ t: "join", name: name, room: room || null }); };
+    window.__sock = ws;
+    ws.onmessage = function (e) { handle(JSON.parse(e.data)); };
+    ws.onclose = function () { $("err").textContent = "Rozłączono."; screen("sEntry"); };
+  }
+  function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+
+  function handle(m) {
+    switch (m.t) {
+      case "error": ($("err3").textContent = $("err2").textContent = $("err").textContent = m.msg); break;
+      case "toast": toast(m.msg); break;
+      case "joined":
+        ME = m.id; ROOM = m.room; HOST = m.host; DEF = m;
+        m.classes.forEach(function (c, i) { CLASS_ROW[c.name] = i; });
+        $("roomCode").textContent = ROOM;
+        screen("sLobby");
+        break;
+      case "lobby": renderLobby(m); break;
+      case "loadout": openLoadout(m); break;
+      case "loadoutOk": $("btnLo").textContent = "Czekam na resztę…"; $("btnLo").disabled = true; break;
+      case "ready": $("err3").textContent = "Gotowi: " + m.ready + "/" + m.of; break;
+      case "role":
+        ROLE = m;
+        screen("sGame");
+        over("oEnd", false); over("oBase", false);
+        paintRole();
+        break;
+      case "act": actEndsAt = m.endsAt; break;
+      case "state": S = m; paintHud(); break;
+      case "fx": fx.push({ x: m.x, y: m.y, school: m.school, born: Date.now() }); break;
+      case "windup": fx.push({ x: 0, y: 0, school: m.school, born: Date.now(), tell: m.id }); break;
+      case "log": showLog(m); break;
+      case "corpse": showCorpse(m); break;
+      case "tribunal": openTribunal(m); break;
+      case "verdict": showVerdict(m); break;
+      case "toBase": over("oBase", true); paintBase(); break;
+      case "watching": break;
+      case "end": showEnd(m); break;
+    }
+  }
+
+  // ------------------------------------------------------------- entry
+  $("btnJoin").onclick = function () {
+    var n = $("nick").value.trim();
+    if (!n) { $("err").textContent = "Podaj imię."; return; }
+    connect(n, $("rcode").value.trim().toUpperCase());
+  };
+  $("nick").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
+  $("rcode").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnJoin").click(); });
+
+  function renderLobby(m) {
+    HOST = m.host === ME;
+    var ul = $("plist");
+    ul.innerHTML = "";
+    m.players.forEach(function (p) {
+      var li = document.createElement("li");
+      li.innerHTML = "<span>" + esc(p.name) + "</span>" +
+        (p.id === m.host ? "<small>host</small>" : "");
+      ul.appendChild(li);
+    });
+    $("lobbyHint").textContent = "Podaj kod znajomym. Od " + m.min + " do " + m.max + " graczy.";
+    $("btnStart").disabled = !HOST || m.players.length < m.min;
+    $("btnStart").textContent = HOST ? "Start rundy" : "Czekasz na hosta";
+    if (m.phase === "lobby") screen("sLobby");
+  }
+  $("btnStart").onclick = function () { send({ t: "start" }); };
+
+  // ------------------------------------------------------------- loadout
+  var pickedItem = null, pickedBook = [], loEndsAt = 0;
+
+  function openLoadout(m) {
+    screen("sLoadout");
+    pickedItem = null; pickedBook = [];
+    loEndsAt = m.endsAt;
+    $("btnLo").disabled = false; $("btnLo").textContent = "Gotowe";
+    $("err3").textContent = "";
+
+    var cls = DEF.classes.filter(function (c) { return c.name === m.cls; })[0];
+    $("loCls").textContent = m.cls;
+    $("loCls").style.color = m.role === "mage" ? "var(--mage)" : "";
+    $("loBlurb").innerHTML = esc(cls.blurb) +
+      (m.role === "mage"
+        ? "<br><b style='color:var(--mage)'>Jesteś magiem.</b> Ta klasa to twoja przykrywka — " +
+          "weź jej sprzęt i <b>umiej go odegrać</b>. Księga to cała amunicja na rundę."
+        : "");
+
+    var box = $("loItem");
+    box.innerHTML = "";
+    m.items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.className = "opt";
+      b.innerHTML = "<b>" + esc(it.name) + "</b><small>" + esc(it.desc) +
+        (it.kind === "active" ? " · " + it.charges + "×" : "") + "</small>";
+      b.onclick = function () {
+        pickedItem = it.id;
+        [].forEach.call(box.children, function (c) { c.classList.remove("on"); });
+        b.classList.add("on");
+      };
+      box.appendChild(b);
+    });
+
+    $("tabBook").style.display = m.role === "mage" ? "" : "none";
+    if (m.role === "mage") buildBook();
+    tab("item");
+  }
+
+  function tab(which) {
+    $("loItem").style.display = which === "item" ? "" : "none";
+    $("loBook").style.display = which === "book" ? "" : "none";
+    [].forEach.call($("loTabs").children, function (b) {
+      b.classList.toggle("on", b.dataset.tab === which);
+    });
+  }
+  [].forEach.call($("loTabs").children, function (b) {
+    b.onclick = function () { tab(b.dataset.tab); };
+  });
+
+  function buildBook() {
+    var row = $("presetRow");
+    row.innerHTML = "";
+    Object.keys(DEF.presets).forEach(function (n) {
+      var b = document.createElement("button");
+      b.textContent = n;
+      b.onclick = function () { pickedBook = DEF.presets[n].slice(); paintBook(); };
+      row.appendChild(b);
+    });
+
+    var grid = $("bookGrid");
+    grid.innerHTML = "";
+    DEF.spells.forEach(function (s) {
+      var b = document.createElement("button");
+      b.className = "sp";
+      b.dataset.id = s.id;
+      var col = DEF.schools[s.school].colour;
+      b.innerHTML = "<span class='n'></span><b style='color:" + col + "'>" + esc(s.name) +
+        "</b><small>" + esc(s.desc) + "</small>";
+      b.onclick = function () {
+        if (pickedBook.length < DEF.slots) pickedBook.push(s.id);
+        else toast("Masz już " + DEF.slots + " slotów. Odejmij coś prawym / długim dotknięciem.");
+        paintBook();
+      };
+      // right click or long press removes one copy
+      b.oncontextmenu = function (e) { e.preventDefault(); dropOne(s.id); };
+      var t0 = 0;
+      b.addEventListener("touchstart", function () { t0 = Date.now(); }, { passive: true });
+      b.addEventListener("touchend", function (e) {
+        if (Date.now() - t0 > 450) { e.preventDefault(); dropOne(s.id); }
+      });
+      grid.appendChild(b);
+    });
+    paintBook();
+  }
+
+  function dropOne(id) {
+    var i = pickedBook.lastIndexOf(id);
+    if (i >= 0) pickedBook.splice(i, 1);
+    paintBook();
+  }
+
+  function paintBook() {
+    $("slotCount").textContent = pickedBook.length + "/" + DEF.slots;
+    var counts = {};
+    pickedBook.forEach(function (id) { counts[id] = (counts[id] || 0) + 1; });
+    [].forEach.call($("bookGrid").children, function (b) {
+      var n = counts[b.dataset.id] || 0;
+      b.classList.toggle("picked", n > 0);
+      b.querySelector(".n").textContent = n ? "×" + n : "";
+    });
+    // the signature: what his corpses will end up saying about him
+    var sig = {};
+    pickedBook.forEach(function (id) {
+      var s = spellById(id);
+      sig[s.school] = (sig[s.school] || 0) + s.charges;
+    });
+    var parts = Object.keys(sig).map(function (k) {
+      return "<b style='color:" + DEF.schools[k].colour + "'>" + DEF.schools[k].name +
+        " " + sig[k] + "</b>";
+    });
+    $("sig").innerHTML = parts.length
+      ? "Podpis, który zostawisz na zwłokach: " + parts.join(" · ")
+      : "Wybierz zaklęcia. Każdy trup zdradzi szkołę, która go zabiła.";
+  }
+
+  function spellById(id) {
+    for (var i = 0; i < DEF.spells.length; i++) if (DEF.spells[i].id === id) return DEF.spells[i];
+    return null;
+  }
+
+  $("btnLo").onclick = function () {
+    if (!pickedItem) { $("err3").textContent = "Wybierz wyposażenie."; tab("item"); return; }
+    if ($("tabBook").style.display !== "none" && pickedBook.length !== DEF.slots) {
+      $("err3").textContent = "Księga musi mieć dokładnie " + DEF.slots + " slotów.";
+      tab("book"); return;
+    }
+    send({ t: "loadout", item: pickedItem, book: pickedBook });
+  };
+
+  // ------------------------------------------------------------- hud
+  var actEndsAt = 0;
+  var ROMAN = ["I", "II", "III"];
+
+  function paintRole() {
+    var mage = ROLE.role === "mage";
+    $("pRole").className = "pill" + (mage ? " role-mage" : "");
+    $("pRole").textContent = (mage ? "MAG · " : "ŁOWCA · ") + ROLE.cls;
+    $("pPerk").textContent = itemName(ROLE.cls, ROLE.item);
+    renderKeys();
+    paintTouchLabels();
+    paintBar();
+  }
+
+  /* The middle button does different jobs for the two sides, so it has to
+     say which. A mage pressing "TAZER" and throwing a fireball is a lie the
+     interface tells him about his own kit. */
+  function paintTouchLabels() {
+    if (!TOUCH || !ROLE) return;
+    var mage = ROLE.role === "mage";
+    $("tA").querySelector("span").textContent = mage ? "RZUĆ" : "TAZER";
+    $("tB").querySelector("span").textContent = "PING";
+  }
+
+  function itemName(cls, id) {
+    var c = DEF.classes.filter(function (x) { return x.name === cls; })[0];
+    if (!c) return "—";
+    var it = c.items.filter(function (x) { return x.id === id; })[0];
+    return it ? it.name : "—";
+  }
+
+  function paintHud() {
+    if (!S || !S.me) return;
+    if (S.me.base) { over("oBase", true); paintBase(); }
+    $("pAct").textContent = ROMAN[S.act] || "?";
+    var left = Math.max(0, (S.actEndsAt || actEndsAt) - Date.now());
+    $("pClock").textContent = Math.floor(left / 60000) + ":" +
+      ("0" + Math.floor(left / 1000) % 60).slice(-2);
+    $("pArt").textContent = S.secured + "/" + S.toWin;
+    $("pLost").innerHTML = "Stracone <b>" + S.lost + "</b>";
+    $("pLost").className = "pill" + (S.pathClosed ? " warn" : "");
+    if (S.pathClosed) $("pLost").innerHTML = "<b>Artefakty przepadły — zostaje trybunał</b>";
+
+    var log = $("log");
+    log.innerHTML = "";
+    (S.events || []).slice().reverse().forEach(function (e) {
+      var d = document.createElement("div");
+      d.className = "lg " + (e.kind || "");
+      d.textContent = e.msg;
+      log.appendChild(d);
+    });
+    paintBar();
+  }
+
+  // ------------------------------------------------------------- spell bar
+  var selected = 0;
+
+  function paintBar() {
+    var bar = $("bar");
+    if (!S || !S.me || !S.me.book) { bar.innerHTML = ""; return; }
+    bar.innerHTML = "";
+    S.me.book.forEach(function (e, i) {
+      var s = spellById(e.id);
+      var d = document.createElement("div");
+      d.className = "slot" + (i === selected ? " sel" : "") + (e.charges <= 0 ? " empty" : "");
+      d.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" + esc(s.name) +
+        "</b><span class='c'>" + e.charges + "</span>";
+      d.onclick = function () { selected = i; paintBar(); };
+      bar.appendChild(d);
+    });
+  }
+
+  function castSelected() {
+    if (!S || !S.me || !S.me.book || !S.me.book[selected]) return;
+    var e = S.me.book[selected];
+    if (e.charges <= 0) { toast("Brak ładunków."); return; }
+    var s = spellById(e.id);
+    var extra = {};
+    if (s.pickClass) extra.cls = nearestSeenClass();
+    if (s.pickSchool) extra.school = "ogien";
+    send({ t: "cast", spell: e.id, ax: lastAim.x, ay: lastAim.y, cls: extra.cls, school: extra.school });
+  }
+
+  function nearestSeenClass() {
+    if (!S || !S.actors) return null;
+    var best = null, bd = 1e9;
+    S.actors.forEach(function (a) {
+      if (a.id === S.me.id) return;
+      var d = Math.hypot(a.x - meActor().x, a.y - meActor().y);
+      if (d < bd) { bd = d; best = a; }
+    });
+    return best ? best.cls : null;
+  }
+
+  function meActor() {
+    if (!S || !S.actors) return { x: 0, y: 0 };
+    for (var i = 0; i < S.actors.length; i++) if (S.actors[i].id === S.me.id) return S.actors[i];
+    return { x: 0, y: 0 };
+  }
+
+  // ------------------------------------------------------------- input
+  var keys = {}, lastAim = { x: 1, y: 0 };
+  var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+
+  window.addEventListener("keydown", function (e) {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === " ") { e.preventDefault(); send({ t: "taser", ax: lastAim.x, ay: lastAim.y }); }
+    if (e.key.toLowerCase() === "q") castSelected();
+    if (e.key.toLowerCase() === "f") send({ t: "item", aim: lastAim, room: hereRoom() });
+    if (e.key.toLowerCase() === "r") send({ t: "readLog" });
+    if (e.key.toLowerCase() === "z") doPing("podejrzany");
+    if (e.key.toLowerCase() === "x") doPing("czysto");
+    if (e.key >= "1" && e.key <= "9") { selected = +e.key - 1; paintBar(); }
+  });
+  window.addEventListener("keyup", function (e) { keys[e.key.toLowerCase()] = false; });
+
+  cv.addEventListener("mousemove", function (e) {
+    var r = cv.getBoundingClientRect();
+    var dx = (e.clientX - r.left) - cv.width / (2 * (window.devicePixelRatio || 1));
+    var dy = (e.clientY - r.top) - cv.height / (2 * (window.devicePixelRatio || 1));
+    var l = Math.hypot(dx, dy) || 1;
+    lastAim = { x: dx / l, y: dy / l };
+  });
+  cv.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    if (e.button === 2) doPing("podejrzany"); else if (ROLE && ROLE.role === "mage") castSelected();
+    else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+  });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function hereRoom() {
+    if (!DEF || !S) return null;
+    var me = meActor();
+    for (var i = 0; i < DEF.map.length; i++) {
+      var c = DEF.map[i];
+      if (me.x >= c.x && me.x <= c.x + c.w && me.y >= c.y && me.y <= c.y + c.h) return c.name;
+    }
+    return null;
+  }
+
+  function doPing(kind) {
+    var me = meActor();
+    send({ t: "ping", kind: kind, x: me.x + lastAim.x * 60, y: me.y + lastAim.y * 60 });
+  }
+
+  function setupTouch() {
+    cv.addEventListener("touchstart", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.clientX < window.innerWidth * 0.45 && !stick.active) {
+          stick.active = true; stick.id = t.identifier;
+          stick.ox = t.clientX; stick.oy = t.clientY; stick.x = 0; stick.y = 0;
+        } else {
+          var r = cv.getBoundingClientRect();
+          var dx = (t.clientX - r.left) - r.width / 2, dy = (t.clientY - r.top) - r.height / 2;
+          var l = Math.hypot(dx, dy) || 1;
+          lastAim = { x: dx / l, y: dy / l };
+          if (ROLE && ROLE.role === "mage") castSelected();
+          else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    cv.addEventListener("touchmove", function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (stick.active && t.identifier === stick.id) {
+          stick.x = t.clientX - stick.ox; stick.y = t.clientY - stick.oy;
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    var end = function (e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (stick.active && e.changedTouches[i].identifier === stick.id) {
+          stick.active = false; stick.x = 0; stick.y = 0;
+        }
+      }
+    };
+    cv.addEventListener("touchend", end);
+    cv.addEventListener("touchcancel", end);
+
+    bindHold($("tHold"));
+    $("tA").onclick = function () {
+      if (ROLE && ROLE.role === "mage") castSelected();
+      else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+    };
+    $("tB").onclick = function () { doPing("podejrzany"); };
+  }
+
+  var holding = false;
+  function bindHold(el) {
+    var on = function (e) { e.preventDefault(); holding = true; el.classList.add("on"); };
+    var off = function () { holding = false; el.classList.remove("on"); };
+    el.addEventListener("touchstart", on, { passive: false });
+    el.addEventListener("touchend", off);
+    el.addEventListener("touchcancel", off);
+    el.addEventListener("mousedown", on);
+    window.addEventListener("mouseup", off);
+  }
+  if (TOUCH) setupTouch();
+
+  function renderKeys() {
+    if (TOUCH) return;
+    var mage = ROLE && ROLE.role === "mage";
+    var rows = [
+      ["WSAD", "ruch"],
+      ["E / trzymaj", "artefakt · wiązanie · stabilizacja"],
+      ["Spacja", "tazer"],
+      mage ? ["Q / LPM", "rzuć wybrane zaklęcie"] : ["F", "użyj przedmiotu"],
+      ["1–9", "wybór slotu"],
+      ["Z / X", "ping: podejrzany / czysto"]
+    ];
+    $("keys").innerHTML = rows.map(function (r) {
+      return "<div class='key'><b>" + r[0] + "</b> — " + r[1] + "</div>";
+    }).join("");
+  }
+
+  setInterval(function () {
+    if (!S || !S.me || S.me.base) return;
+    var x = 0, y = 0;
+    if (keys.a || keys.arrowleft) x -= 1;
+    if (keys.d || keys.arrowright) x += 1;
+    if (keys.w || keys.arrowup) y -= 1;
+    if (keys.s || keys.arrowdown) y += 1;
+    if (stick.active) {
+      var l = Math.hypot(stick.x, stick.y);
+      if (l > 8) {                       // dead zone, so a resting thumb does not creep
+        x = Math.max(-1, Math.min(1, stick.x / 56));
+        y = Math.max(-1, Math.min(1, stick.y / 56));
+        var al = Math.hypot(x, y) || 1;
+        lastAim = { x: x / al, y: y / al };
+      }
+    }
+    var hold = holding || !!keys.e;
+    send({ t: "input", x: x, y: y, hold: hold });
+  }, 50);
+
+  // ------------------------------------------------------------- render
+  var fx = [];
+
+  function fit() {
+    var r = window.devicePixelRatio || 1;
+    cv.width = Math.floor(cv.clientWidth * r);
+    cv.height = Math.floor(cv.clientHeight * r);
+    // a handset should see roughly the same slice of floor as a desktop,
+    // not a pixel-doubled keyhole
+    ZOOM = Math.max(1, Math.min(2.4, cv.width / 520));
+  }
+  window.addEventListener("resize", fit);
+
+  function draw() {
+    requestAnimationFrame(draw);
+    if (!S || !S.me || S.me.base || !DEF) return;
+    if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
+
+    var me = meActor();
+    CAM.x = me.x - cv.width / (2 * ZOOM);
+    CAM.y = me.y - cv.height / (2 * ZOOM);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#05070c";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(ZOOM, 0, 0, ZOOM, -CAM.x * ZOOM, -CAM.y * ZOOM);
+
+    var sealed = {}, lit = {}, doused = {};
+    (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
+    (S.lit || []).forEach(function (n) { lit[n] = 1; });
+    (S.doused || []).forEach(function (n) { doused[n] = 1; });
+
+    DEF.map.forEach(function (c) {
+      if (c.section > S.act) return;                 // locked sections stay dark
+      ctx.fillStyle = lit[c.name] ? "#141d2e" : doused[c.name] ? "#080a12" : "#0d1320";
+      ctx.fillRect(c.x, c.y, c.w, c.h);
+      ctx.strokeStyle = sealed[c.name] ? "#b05a4a" : "#223050";
+      ctx.lineWidth = sealed[c.name] ? 4 : 3;
+      c.walls.forEach(function (w) {
+        ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+      });
+      if (sealed[c.name]) {
+        ctx.strokeStyle = "#b05a4a";
+        ctx.strokeRect(c.x, c.y, c.w, c.h);
+      }
+      ctx.fillStyle = "rgba(150,170,210,0.32)";
+      ctx.font = "11px system-ui";
+      ctx.fillText(c.name, c.x + 8, c.y + 16);
+    });
+
+    (S.walls || []).forEach(function (w) {
+      ctx.strokeStyle = "#8b6b3a"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+    });
+
+    (S.artifacts || []).forEach(function (a) {
+      if (a.state === "secured") return;
+      ctx.fillStyle = a.state === "lost" ? "#4a3038" : a.sealed ? "#8ce0a8" : "#ffd27a";
+      ctx.beginPath(); ctx.arc(a.x, a.y, 7, 0, 6.284); ctx.fill();
+      if (a.state === "open") {
+        ctx.strokeStyle = "rgba(255,210,122,0.35)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(a.x, a.y, 13 + Math.sin(Date.now() / 300) * 2, 0, 6.284); ctx.stroke();
+      }
+    });
+
+    (S.corpses || []).forEach(function (c) {
+      ctx.fillStyle = "#5a2a34";
+      ctx.fillRect(c.x - 9, c.y - 4, 18, 8);
+      ctx.fillStyle = "rgba(230,120,140,0.7)";
+      ctx.font = "10px system-ui";
+      ctx.fillText(c.name, c.x - 14, c.y - 10);
+    });
+
+    (S.balls || []).forEach(function (b) {
+      var col = (DEF.schools[b.school] || {}).colour || "#ff7a3c";
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, 6.284); ctx.fill();
+    });
+
+    (S.actors || []).forEach(function (a) { drawActor(a); });
+
+    (S.pings || []).forEach(function (p) {
+      ctx.strokeStyle = p.kind === "podejrzany" ? "#ff6b6b" : "#7ce8a8";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, 6.284); ctx.stroke();
+      ctx.fillStyle = "rgba(230,236,250,0.8)";
+      ctx.font = "10px system-ui";
+      ctx.fillText(p.kind + " · " + (p.byName || ""), p.x - 24, p.y - 22);
+    });
+
+    var now = Date.now();
+    fx = fx.filter(function (f) { return now - f.born < 700; });
+    fx.forEach(function (f) {
+      if (f.tell) return;
+      var k = (now - f.born) / 700;
+      var col = (DEF.schools[f.school] || {}).colour || "#fff";
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 8 + k * 34, 0, 6.284); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+
+    // the fog: a single radial gradient. Canvas extends the last stop past
+    // its end radius, so one fill covers the whole viewport -- a second fill
+    // with a reversed arc fights the nonzero winding rule and seams.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var cx = cv.width / 2, cy = cv.height / 2, r = (S.me.vision || 240) * ZOOM;
+    var g = ctx.createRadialGradient(cx, cy, r * 0.45, cx, cy, r);
+    g.addColorStop(0, "rgba(5,7,12,0)");
+    g.addColorStop(0.75, "rgba(5,7,12,0.72)");
+    g.addColorStop(1, "rgba(5,7,12,0.97)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    if (TOUCH && stick.active) {
+      ctx.strokeStyle = "rgba(127,216,255,0.45)"; ctx.lineWidth = 2;
+      var r0 = (window.devicePixelRatio || 1);
+      ctx.beginPath(); ctx.arc(stick.ox * r0, stick.oy * r0, 46 * r0, 0, 6.284); ctx.stroke();
+      ctx.fillStyle = "rgba(127,216,255,0.35)";
+      ctx.beginPath();
+      ctx.arc((stick.ox + Math.max(-46, Math.min(46, stick.x))) * r0,
+              (stick.oy + Math.max(-46, Math.min(46, stick.y))) * r0, 18 * r0, 0, 6.284);
+      ctx.fill();
+    }
+  }
+
+  function drawActor(a) {
+    var row = CLASS_ROW[a.cls] || 0;
+    var dir = a.dir || 0;
+    if (SHEET.complete && SHEET.naturalWidth) {
+      ctx.drawImage(SHEET, (a.step ? 32 : 0), (row * 4 + dir) * 32, 32, 32,
+        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
+    } else {
+      ctx.fillStyle = "#8b9ac0";
+      ctx.fillRect(a.x - 8, a.y - 16, 16, 24);
+    }
+    if (a.casting) {
+      ctx.strokeStyle = "#c682ff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(a.x, a.y - 6, 20 + Math.sin(Date.now() / 90) * 3, 0, 6.284); ctx.stroke();
+    }
+    if (a.stunned) {
+      ctx.fillStyle = "#ffc35c"; ctx.font = "12px system-ui";
+      ctx.fillText("!", a.x - 2, a.y - 26);
+    }
+    if (a.channel) {
+      ctx.fillStyle = "rgba(127,216,255,0.85)";
+      ctx.fillRect(a.x - 12, a.y + 12, 24, 3);
+    }
+    ctx.fillStyle = a.id === (S.me && S.me.id) ? "#7fd8ff" : "rgba(200,214,240,0.75)";
+    ctx.font = "10px system-ui";
+    // stagger by id: bodies pile up constantly in this game and two labels
+    // at the same height read as one nonsense word
+    var lift = 28 + (parseInt(String(a.id).replace(/\D/g, ""), 10) % 3) * 9;
+    ctx.fillText(a.name, a.x - ctx.measureText(a.name).width / 2, a.y - lift);
+  }
+  requestAnimationFrame(draw);
+  fit();
+
+  // ------------------------------------------------------------- evidence
+  function showLog(m) {
+    var lines = m.entries.map(function (e) {
+      var d = new Date(e.t);
+      return (e.kind === "in" ? "→ " : "← ") + e.cls + "  " +
+        ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2);
+    });
+    var res = m.residue.length
+      ? "\nOsad: " + m.residue.map(function (s) { return DEF.schools[s].name; }).join(", ")
+      : "\nOsad: brak";
+    toast("Rejestr " + m.room + " — " + m.entries.length + " wpisów");
+    var log = $("log");
+    var d = document.createElement("div");
+    d.className = "lg start";
+    d.style.whiteSpace = "pre-line";
+    d.textContent = "REJESTR " + m.room + "\n" + (lines.join("\n") || "pusto") + res;
+    log.appendChild(d);
+  }
+
+  function showCorpse(m) {
+    if (!m.read) { toast("Ślad wystygł."); return; }
+    var d = new Date(m.read.t);
+    toast("Szkoła: " + DEF.schools[m.read.school].name + " · " +
+      (m.read.exact ? "" : "około ") +
+      ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2));
+  }
+
+  // ------------------------------------------------------------- tribunal
+  var trEndsAt = 0, trTimer = 0, voterNames = {};
+  function openTribunal(m) {
+    trEndsAt = m.endsAt;
+    // the verdict names everyone who voted, including players the fog kept
+    // out of your snapshot -- so the roll has to come from here, not from
+    // the actors you happened to be able to see
+    voterNames = {};
+    (m.voters || []).forEach(function (v) { voterNames[v.id] = v.name; });
+    $("trText").innerHTML = "<b>" + esc(m.accused.name) + "</b> (" + esc(m.accused.cls) +
+      ") został związany przez <b>" + esc(m.accuser.name) + "</b> (" + esc(m.accuser.cls) + ").";
+    $("trMine").textContent = "";
+    over("oTribunal", true);
+    over("oVerdict", false);
+    clearInterval(trTimer);
+    trTimer = setInterval(function () {
+      var left = Math.max(0, trEndsAt - Date.now());
+      $("trClock").textContent = Math.ceil(left / 1000) + " s";
+      if (left <= 0) clearInterval(trTimer);
+    }, 200);
+  }
+  function vote(v, label) {
+    send({ t: "vote", vote: v });
+    $("trMine").textContent = "Twój głos: " + label;
+  }
+  $("vTak").onclick = function () { vote("tak", "mag"); };
+  $("vNie").onclick = function () { vote("nie", "niewinny"); };
+  $("vAbs").onclick = function () { vote("wstrzym", "wstrzymanie"); };
+
+  function showVerdict(m) {
+    clearInterval(trTimer);
+    over("oTribunal", false);
+    $("vdTitle").textContent = m.convicted ? "Odesłany do bazy" : "Wypuszczony";
+    $("vdText").textContent = m.convicted
+      ? (m.accused ? m.accused.name : "Oskarżony") + " wypada z rundy. Jeśli to nie był mag, " +
+        "właśnie sami sobie odjęliście człowieka."
+      : "Głosów za było za mało. Trybunał stygnie dwie minuty.";
+    $("vdVotes").innerHTML = (m.cast || []).map(function (c) {
+      return "<span class='vt " + c.vote + "'>" + esc(nameOf(c.id)) + ": " +
+        (c.vote === "tak" ? "mag" : c.vote === "nie" ? "niewinny" : "—") + "</span>";
+    }).join("");
+    over("oVerdict", true);
+    setTimeout(function () { over("oVerdict", false); }, 6000);
+  }
+
+  function nameOf(id) {
+    if (voterNames[id]) return voterNames[id];
+    if (S && S.actors) {
+      for (var i = 0; i < S.actors.length; i++) if (S.actors[i].id === id) return S.actors[i].name;
+    }
+    return id;
+  }
+
+  // ------------------------------------------------------------- base
+  var watching = [];
+  function paintBase() {
+    if (!S || !S.base) return;
+    $("bCharges").textContent = S.base.charges;
+
+    var cams = $("bCams");
+    if (cams.children.length !== S.base.cameras.length) {
+      cams.innerHTML = "";
+      S.base.cameras.forEach(function (n) {
+        var b = document.createElement("button");
+        b.textContent = n;
+        b.onclick = function () {
+          var i = watching.indexOf(n);
+          if (i >= 0) watching.splice(i, 1);
+          else { watching.push(n); if (watching.length > 2) watching.shift(); }
+          send({ t: "watch", rooms: watching });
+          paintBase();
+        };
+        cams.appendChild(b);
+      });
+    }
+    [].forEach.call(cams.children, function (b) {
+      b.classList.toggle("on", watching.indexOf(b.textContent) >= 0);
+    });
+
+    var acts = $("bActs");
+    if (!acts.children.length) {
+      DEF.map.forEach(function (c) {
+        var b = document.createElement("button");
+        b.textContent = "⌁ " + c.name;
+        b.onclick = function () { send({ t: "light", room: c.name }); };
+        b.oncontextmenu = function (e) { e.preventDefault(); send({ t: "door", room: c.name }); };
+        acts.appendChild(b);
+      });
+    }
+
+    var box = $("feeds");
+    box.innerHTML = "";
+    (S.feeds || []).forEach(function (f) {
+      var d = document.createElement("div");
+      d.className = "feed";
+      d.innerHTML = "<h3>" + esc(f.room) + "</h3>";
+      var c = document.createElement("canvas");
+      c.width = 200; c.height = 120;
+      d.appendChild(c);
+      box.appendChild(d);
+      drawFeed(c, f);
+    });
+    if (!(S.feeds || []).length) {
+      box.innerHTML = "<div class='feed'><h3>Brak podglądu</h3></div>";
+    }
+  }
+
+  function drawFeed(c, f) {
+    var g = c.getContext("2d");
+    var room = null;
+    for (var i = 0; i < DEF.map.length; i++) if (DEF.map[i].name === f.room) room = DEF.map[i];
+    g.fillStyle = "#04060a"; g.fillRect(0, 0, c.width, c.height);
+    if (!room) return;
+    var sx = c.width / room.w, sy = c.height / room.h;
+    g.strokeStyle = "#223050"; g.strokeRect(1, 1, c.width - 2, c.height - 2);
+    f.bodies.forEach(function (b) {
+      var x = (b.x - room.x) * sx, y = (b.y - room.y) * sy;
+      var col = "#8b9ac0";
+      for (var i = 0; i < DEF.classes.length; i++) {
+        if (DEF.classes[i].name === b.cls) col = DEF.classes[i].glow;
+      }
+      g.fillStyle = col;
+      g.fillRect(x - 4, y - 7, 8, 14);
+      g.fillStyle = "rgba(200,214,240,0.75)";
+      g.font = "9px system-ui";
+      // a class, never a name: that is the entire contract with the base
+      g.fillText(b.cls, x - 16, y - 10);
+    });
+  }
+
+  // ------------------------------------------------------------- end
+  function showEnd(m) {
+    over("oTribunal", false); over("oVerdict", false); over("oBase", false);
+    var mine = ROLE && ROLE.role === "mage" ? "mage" : "hunters";
+    $("edTitle").textContent = m.winner === mine ? "Wygraliście" : "Przegraliście";
+    $("edTitle").style.color = m.winner === mine ? "var(--good)" : "var(--bad)";
+    $("edText").innerHTML = esc(m.msg) +
+      (m.mage ? "<br><br>Magiem był <b style='color:var(--mage)'>" + esc(m.mage.name) +
+        "</b> — " + esc(m.mage.cls) + "." : "");
+    over("oEnd", true);
+    $("btnAgain").disabled = !HOST;
+  }
+  $("btnAgain").onclick = function () { send({ t: "again" }); over("oEnd", false); };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  setInterval(function () {
+    if ($("sLoadout").classList.contains("on") && loEndsAt) {
+      var left = Math.max(0, loEndsAt - Date.now());
+      $("loClock").textContent = Math.ceil(left / 1000) + " s — potem losowo";
+    }
+  }, 250);
+})();
+
+</script>
+<script>
+/* Range-only chrome: pick which side you want to try, because a one-in-six
+   roll would make "let me see how the mage plays" a chore. */
+(function () {
+  "use strict";
+  var role = "random";
+  var card = document.querySelector("#sLobby .card");
+  var wrap = document.createElement("div");
+  wrap.innerHTML =
+    "<label>Kim chcesz zagrać</label><div class='row' id='asRow' style='margin-top:0'>" +
+    "<button data-as='random' class='on'>Losowo</button>" +
+    "<button data-as='hunter'>Łowca</button>" +
+    "<button data-as='mage'>Mag</button></div>";
+  card.insertBefore(wrap, document.getElementById("btnStart").parentNode);
+  [].forEach.call(wrap.querySelectorAll("button"), function (b) {
+    b.onclick = function () {
+      role = b.dataset.as;
+      [].forEach.call(wrap.querySelectorAll("button"), function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+    };
+  });
+  [].forEach.call(wrap.querySelectorAll("button"), function (b) {
+    b.classList.toggle("on", b.dataset.as === "random");
+  });
+
+  var start = document.getElementById("btnStart");
+  start.disabled = false;
+  start.textContent = "Wejdź na wrak";
+  start.onclick = function () {
+    window.__sock.send(JSON.stringify({ t: "start", as: role === "random" ? null : role }));
+  };
+
+  document.getElementById("lobbyHint").innerHTML =
+    "Poligon dla jednego gracza: pięcioro botów przeczesuje wrak razem z tobą. " +
+    "Zasady, mapa, dowody i księga są te same co w grze sieciowej — " +
+    "<b>brak tu tylko ludzi po drugiej stronie</b>, więc trybunał głosuje losowo.";
+  document.querySelector("#sEntry .card .row button").textContent = "Wejdź";
+  document.getElementById("nick").value = "Ty";
+})();
+</script>
+
