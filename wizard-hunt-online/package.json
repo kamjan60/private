@@ -4,6 +4,9 @@
   "private": true,
   "description": "I'm Not a Wizard, Harry - online hidden-mage hunt on a derelict station",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js"
+  },
   "dependencies": { "ws": "^8.18.0" }
 }
