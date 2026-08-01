@@ -74,8 +74,10 @@ const CLASSES = {
     vision: 230, taser: 58, hp: 1, speed: 0.98, glow: "#d8e878",
     blurb: "Raz na rundę odwraca to, co mag uznał za załatwione.",
     items: [
+      // spent by holding over a body, not by a button: reviving is a
+      // channel that breaks on movement, like every other commitment
       { id: "stabilizator", name: "Stabilizator", kind: "active", charges: 1,
-        desc: "Podnosi jednego rannego łowcę." },
+        viaChannel: true, desc: "Podnosi jednego rannego łowcę." },
       { id: "stymulanty", name: "Stymulanty", kind: "active", charges: 2, durationMs: 10000,
         desc: "+40% prędkości i −50% ogłuszenia na 10 s." },
       { id: "autopsja", name: "Autopsja", kind: "passive", mods: { exactTime: true },
