@@ -34,24 +34,37 @@
   .panel h2{ font-size:12px; letter-spacing:0.1em; text-transform:uppercase;
     color:var(--accent); margin:0 0 16px; font-weight:600; }
 
-  /* one frame of the 6-frame strip; sheet is 192x32 logical */
+  /* One frame of the 6-frame strip; sheet is 192x32 logical.
+     Offsets must be in pixels, one container-width per frame. A percentage
+     in background-position is resolved against (container - image) width,
+     not as a per-frame step, so percentage offsets scatter the frames and
+     the sprite appears to blink. */
   .fb{
     background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAAAgCAYAAABEmHeFAAADEElEQVR4nO2boY7bQBCGx1LRobBUQVFRQUFZpaKCA1V1PGF9gYNRQR+g4BRQkIdweFUFFBSdVBZQEFQZnWRmVLoF6abr9dger3fsXvJ/6JLY/v6d3Y2T7B4RAAAAAAAAAAAAAAAAAAAAEZn1zEiOS+cT0XH/K9J2PnbnOSOtZxJbzA3+ZVYEe8x6ZpLVQ6fz/Qx9/CHeZVYkboah/G4GF21/Op8Y1+FnWNxeUdc+DMlA9K+t0vr3CsVJ0vnEvHl+Rd8PvyvHa3SEye/M9tUn0bGx/Ca/M8n0Q+lakrueRvvdwWdrT0RR6s+1k/P7z/Xpf4lTkoGD83fuEFtwK3ULvvjxkfL3n9nzbEH6DgJ/0rk5rMNm0vDXZeCcMf2SSdeUIWb7fb87BuoyaNXf9bseP0edv9dM4xo7Xb+sPJev9qUgoUXwBxpXcA1/W8Ht4+k1Eb3V9zdNOu36+88NUX8/Q9NE7+oXB+HE02vvIKbzT+z2lH87/vl0J/886BbdHWj2WqUcSn52oHEZIvv9d1iLnXSa9ZcMdiJvDCi1n8vg1r9P/7NB6sSVgrtY+bN19bVfq1MIIhJ9IeI6fyx/o1fB77d9DH/rYFfyc294ogyB/ie+vLHDm2aYBHv+6oF9ubXjx/L39Qr9NsPi1uv4gfy2/RV/rBwCv/iNNpK/NAEWX16HXzwCl+43P9+NuhYwdvvH8JcmwPbmvvmWH+udqIbtzT0RKd4BQv3KXkvy4muiegdowbZf7Q4g8KveARhKE2CZFQllBaWHmu8AtO8XbNdwPjk/UWXF8XZ88L4DjORv9Eb0nzJsqPxRbCD/qf0b4r8DDFD/lMjQ4fi4U4ZAP34FEvjxK9CRi/kVSBoI6wBYB7iYdQA3QN1KsPvYByvBeiuxFqwEK68E+5j1zGw35Qtr7wXiNsf12QsSi9h7gaSbAGPuBYqx8ZCo316gEAbdCxQSplPHB2yGasvQ2vEtzi6D0foueTeov0GxyR8y6djr/HV23Q3aetGQ8x77/wOcE6F9CAAAAAAAAAAAAAAAAOAs+APU0Q6AiykKIQAAAABJRU5ErkJggg==");
     background-repeat:no-repeat;
     image-rendering:pixelated;
-    animation:burn 0.48s steps(1) infinite;
   }
-  .fb.xl{ width:256px; height:256px; background-size:1536px 256px; }
-  .fb.md{ width:128px; height:128px; background-size:768px 128px; }
-  .fb.sm{ width:64px;  height:64px;  background-size:384px 64px; }
+  .fb.xl{ width:256px; height:256px; background-size:1536px 256px;
+          animation:burnXL 0.48s steps(1) infinite; }
+  .fb.md{ width:128px; height:128px; background-size:768px 128px;
+          animation:burnMD 0.48s steps(1) infinite; }
+  .fb.sm{ width:64px;  height:64px;  background-size:384px 64px;
+          animation:burnSM 0.48s steps(1) infinite; }
 
-  @keyframes burn{
-    0%   {background-position-x:0;}
-    16.6%{background-position-x:-100%;}
-    33.3%{background-position-x:-200%;}
-    50%  {background-position-x:-300%;}
-    66.6%{background-position-x:-400%;}
-    83.3%{background-position-x:-500%;}
+  @keyframes burnXL{
+    0%{background-position-x:0;}        16.6%{background-position-x:-256px;}
+    33.3%{background-position-x:-512px;} 50%{background-position-x:-768px;}
+    66.6%{background-position-x:-1024px;} 83.3%{background-position-x:-1280px;}
+  }
+  @keyframes burnMD{
+    0%{background-position-x:0;}        16.6%{background-position-x:-128px;}
+    33.3%{background-position-x:-256px;} 50%{background-position-x:-384px;}
+    66.6%{background-position-x:-512px;} 83.3%{background-position-x:-640px;}
+  }
+  @keyframes burnSM{
+    0%{background-position-x:0;}       16.6%{background-position-x:-64px;}
+    33.3%{background-position-x:-128px;} 50%{background-position-x:-192px;}
+    66.6%{background-position-x:-256px;} 83.3%{background-position-x:-320px;}
   }
 
   .hero{ display:flex; align-items:center; gap:30px; flex-wrap:wrap; }
