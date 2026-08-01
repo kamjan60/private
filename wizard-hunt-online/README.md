@@ -31,8 +31,11 @@ from the environment.
 | `WSAD` / arrows | move |
 | `E` (hold) | context: extract an artifact, bind a stunned player, stabilise a body |
 | `Space` | taser (Marksman: rifle, long range) |
-| `Q` | *mage only* — cast at the nearest hunter in range |
-| `F` | *mage only* — decoy bloom somewhere you are not |
+| Left mouse | *mage only* — **fireball**: a travelling projectile, aimed at the cursor |
+| Right mouse | *mage only* — **storm**: area stun where you aim, 130 px radius |
+| `Q` | *mage only* — targeted cast at the nearest hunter in range |
+| `F` | *mage only* — **disguise**: render as the nearest player's class for 14 s |
+| `R` | *mage only* — decoy bloom somewhere you are not |
 | `C` | *Scout only* — station cameras, brief full map vision |
 
 ## Classes
@@ -62,11 +65,23 @@ squad a body as surely as the mage does.
 
 ## Design notes
 
+**The mage throws, he does not select.** The fireball is a body that
+travels at 7.6 px/tick, so it can miss, be dodged, and it shows the caster's
+position for as long as it is in the air. The storm is an *area stun*, not
+area damage — it sets a kill up rather than being one, so the mage still has
+to close and commit. Both are integrated and hit-tested server-side; the
+client sends only a normalised aim vector and never a claimed hit.
+
+**Disguise swaps the body, not the name.** A disguised mage renders as
+another player's class to everyone else while keeping his own label, so a
+witness who only caught a silhouette down a corridor is wrong about who they
+saw. You always see your own real class.
+
 **Casting has a visible wind-up.** The mage's kill is not instant: a
 1.3 s tell broadcasts a bloom at his position that anyone with line of sight
 can see, and a taser during the wind-up interrupts it. Without the tell the
 mage is unbeatable; with it, being *seen* is the risk he manages. The decoy
-(`F`) exists to muddy exactly that signal, so an FX sighting is evidence
+(`R`) exists to muddy exactly that signal, so an FX sighting is evidence
 rather than proof.
 
 **The server is authoritative, and that includes the fog.** Movement is

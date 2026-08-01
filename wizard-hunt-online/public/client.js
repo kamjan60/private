@@ -38,6 +38,17 @@
   var state = null, role = null, myCls = null, myVision = 240;
   var fx = [], shots = [], windups = [];
   var keys = {}, over = false;
+  var mouse = { x: 0, y: 0 }, storms = [];
+
+  // Aim is screen-relative: you are always dead centre of the view, so the
+  // vector from the middle of the canvas to the cursor is the throw
+  // direction. The server re-derives the target from it and never trusts a
+  // client-supplied position.
+  function aim() {
+    var dx = mouse.x - cv.width / 2, dy = mouse.y - cv.height / 2;
+    var d = Math.hypot(dx, dy) || 1;
+    return { x: dx / d, y: dy / d };
+  }
 
   function resize() {
     cv.width = window.innerWidth; cv.height = window.innerHeight;
@@ -102,6 +113,10 @@
       case "shot":
         shots.push({ a: m.from, b: m.to, born: performance.now(), life: 260, ranged: m.ranged });
         break;
+      case "storm":
+        storms.push({ x: m.x, y: m.y, r: m.r, hits: m.hits || [], born: performance.now(), life: 700 });
+        fx.push({ def: FXDEF.bolt, x: m.x, y: m.y, born: performance.now(), life: 900 });
+        break;
       case "stunned": toast("Ogłuszony!"); break;
       case "hurt": toast("Trafiony — pancerz wytrzymał."); break;
       case "died": toast("Zginąłeś. Obserwujesz."); break;
@@ -131,10 +146,24 @@
     if (!ws || ws.readyState !== 1) return;
     if (e.code === "Space") { ws.send(JSON.stringify({ t: "taser" })); e.preventDefault(); }
     if (e.code === "KeyQ" && role === "mage") ws.send(JSON.stringify({ t: "cast" }));
-    if (e.code === "KeyF" && role === "mage") ws.send(JSON.stringify({ t: "blend" }));
+    if (e.code === "KeyF" && role === "mage") ws.send(JSON.stringify({ t: "disguise" }));
+    if (e.code === "KeyR" && role === "mage") ws.send(JSON.stringify({ t: "blend" }));
     if (e.code === "KeyC" && myCls === "Zwiadowca") ws.send(JSON.stringify({ t: "camera" }));
   });
   document.addEventListener("keyup", function (e) { keys[e.code] = false; });
+
+  cv.addEventListener("mousemove", function (e) {
+    var r = cv.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+  });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  cv.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    if (!ws || ws.readyState !== 1 || role !== "mage") return;
+    var a = aim();
+    if (e.button === 0) ws.send(JSON.stringify({ t: "ball", ax: a.x, ay: a.y }));
+    if (e.button === 2) ws.send(JSON.stringify({ t: "storm", ax: a.x, ay: a.y }));
+  });
 
   setInterval(function () {
     if (!ws || ws.readyState !== 1 || !role) return;
@@ -268,6 +297,36 @@
       ctx.beginPath(); ctx.arc(w.x * ZOOM, w.y * ZOOM, 10 + k * 60, 0, Math.PI * 2); ctx.stroke();
     });
 
+    // fireballs in flight, rotated along their velocity
+    (state.balls || []).forEach(function (b) {
+      var d = FXDEF.fire, fr = Math.floor(t / d.ms) % d.frames;
+      ctx.save();
+      ctx.translate(b.x * ZOOM, b.y * ZOOM);
+      ctx.rotate(b.a);
+      ctx.drawImage(sheets.fireball, fr * d.w, 0, d.w, d.h,
+        -d.w * ZOOM / 2, -d.h * ZOOM / 2, d.w * ZOOM, d.h * ZOOM);
+      ctx.restore();
+    });
+
+    storms = storms.filter(function (s) { return t - s.born < s.life; });
+    storms.forEach(function (s) {
+      var k = 1 - (t - s.born) / s.life;
+      ctx.strokeStyle = "rgba(120,208,255," + k + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.x * ZOOM, s.y * ZOOM, s.r * ZOOM * (1 - k * 0.15), 0, Math.PI * 2);
+      ctx.stroke();
+      // an arc to each victim, so the area stun reads as chain lightning
+      s.hits.forEach(function (h) {
+        ctx.beginPath();
+        ctx.moveTo(s.x * ZOOM, s.y * ZOOM);
+        var mx = (s.x + h.x) / 2 * ZOOM + (Math.random() - 0.5) * 26;
+        var my = (s.y + h.y) / 2 * ZOOM + (Math.random() - 0.5) * 26;
+        ctx.quadraticCurveTo(mx, my, h.x * ZOOM, h.y * ZOOM - 20);
+        ctx.stroke();
+      });
+    });
+
     shots = shots.filter(function (s) { return t - s.born < s.life; });
     shots.forEach(function (s) {
       if (!s.b) return;
@@ -315,6 +374,16 @@
       ctx.fillText(labels[y.chKind] || "", cv.width / 2, y0 + 18);
       ctx.textAlign = "left";
     }
+    if (role === "mage") {           // crosshair, so aiming reads as aiming
+      ctx.strokeStyle = "rgba(198,130,255,0.8)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 4, mouse.y);
+      ctx.moveTo(mouse.x + 4, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y);
+      ctx.moveTo(mouse.x, mouse.y - 14); ctx.lineTo(mouse.x, mouse.y - 4);
+      ctx.moveTo(mouse.x, mouse.y + 4); ctx.lineTo(mouse.x, mouse.y + 14);
+      ctx.stroke();
+    }
     if (y.windup > 0) {
       ctx.fillStyle = "rgba(198,130,255,0.9)";
       ctx.font = "14px system-ui"; ctx.textAlign = "center";
@@ -331,8 +400,11 @@
     out.push(k("E", "przytrzymaj: artefakt / wiązanie", 0));
     out.push(k("SPACJA", myCls === "Strzelec" ? "karabin" : "tazer", y.taser));
     if (role === "mage") {
-      out.push(k("Q", "zaklęcie", y.cast));
-      out.push(k("F", "zmyłka", y.blend));
+      out.push(k("LPM", "fireball", y.ball));
+      out.push(k("PPM", "piorun AoE", y.storm));
+      out.push(k("Q", "zaklęcie celowane", y.cast));
+      out.push(k("F", "przebranie" + (y.disguised ? " · " + y.disguised : ""), y.disguise));
+      out.push(k("R", "zmyłka", y.blend));
     }
     if (myCls === "Zwiadowca") out.push(k("C", "kamery", 0));
     $("keys").innerHTML = out.join("");
