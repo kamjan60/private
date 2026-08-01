@@ -137,10 +137,17 @@
   body.touch #keys{ display:none; }
   /* the bar sits on the floor and the log stacks above it: overlapping them
      put the spell names on top of the event feed */
+  /* wrap instead of scrolling sideways: a slot you have to scroll to is a
+     slot you will not switch to mid-round */
   body.touch #bar{ bottom:calc(14px + env(safe-area-inset-bottom)); left:10px; transform:none;
-    max-width:min(52vw,250px); }
+    max-width:min(54vw,260px); flex-wrap:wrap; overflow:visible; gap:4px; }
+  body.touch .slot{ width:60px; flex:0 0 60px; padding:4px 4px; font-size:9.5px; }
+  body.touch .slot b{ font-size:9.5px; }
   body.touch #log{ bottom:calc(84px + env(safe-area-inset-bottom)); max-height:104px;
     width:min(300px,52%); }
+  /* only a mage carries a spell bar, and it wraps to three rows; a hunter
+     should not lose that space to an element that is not there */
+  body.touch.has-bar #log{ bottom:calc(152px + env(safe-area-inset-bottom)); max-height:88px; }
   body.touch #topbar{ padding-top:calc(10px + env(safe-area-inset-top)); }
 
   /* ---------------- overlays ---------------- */

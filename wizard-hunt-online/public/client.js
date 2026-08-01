@@ -299,20 +299,49 @@
   }
 
   // ------------------------------------------------------------- spell bar
-  var selected = 0;
+  var selected = 0, barKey = "";
 
+  /**
+   * Rebuild the bar only when the book itself changes.
+   *
+   * This runs on every snapshot -- fifteen times a second. Tearing the slots
+   * down and recreating them that often means the node a tap started on is
+   * gone before the click resolves, so on a phone the slots simply could not
+   * be selected. Charges and selection are updated in place instead.
+   */
   function paintBar() {
     var bar = $("bar");
-    if (!S || !S.me || !S.me.book) { bar.innerHTML = ""; return; }
-    bar.innerHTML = "";
+    if (!S || !S.me || !S.me.book) {
+      bar.innerHTML = ""; barKey = "";
+      document.body.classList.remove("has-bar");
+      return;
+    }
+    document.body.classList.add("has-bar");
+
+    var key = S.me.book.map(function (e) { return e.id; }).join(",");
+    if (key !== barKey) {
+      barKey = key;
+      bar.innerHTML = "";
+      S.me.book.forEach(function (e, i) {
+        var s = spellById(e.id);
+        var d = document.createElement("div");
+        d.className = "slot";
+        d.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" + esc(s.name) +
+          "</b><span class='c'>0</span>";
+        var pick = function (ev) { ev.preventDefault(); selected = i; paintBar(); };
+        d.addEventListener("click", pick);
+        d.addEventListener("touchend", pick);
+        bar.appendChild(d);
+      });
+    }
+
     S.me.book.forEach(function (e, i) {
-      var s = spellById(e.id);
-      var d = document.createElement("div");
-      d.className = "slot" + (i === selected ? " sel" : "") + (e.charges <= 0 ? " empty" : "");
-      d.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" + esc(s.name) +
-        "</b><span class='c'>" + e.charges + "</span>";
-      d.onclick = function () { selected = i; paintBar(); };
-      bar.appendChild(d);
+      var d = bar.children[i];
+      if (!d) return;
+      d.classList.toggle("sel", i === selected);
+      d.classList.toggle("empty", e.charges <= 0);
+      var c = d.querySelector(".c");
+      if (c.textContent !== String(e.charges)) c.textContent = e.charges;
     });
   }
 
@@ -347,6 +376,7 @@
   // ------------------------------------------------------------- input
   var keys = {}, lastAim = { x: 1, y: 0 };
   var stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  var aim = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
 
   window.addEventListener("keydown", function (e) {
     keys[e.key.toLowerCase()] = true;
@@ -429,11 +459,53 @@
     cv.addEventListener("touchcancel", end);
 
     bindHold($("tHold"));
-    $("tA").onclick = function () {
-      if (ROLE && ROLE.role === "mage") castSelected();
-      else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
-    };
+    bindAim($("tA"));
     $("tB").onclick = function () { doPing("podejrzany"); };
+  }
+
+  /**
+   * Hold the fire button and steer: the button becomes a second stick, and
+   * the canvas draws where the shot lands while you are still deciding.
+   *
+   * Tapping it without dragging fires along the direction you were last
+   * moving or aiming, so a quick shot stays one tap.
+   */
+  function bindAim(el) {
+    el.addEventListener("touchstart", function (e) {
+      var t = e.changedTouches[0];
+      aim.active = true; aim.id = t.identifier;
+      aim.ox = t.clientX; aim.oy = t.clientY; aim.x = 0; aim.y = 0;
+      el.classList.add("on");
+      e.preventDefault();
+    }, { passive: false });
+
+    // the finger leaves the button while steering, so track it on the window
+    window.addEventListener("touchmove", function (e) {
+      if (!aim.active) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier !== aim.id) continue;
+        aim.x = t.clientX - aim.ox; aim.y = t.clientY - aim.oy;
+        var l = Math.hypot(aim.x, aim.y);
+        if (l > 12) lastAim = { x: aim.x / l, y: aim.y / l };
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    var release = function (e) {
+      if (!aim.active) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier !== aim.id) continue;
+        aim.active = false;
+        el.classList.remove("on");
+        if (ROLE && ROLE.role === "mage") castSelected();
+        else send({ t: "taser", ax: lastAim.x, ay: lastAim.y });
+      }
+    };
+    window.addEventListener("touchend", release);
+    window.addEventListener("touchcancel", function () {
+      aim.active = false; el.classList.remove("on");
+    });
   }
 
   var holding = false;
@@ -574,6 +646,8 @@
       ctx.fillText(p.kind + " · " + (p.byName || ""), p.x - 24, p.y - 22);
     });
 
+    drawAimPreview(me);
+
     var now = Date.now();
     fx = fx.filter(function (f) { return now - f.born < 700; });
     fx.forEach(function (f) {
@@ -598,15 +672,148 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, cv.width, cv.height);
 
-    if (TOUCH && stick.active) {
-      ctx.strokeStyle = "rgba(127,216,255,0.45)"; ctx.lineWidth = 2;
-      var r0 = (window.devicePixelRatio || 1);
-      ctx.beginPath(); ctx.arc(stick.ox * r0, stick.oy * r0, 46 * r0, 0, 6.284); ctx.stroke();
-      ctx.fillStyle = "rgba(127,216,255,0.35)";
+    var r0 = (window.devicePixelRatio || 1);
+    if (TOUCH && stick.active) knob(stick, "rgba(127,216,255,0.45)", "rgba(127,216,255,0.35)");
+    if (TOUCH && aim.active) {
+      // the aiming stick wears the school's colour, so the thumb and the
+      // preview on the floor are obviously the same gesture
+      var col = "rgba(198,130,255,0.6)";
+      if (ROLE && ROLE.role === "mage" && S.me.book && S.me.book[selected]) {
+        col = DEF.schools[S.me.book[selected].school].colour;
+      } else if (!ROLE || ROLE.role !== "mage") {
+        col = "rgba(127,216,255,0.6)";
+      }
+      knob(aim, col, col);
+    }
+
+    function knob(st, stroke, fill) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = stroke; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(st.ox * r0, st.oy * r0, 46 * r0, 0, 6.284); ctx.stroke();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.arc((stick.ox + Math.max(-46, Math.min(46, stick.x))) * r0,
-              (stick.oy + Math.max(-46, Math.min(46, stick.y))) * r0, 18 * r0, 0, 6.284);
+      ctx.arc((st.ox + Math.max(-46, Math.min(46, st.x))) * r0,
+              (st.oy + Math.max(-46, Math.min(46, st.y))) * r0, 18 * r0, 0, 6.284);
       ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /**
+   * Show what the current verb will do and where, before it is spent.
+   *
+   * Charges are the mage's whole round and a taser has a six second
+   * cooldown, so firing blind is an expensive way to learn a range. The
+   * preview is faint while you are just standing there and firms up while
+   * you are actively steering with the fire button held.
+   */
+  function drawAimPreview(me) {
+    if (!S || !S.me) return;
+    var strong = aim.active || !TOUCH;
+    var dir = lastAim, col, s = null;
+
+    if (ROLE && ROLE.role === "mage" && S.me.book && S.me.book[selected]) {
+      s = spellById(S.me.book[selected].id);
+      col = DEF.schools[s.school].colour;
+      if (S.me.book[selected].charges <= 0) col = "#6a7288";
+    } else {
+      col = "#7fd8ff";
+    }
+
+    ctx.save();
+    ctx.globalAlpha = strong ? 0.75 : 0.22;
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 2;
+
+    if (!s) {                                   // a hunter's taser
+      var reach = ROLE && ROLE.item === "karabin" ? 330 : 62;
+      wedge(me, dir, reach, 1.2);
+    } else if (s.target === "self") {
+      ring(me.x, me.y, 26);
+      label(me.x, me.y - 44, s.name + " — na sobie");
+    } else if (s.target === "compartment") {
+      var room = null, here = hereRoom();
+      for (var i = 0; i < DEF.map.length; i++) if (DEF.map[i].name === here) room = DEF.map[i];
+      if (room) {
+        ctx.setLineDash([8, 6]);
+        ctx.strokeRect(room.x + 3, room.y + 3, room.w - 6, room.h - 6);
+        ctx.setLineDash([]);
+        ctx.globalAlpha = strong ? 0.14 : 0.06;
+        ctx.fillRect(room.x, room.y, room.w, room.h);
+        ctx.globalAlpha = strong ? 0.75 : 0.22;
+        label(room.x + room.w / 2, room.y + 22, s.name + " — cały przedział");
+      } else {
+        label(me.x, me.y - 44, "Musisz stać w przedziale");
+      }
+    } else if (s.effect === "cone") {
+      wedge(me, dir, s.range || 120, 0.93);
+      label(me.x, me.y - 44, s.name);
+    } else if (s.effect === "projectile") {
+      var far = 320;
+      ctx.setLineDash([10, 8]);
+      ctx.beginPath();
+      ctx.moveTo(me.x, me.y);
+      ctx.lineTo(me.x + dir.x * far, me.y + dir.y * far);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ring(me.x + dir.x * far, me.y + dir.y * far, 9);
+      label(me.x + dir.x * far, me.y + dir.y * far - 18, s.name);
+    } else if (s.target === "actor") {
+      var reach2 = s.range || 210;
+      var best = null, bd = reach2;
+      (S.actors || []).forEach(function (a) {
+        if (a.id === S.me.id) return;
+        var d = Math.hypot(a.x - me.x, a.y - me.y);
+        if (d < bd) { bd = d; best = a; }
+      });
+      ctx.globalAlpha = strong ? 0.3 : 0.12;
+      ring(me.x, me.y, reach2);
+      ctx.globalAlpha = strong ? 0.85 : 0.25;
+      if (best) {
+        ctx.beginPath(); ctx.moveTo(me.x, me.y); ctx.lineTo(best.x, best.y); ctx.stroke();
+        ring(best.x, best.y, 18);
+        label(best.x, best.y - 40, s.name + " → " + best.name);
+      } else {
+        label(me.x, me.y - 44, s.name + " — nikogo w zasięgu");
+      }
+    } else {                                    // an area landing where you point
+      var reach3 = s.range || 210;
+      var ax = me.x + dir.x * reach3, ay = me.y + dir.y * reach3;
+      ctx.globalAlpha = strong ? 0.22 : 0.09;
+      ctx.beginPath(); ctx.arc(ax, ay, s.radius || 60, 0, 6.284); ctx.fill();
+      ctx.globalAlpha = strong ? 0.8 : 0.25;
+      ring(ax, ay, s.radius || 60);
+      ctx.setLineDash([6, 8]);
+      ctx.beginPath(); ctx.moveTo(me.x, me.y); ctx.lineTo(ax, ay); ctx.stroke();
+      ctx.setLineDash([]);
+      label(ax, ay - (s.radius || 60) - 8, s.name);
+    }
+    ctx.restore();
+
+    function ring(x, y, r) {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.284); ctx.stroke();
+    }
+    function wedge(o, d, r, half) {
+      var a0 = Math.atan2(d.y, d.x);
+      ctx.globalAlpha = strong ? 0.18 : 0.07;
+      ctx.beginPath();
+      ctx.moveTo(o.x, o.y);
+      ctx.arc(o.x, o.y, r, a0 - half, a0 + half);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = strong ? 0.7 : 0.22;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, r, a0 - half, a0 + half);
+      ctx.stroke();
+    }
+    function label(x, y, text) {
+      if (!strong) return;
+      ctx.font = "11px system-ui";
+      var w = ctx.measureText(text).width;
+      ctx.globalAlpha = 0.95;
+      ctx.fillText(text, x - w / 2, y);
     }
   }
 
