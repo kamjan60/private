@@ -15,20 +15,18 @@ const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 8;          // one unique class each, and there are eight
 
 // ---------------------------------------------------------------- world
-const W = 2000, H = 1600;
+const W = 2220, H = 1640;
 const SPEED_BASE = 2.5;
 /**
- * Compartments are joined by airlocks, not open floor. Stepping into one
- * seals you in for this long before the far side opens.
+ * A corridor's hatches slam when somebody steps in, and take this long to
+ * cycle open again.
  *
- * The void between rooms used to be walkable, which let players drift off
- * the ship entirely and made the transit log meaningless. Locking the
- * passage instead turns every room change into a committed, timed act: you
- * cannot follow somebody through instantly, and you cannot flee through one
- * mid-fight without buying the pursuer two and a half seconds.
+ * This is what makes a corridor a killing box rather than a shortcut. For
+ * those seconds nobody outside can get in and nobody inside can get out --
+ * so if the mage followed you in, you are alone with him and the doors are
+ * shut, and if you followed him in, that was your decision.
  */
-const LOCK_MS = 2500;
-const DOOR_REACH = 30;      // how close you must be to a hatch to enter it
+const CORRIDOR_CYCLE_MS = 2600;
 
 // ---------------------------------------------------------------- acts
 const ACTS = 3;
@@ -90,7 +88,7 @@ const LOADOUT_MS = 90000;       // then everyone undecided gets a random pick
 
 module.exports = {
   TICK_HZ, TICK_MS, MIN_PLAYERS, MAX_PLAYERS,
-  W, H, SPEED_BASE, LOCK_MS, DOOR_REACH,
+  W, H, SPEED_BASE, CORRIDOR_CYCLE_MS,
   ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
   ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE,
   TASER_STUN_MS, TASER_COOLDOWN, BIND_MS, BIND_MS_SHACKLES,

@@ -60,6 +60,9 @@
       case "toast": toast(m.msg); break;
       case "joined":
         ME = m.id; ROOM = m.room; HOST = m.host; DEF = m;
+        // the wreck's geometry is public knowledge, not information about
+        // anybody in it; exposed so the browser harness can assert on it
+        window.__DEF = m;
         m.classes.forEach(function (c, i) { CLASS_ROW[c.name] = i; });
         $("roomCode").textContent = ROOM;
         screen("sLobby");
@@ -640,7 +643,6 @@
   function draw() {
     requestAnimationFrame(draw);
     if (!S || !S.me || S.me.base || !DEF) return;
-    if (S.me.lock) { drawLock(); return; }
     if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
 
     var me = meActor();
@@ -652,52 +654,47 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.setTransform(ZOOM, 0, 0, ZOOM, -CAM.x * ZOOM, -CAM.y * ZOOM);
 
-    var sealed = {}, lit = {}, doused = {};
+    var sealed = {}, lit = {}, doused = {}, cyc = {};
     (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
+    (S.cycling || []).forEach(function (c) { cyc[c.room] = c.until; });
     (S.lit || []).forEach(function (n) { lit[n] = 1; });
     (S.doused || []).forEach(function (n) { doused[n] = 1; });
 
     DEF.map.forEach(function (c) {
-      if (c.section > S.act) return;                 // locked sections stay dark
-      ctx.fillStyle = lit[c.name] ? "#141d2e" : doused[c.name] ? "#080a12" : "#0d1320";
+      if (c.section > S.act) return;                 // decks not yet open stay dark
+      var hall = c.kind === "corridor";
+      // corridors read darker and colder: no camera watches one, and the
+      // renderer should make that legible before somebody follows you in
+      ctx.fillStyle = lit[c.name] ? "#141d2e"
+        : doused[c.name] ? "#080a12"
+        : hall ? "#0a0e18" : "#0d1320";
       ctx.fillRect(c.x, c.y, c.w, c.h);
-      ctx.strokeStyle = sealed[c.name] ? "#b05a4a" : "#223050";
-      ctx.lineWidth = sealed[c.name] ? 4 : 3;
+      var shut = sealed[c.name] || cyc[c.name];
+      ctx.strokeStyle = shut ? "#b05a4a" : hall ? "#1c2740" : "#223050";
+      ctx.lineWidth = shut ? 4 : 3;
       c.walls.forEach(function (w) {
         ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
       });
-      if (sealed[c.name]) {
+      if (shut) {
         ctx.strokeStyle = "#b05a4a";
         ctx.strokeRect(c.x, c.y, c.w, c.h);
       }
-      ctx.fillStyle = "rgba(150,170,210,0.32)";
-      ctx.font = "11px system-ui";
-      ctx.fillText(c.name, c.x + 8, c.y + 16);
-    });
-
-    // hatches: the only way between compartments, and the only thing on a
-    // wall worth walking at
-    (DEF.doors || []).forEach(function (d) {
-      var a = roomByName(d.a), b = roomByName(d.b);
-      if (!a || !b) return;
-      if (a.section > S.act && b.section > S.act) return;
-      var shut = sealed[d.a] || sealed[d.b];
-      [[d.ax, d.ay], [d.bx, d.by]].forEach(function (h) {
-        ctx.fillStyle = shut ? "#7a3a30" : "#2f4c74";
-        ctx.strokeStyle = shut ? "#b05a4a" : "#7fd8ff";
-        ctx.lineWidth = 2;
-        if (d.axis === "x") {
-          ctx.fillRect(h[0] - 5, h[1] - 26, 10, 52);
-          ctx.strokeRect(h[0] - 5, h[1] - 26, 10, 52);
-        } else {
-          ctx.fillRect(h[0] - 26, h[1] - 5, 52, 10);
-          ctx.strokeRect(h[0] - 26, h[1] - 5, 52, 10);
-        }
-      });
-      ctx.strokeStyle = shut ? "rgba(176,90,74,0.4)" : "rgba(127,216,255,0.22)";
-      ctx.setLineDash([5, 7]);
-      ctx.beginPath(); ctx.moveTo(d.ax, d.ay); ctx.lineTo(d.bx, d.by); ctx.stroke();
-      ctx.setLineDash([]);
+      // a corridor whose hatches have slammed: the seconds are the whole
+      // reason to be afraid of the place
+      if (hall && cyc[c.name]) {
+        var left = Math.max(0, cyc[c.name] - Date.now());
+        ctx.fillStyle = "rgba(176,90,74,0.16)";
+        ctx.fillRect(c.x, c.y, c.w, c.h);
+        ctx.fillStyle = "#ff9b8a";
+        ctx.font = "11px system-ui";
+        var tx = "ZAMKNIĘTE " + (left / 1000).toFixed(1) + " s";
+        ctx.fillText(tx, c.x + c.w / 2 - ctx.measureText(tx).width / 2, c.y - 6);
+      }
+      if (!hall) {
+        ctx.fillStyle = "rgba(150,170,210,0.32)";
+        ctx.font = "11px system-ui";
+        ctx.fillText(c.name, c.x + 8, c.y + 16);
+      }
     });
 
     (S.walls || []).forEach(function (w) {
@@ -912,43 +909,6 @@
       ctx.globalAlpha = 0.95;
       ctx.fillText(text, x - w / 2, y);
     }
-  }
-
-  /**
-   * Sealed in a hatch. You see nothing and nothing sees you -- so the screen
-   * shows the wait itself rather than pretending you still have a view. The
-   * two and a half seconds are the mechanic, not a loading spinner.
-   */
-  function drawLock() {
-    if (cv.width !== Math.floor(cv.clientWidth * (window.devicePixelRatio || 1))) fit();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#05070c";
-    ctx.fillRect(0, 0, cv.width, cv.height);
-
-    var cx = cv.width / 2, cy = cv.height / 2;
-    var r0 = window.devicePixelRatio || 1;
-    var left = Math.max(0, S.me.lock.until - Date.now());
-    var k = 1 - Math.min(1, left / 2500);
-
-    ctx.strokeStyle = "rgba(127,216,255,0.28)";
-    ctx.lineWidth = 10 * r0;
-    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, 0, 6.284); ctx.stroke();
-    ctx.strokeStyle = "#7fd8ff";
-    ctx.beginPath(); ctx.arc(cx, cy, 60 * r0, -1.571, -1.571 + 6.284 * k); ctx.stroke();
-
-    ctx.fillStyle = "#e6ecfa";
-    ctx.textAlign = "center";
-    ctx.font = (15 * r0) + "px system-ui";
-    ctx.fillText("ŚLUZA", cx, cy - 128 * r0);
-    // above the ring, not below: the button cluster owns the lower third
-    ctx.font = (13 * r0) + "px system-ui";
-    ctx.fillStyle = "#8b9ac0";
-    ctx.fillText("Przejście do: " + S.me.lock.to, cx, cy - 106 * r0);
-    ctx.fillText("Nikt cię tu nie dosięgnie. I ty nikogo.", cx, cy - 86 * r0);
-    ctx.font = (22 * r0) + "px system-ui";
-    ctx.fillStyle = "#e6ecfa";
-    ctx.fillText((left / 1000).toFixed(1) + " s", cx, cy + 8 * r0);
-    ctx.textAlign = "left";
   }
 
   function drawActor(a) {

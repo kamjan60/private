@@ -18,7 +18,7 @@ const {
   W, H
 } = require("./rules");
 const { spell } = require("./spells");
-const { compartmentAt } = require("./map");
+const { compartmentAt, isCorridor } = require("./map");
 const { addResidue, eraseLog, makeCorpse } = require("./evidence");
 const R = require("./round");
 
@@ -35,7 +35,6 @@ function charge(p, spellId) {
  */
 function beginCast(room, p, spellId, aim, now, extra = {}) {
   if (p.role !== "mage" || !p.alive || p.ejected) return { ok: false };
-  if (p.lock) return { ok: false, why: "Jesteś w śluzie." };
   if (room.phase !== "play") return { ok: false, why: "Nie teraz." };
   if (p.windup) return { ok: false, why: "Już rzucasz." };
   if (now < p.castReadyAt) return { ok: false, why: "Zaklęcia stygną." };
@@ -94,7 +93,7 @@ function resolveCast(room, p, now, api) {
 /** Everyone a spell could reach: alive, not ejected, and not sealed in a
  *  hatch. A body inside an airlock is out of the world for those seconds. */
 const livingOthers = (room, p) =>
-  [...room.players.values()].filter((o) => o.alive && !o.ejected && !o.lock && o.id !== p.id);
+  [...room.players.values()].filter((o) => o.alive && !o.ejected && o.id !== p.id);
 
 function aimPoint(p, aim, range) {
   const len = Math.hypot(aim.x, aim.y) || 1;
@@ -144,6 +143,7 @@ function apply(room, p, s, w, now, api) {
       room.delayed.push({ x: at.x, y: at.y, at: now + s.delayMs, r: s.radius, by: p.id, school: s.school });
       break;
     case "burn_artifact": {
+      if (isCorridor(w.comp)) break;        // corridors hold no artifacts
       const a = room.round.artifacts.find((x) => x.room === w.comp && x.state === "open");
       if (a && R.lose(room.round, a.id, "pozoga")) api.artifactLost(room, a, "spalony");
       break;
@@ -220,6 +220,8 @@ function apply(room, p, s, w, now, api) {
       }
       break;
     case "collapse": {
+      // burying a corridor would cut the ship in two and strand the round
+      if (isCorridor(w.comp)) break;
       room.round.sealed.add(w.comp);
       const a = room.round.artifacts.find((x) => x.room === w.comp && x.state === "open");
       if (a && R.lose(room.round, a.id, "zawal")) api.artifactLost(room, a, "zasypany");
@@ -276,7 +278,7 @@ function stepProjectiles(room, now, api) {
   room.balls = room.balls.filter((b) => {
     b.x += b.vx; b.y += b.vy;
     const victim = [...room.players.values()].find(
-      (o) => o.alive && !o.ejected && !o.lock && o.id !== b.by &&
+      (o) => o.alive && !o.ejected && o.id !== b.by &&
         Math.hypot(o.x - b.x, o.y - b.y) < BALL_HIT_R
     );
     const outside = b.x < 0 || b.y < 0 || b.x > W || b.y > H;
@@ -293,7 +295,7 @@ function stepProjectiles(room, now, api) {
     if (now < d.at) return true;
     api.fx(room, d.school, d.x, d.y);
     for (const o of room.players.values()) {
-      if (!o.alive || o.ejected || o.lock || o.id === d.by) continue;
+      if (!o.alive || o.ejected || o.id === d.by) continue;
       if (Math.hypot(o.x - d.x, o.y - d.y) <= d.r) api.hit(room, o, room.players.get(d.by), d.school);
     }
     return false;

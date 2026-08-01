@@ -12,10 +12,10 @@
 const {
   SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
-  PING_COOLDOWN, PING_MS, PING_KINDS, LOCK_MS, DOOR_REACH
+  PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_CYCLE_MS
 } = require("./rules");
 const { findItem } = require("./classes");
-const { free, compartmentAt, compartment, doorsOf, doorUnder } = require("./map");
+const { free, compartmentAt, isCorridor } = require("./map");
 const { logTransit, makeCorpse } = require("./evidence");
 const { apparentClass, pushEvent, alive, hunters } = require("./room");
 const { interrupt } = require("./effects");
@@ -30,7 +30,11 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function collisionState(room, now) {
   const sealed = new Set(room.round.sealed);
   for (const [c, until] of room.sealedTemp) if (until > now) sealed.add(c);
-  return { sealed, walls: room.walls };
+  // a corridor mid-cycle is shut at both ends
+  for (const [c, until] of room.cycling) if (until > now) sealed.add(c);
+  // the act gates the decks: a zone belonging to a later section is simply
+  // not floor yet, so no separate bulkhead state is needed
+  return { sealed, walls: room.walls, act: room.round.act };
 }
 
 /**
@@ -38,7 +42,6 @@ function collisionState(room, now) {
  * a corridor you cannot round a corner in is a corridor nobody uses.
  */
 function step(room, p, now) {
-  if (p.lock) { cycleLock(room, p, now); return; }
   if (now < p.stunUntil || now < p.proneUntil) { p.channel = null; return; }
 
   const ix = p.input.x, iy = p.input.y;
@@ -53,12 +56,6 @@ function step(room, p, now) {
   const st = collisionState(room, now);
   const before = p.comp;
 
-  // pressing against a hatch takes you into the lock instead of nowhere
-  const hatch = before
-    ? doorUnder(p.x, p.y, ix / len, iy / len, before, DOOR_REACH)
-    : null;
-  if (hatch && enterLock(room, p, hatch, now)) return;
-
   if (free(p.x + nx, p.y + ny, 12, st)) { p.x += nx; p.y += ny; }
   else if (free(p.x + nx, p.y, 12, st)) { p.x += nx; }
   else if (free(p.x, p.y + ny, 12, st)) { p.y += ny; }
@@ -68,6 +65,29 @@ function step(room, p, now) {
   p.phase += sp;
   p.step = Math.floor(p.phase / 10) % 2;
   if (p.channel) p.channel = null;   // channels break on movement, always
+
+  /*
+   * Stepping into a corridor slams both hatches for a couple of seconds.
+   * That is what makes a corridor a killing box rather than a shortcut: if
+   * the mage followed you in, you are shut in with him.
+   *
+   * It fires only once the body is clear of the doorway. Sealing the moment
+   * they cross would close the wall on top of them and leave them standing
+   * inside it, unable to move in any direction.
+   */
+  if (p.enteringHall) {
+    const z = compartmentAt(p.x, p.y);
+    if (!z || z.name !== p.enteringHall) {
+      p.enteringHall = null;
+    } else {
+      const deep = Math.min(p.x - z.x, z.x + z.w - p.x, p.y - z.y, z.y + z.h - p.y);
+      if (deep > 20) {
+        const open = (room.cycling.get(z.name) || 0) <= now;
+        if (open) room.cycling.set(z.name, now + CORRIDOR_CYCLE_MS);
+        p.enteringHall = null;
+      }
+    }
+  }
 
   const comp = compartmentAt(p.x, p.y);
   const name = comp ? comp.name : null;
@@ -86,61 +106,11 @@ function step(room, p, now) {
         act: room.round.act, t: now
       });
       fireSensors(room, p, name, now);
+      // armed on entry, fired a step later once they are clear of the doorway
+      p.enteringHall = isCorridor(name) ? name : null;
     }
     p.comp = name;
   }
-}
-
-/**
- * Step into an airlock.
- *
- * You leave the room's log immediately -- the sensors saw you go -- but you
- * do not appear in the next one until the far hatch opens. For those two and
- * a half seconds you are nowhere: unreachable, and unable to reach anybody.
- *
- * A sealed compartment on either side refuses you, which is what makes
- * Rygiel and Zawał worth a charge.
- */
-function enterLock(room, p, hatch, now) {
-  const st = collisionState(room, now);
-  if (st.sealed.has(p.comp) || st.sealed.has(hatch.to)) return false;
-  if (room.round.sealed.has(hatch.to)) return false;
-
-  const target = compartment(hatch.to);
-  if (target.section > room.round.act) return false;   // that deck is not open yet
-
-  p.lock = { to: hatch.to, from: p.comp, until: now + LOCK_MS, x: hatch.x, y: hatch.y };
-  p.channel = null;
-  if (p.comp) {
-    logTransit(room.evidence, p.comp, {
-      realId: p.id, apparentClass: apparentClass(p), kind: "out",
-      act: room.round.act, t: now
-    });
-  }
-  p.comp = null;
-  return true;
-}
-
-/** Hold them until the far side opens, then put them just inside it. */
-function cycleLock(room, p, now) {
-  if (now < p.lock.until) return;
-  const to = p.lock.to;
-  const c = compartment(to);
-  const far = doorsOf(to).find((h) => h.to === p.lock.from);
-  // step in from the hatch, not onto the wall itself
-  const inx = c.x + c.w / 2, iny = c.y + c.h / 2;
-  let x = far ? far.x : inx, y = far ? far.y : iny;
-  const dx = inx - x, dy = iny - y, d = Math.hypot(dx, dy) || 1;
-  x += (dx / d) * 34; y += (dy / d) * 34;
-
-  p.x = Math.round(x); p.y = Math.round(y);
-  p.comp = to;
-  p.lock = null;
-  logTransit(room.evidence, to, {
-    realId: p.id, apparentClass: apparentClass(p), kind: "in",
-    act: room.round.act, t: now
-  });
-  fireSensors(room, p, to, now);
 }
 
 /** Zwiadowca's Czujnik ruchu. Reports a class, like everything else does. */
@@ -204,7 +174,7 @@ function hit(room, target, source, school, api) {
 // ------------------------------------------------------------------ taser
 
 function taser(room, p, aim, now) {
-  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return { ok: false };
+  if (!p.alive || p.ejected || room.phase !== "play") return { ok: false };
   if (now < p.taserReadyAt) return { ok: false, why: "Tazer się ładuje." };
   if (now < p.stunUntil || now < p.proneUntil) return { ok: false };
 
@@ -214,7 +184,7 @@ function taser(room, p, aim, now) {
 
   let best = null, bd = range;
   for (const o of room.players.values()) {
-    if (!o.alive || o.ejected || o.lock || o.id === p.id) continue;
+    if (!o.alive || o.ejected  || o.id === p.id) continue;
     const d = dist(p, o);
     if (d > bd) continue;
     // must be roughly in front, so a taser is aimed rather than a radius
@@ -243,12 +213,12 @@ function taser(room, p, aim, now) {
  * All three break on movement, which is what makes them a commitment.
  */
 function hold(room, p, now) {
-  if (!p.alive || p.ejected || p.lock || room.phase !== "play") return;
+  if (!p.alive || p.ejected || room.phase !== "play") return;
   if (now < p.stunUntil || now < p.proneUntil || now < p.silenceUntil) { p.channel = null; return; }
   if (p.channel) return;
 
   const stunnedNear = [...room.players.values()].find(
-    (o) => o.alive && !o.ejected && !o.lock && o.id !== p.id &&
+    (o) => o.alive && !o.ejected && o.id !== p.id &&
       o.stunUntil > now && dist(p, o) < 46
   );
   if (stunnedNear) {

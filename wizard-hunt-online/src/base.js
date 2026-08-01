@@ -23,7 +23,14 @@ function makeBase() {
   return {
     charges: BASE_ACT_CHARGES,
     act: 0,
-    /** compartment names with a working camera; act III kills half of them */
+    /**
+     * Rooms with a working camera; act III kills half of them.
+     *
+     * Corridors are deliberately absent. Nothing watches a corridor, which
+     * is what makes one the only place aboard where a killing leaves no
+     * witness -- and why "two went in, one came out" has to be argued from
+     * the transit log rather than seen.
+     */
     cameras: COMPARTMENTS.map((c) => c.name),
     /** extra cameras dropped by the Technik, always live */
     field: new Set(),

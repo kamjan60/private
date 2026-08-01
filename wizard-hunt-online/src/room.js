@@ -39,6 +39,7 @@ function makeRoom() {
     sealedTemp: new Map(),   // compartment -> until (Rygiel, Kotwica, base doors)
     doused: new Map(),       // compartment -> until (Zgaszenie)
     lit: new Map(),          // compartment -> until (Generator, base lights)
+    cycling: new Map(),      // corridor -> until (both hatches shut)
     events: [], loadoutEndsAt: 0, winner: null, tick: 0
   };
   rooms.set(room.id, room);
@@ -53,10 +54,10 @@ function makePlayer(id, name, ws) {
     input: { x: 0, y: 0 }, holding: false,
     stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
     slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
+    channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
     disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
     itemCharges: 0, itemReadyAt: 0, vests: 0, usedRevive: false,
-    lastPingAt: 0, loadoutReady: false
+    lastPingAt: 0, loadoutReady: false, enteringHall: null
   };
 }
 
@@ -140,7 +141,7 @@ function startRound(room) {
   room.base = makeBase();
   room.balls = []; room.delayed = []; room.walls = []; room.corpses = [];
   room.pings = []; room.markers = []; room.events = [];
-  room.sealedTemp.clear(); room.doused.clear(); room.lit.clear();
+  room.sealedTemp.clear(); room.doused.clear(); room.lit.clear(); room.cycling.clear();
   room.winner = null;
   room.phase = "play";
 
@@ -153,9 +154,10 @@ function startRound(room) {
       alive: true, down: false, ejected: false,
       stunUntil: 0, stunImmune: false, silenceUntil: 0, blindUntil: 0,
       slowUntil: 0, slowMul: 1, hasteUntil: 0, hasteMul: 1, proneUntil: 0,
-      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0, lock: null,
+      channel: null, windup: null, castReadyAt: 0, taserReadyAt: 0,
       disguisedAs: null, disguiseUntil: 0, invisibleUntil: 0,
-      vests: 0, usedRevive: false, lastPingAt: 0, input: { x: 0, y: 0 }, holding: false
+      vests: 0, usedRevive: false, lastPingAt: 0, enteringHall: null,
+      input: { x: 0, y: 0 }, holding: false
     });
     p.stats = statsFor(p.cls, p.item);
     p.hp = p.stats.hp;

@@ -57,9 +57,6 @@ function forLiving(room, me, now) {
   const actors = [];
   for (const o of room.players.values()) {
     if (!o.alive || o.ejected) continue;
-    // inside an airlock you are in neither room: nobody sees you, and you
-    // cannot be tasered, hit or bound until the far hatch opens
-    if (o.lock) continue;
     if (o.id === me.id) { actors.push(actorView(o, now)); continue; }
     if (o.invisibleUntil > now) continue;
     if (!near(o)) continue;
@@ -76,8 +73,7 @@ function forLiving(room, me, now) {
       // the book, with what is left in it -- only ever sent to its owner
       book: me.role === "mage" ? me.book.map((b) => ({ ...b })) : null,
       channel: me.channel ? { kind: me.channel.kind, start: me.channel.start, ms: me.channel.ms } : null,
-      windup: me.windup ? { spell: me.windup.spellId, at: me.windup.at } : null,
-      lock: me.lock ? { to: me.lock.to, until: me.lock.until } : null
+      windup: me.windup ? { spell: me.windup.spellId, at: me.windup.at } : null
     },
     actors,
     corpses: room.corpses.filter(near).map((c) => ({
@@ -92,6 +88,8 @@ function forLiving(room, me, now) {
     pings: room.pings.filter((p) => p.until > now).map((p) => ({ ...p })),
     sealed: [...room.sealedTemp.entries()].filter(([, u]) => u > now).map(([c]) => c)
       .concat([...room.round.sealed]),
+    cycling: [...room.cycling.entries()].filter(([, u]) => u > now)
+      .map(([c, u]) => ({ room: c, until: u })),
     doused: [...room.doused.entries()].filter(([, u]) => u > now).map(([c]) => c),
     lit: [...room.lit.entries()].filter(([, u]) => u > now).map(([c]) => c)
   };
@@ -108,7 +106,6 @@ function forBase(room, me, now) {
     const bodies = [];
     for (const o of room.players.values()) {
       if (!o.alive || o.ejected) continue;
-      if (o.lock) continue;                 // inside a hatch, off every camera
       if (o.invisibleUntil > now) continue;
       const comp = compartmentAt(o.x, o.y);
       if (!comp || comp.name !== name) continue;

@@ -22,7 +22,7 @@ const T = require("./tribunal");
 const B = require("./base");
 const { readLog, readResidue, readCorpse } = require("./evidence");
 const { snapshotFor } = require("./snapshot");
-const { compartmentAt, free, COMPARTMENTS, DOORS, wallsOf } = require("./map");
+const { compartmentAt, free, ZONES, wallsOf } = require("./map");
 const { CLASSES, CLASS_NAMES, itemsOf } = require("./classes");
 const { SPELLS, SCHOOLS, PRESETS } = require("./spells");
 
@@ -71,11 +71,10 @@ function makeDriver(onMessage, opts) {
       t: "joined", id: human.id, room: room.id, host: true,
       classes: CLASS_NAMES.map((n) => ({ name: n, ...CLASSES[n], items: itemsOf(n) })),
       spells: SPELLS, schools: SCHOOLS, presets: PRESETS, slots: RULES.BOOK_SLOTS,
-      map: COMPARTMENTS.map((c) => ({
-        name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
-        walls: wallsOf(c)
+      map: ZONES.map((z) => ({
+        name: z.name, kind: z.kind, section: z.section,
+        x: z.x, y: z.y, w: z.w, h: z.h, walls: wallsOf(z, false)
       })),
-      doors: DOORS,
       w: RULES.W, h: RULES.H, sandbox: true
     });
     broadcast({

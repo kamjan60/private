@@ -42,24 +42,29 @@ hunters' only road is the tribunal — the one road they can be wrong on. That
 is the mage's clock, and it is why stalling is a strategy for him rather than
 a failure to act.
 
-## Getting about
+## Corridors
 
-Compartments are sealed boxes. There is no walkable space between them --
-the void outside is hull and vacuum, and a shove cannot put a body there.
+Fifteen rooms on three decks, joined by eighteen corridors. Only those
+zones are floor: the space around them is hull and vacuum, so nobody walks
+off the ship and no shove can put them there.
 
-Rooms are joined by **airlocks**. Walk into a hatch and you are sealed in
-for two and a half seconds before the far side opens. While you are inside
-you are in neither room: nobody can see you, taser you, hit you or bind you,
-and you can do none of those things either.
+A corridor is not a door and not a loading screen. It is a room in its own
+right -- long enough to be caught halfway down, wide enough for several
+people, and **watched by no camera**. That makes it the only place aboard
+where a killing has no witness but the walls: the space the mage needs, and
+the space hunters should think twice about entering in company.
 
-That delay is the point. Nobody follows you through instantly, fleeing a
-fight costs the pursuer nothing to match, and every room change is a
-committed act that writes both halves of the transit log -- you leave the
-first room's record the moment the hatch takes you, and appear in the
-second's only when it opens.
+**Stepping into a corridor slams both hatches** for two and a half seconds.
+Nobody can follow you in and you cannot get out, so if the mage went in
+behind you, you are shut in with him — and if you went in behind him, that
+was your decision.
 
-Rygiel and Zawał shut the hatches of a compartment, which is what makes
-them worth a charge.
+Corridors are logged like everything else, which is what makes them
+dangerous in both directions. "Two went in and one came out" is the hardest
+evidence in the game, and a disguise is the only thing that can lie about it.
+
+Rygiel shuts a zone's openings; Zawał buries a room for good but refuses a
+corridor, since cutting the ship in two would strand the round.
 
 ## The tribunal
 

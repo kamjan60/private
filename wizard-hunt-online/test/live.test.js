@@ -83,8 +83,11 @@ function bot(name, roomCode) {
   const mage = all.find((b) => b.last.loadout.role === "mage");
   const hunterBots = all.filter((b) => b !== mage);
 
-  // everyone but one hunter picks; the straggler must not block the round
-  for (const b of all.slice(0, all.length - 1)) {
+  // Everyone but one hunter picks; the straggler must not block the round.
+  // The straggler has to be a hunter: leaving the mage out would hand him a
+  // random preset, and the cast assertions below name a specific spell.
+  const straggler = all.filter((b) => b !== mage).pop();
+  for (const b of all.filter((b) => b !== straggler)) {
     b.send({
       t: "loadout", item: b.last.loadout.items[0].id,
       book: b === mage ? host.last.joined.presets["Rzeźnik"] : undefined
@@ -142,62 +145,75 @@ function bot(name, roomCode) {
       "a player outside vision must not be serialised at all");
   });
 
-  // ------------------------------------------------------------- airlocks
+  // ------------------------------------------------------------- corridors
   const M = require("../src/map");
   const { readLog } = require("../src/evidence");
-  const { LOCK_MS } = require("../src/rules");
   const walker = [...room.players.values()].find((p) => p.role !== "mage");
 
-  check("the void between compartments is not floor", () => {
-    const st = { sealed: new Set(), walls: [] };
-    // a point squarely in the gap between the first two rooms
-    const a = M.compartment("Mostek"), b = M.compartment("Ładownia");
-    const gapX = (a.x + a.w + b.x) / 2;
-    assert.strictEqual(M.free(gapX, a.y + a.h / 2, 12, st), false,
-      "a shove must not be able to put a body outside the hull");
+  check("only zones are floor", () => {
+    const st = { sealed: new Set(), walls: [], act: 2 };
+    // the hull between a room and the corridor beside it
+    const a = M.compartment("Mostek");
+    assert.strictEqual(M.free(a.x + 10, a.y - 40, 12, st), false,
+      "a shove must not be able to put a body outside the ship");
     assert.strictEqual(M.free(a.x + a.w / 2, a.y + a.h / 2, 12, st), true);
   });
 
-  const hatch = M.doorsOf("Mostek").find((h) => h.to === "Ładownia");
-  walker.comp = "Mostek";
-  walker.lock = null;
-  walker.x = hatch.x - 22; walker.y = hatch.y;
-  walker.input = { x: 1, y: 0 };
-  await wait(250);
-
-  check("pressing a hatch seals you into the lock", () => {
-    assert.ok(walker.lock, "the walker should be inside the airlock");
-    assert.strictEqual(walker.lock.to, "Ładownia");
-    assert.strictEqual(walker.comp, null, "you are in neither room while locked");
+  check("corridors are real rooms, and nothing watches them", () => {
+    assert.strictEqual(M.CORRIDORS.length, M.LINKS.length);
+    const hall = M.CORRIDORS[0];
+    assert.ok(hall.w >= 76 && hall.h >= 76, "a corridor has to hold more than one body");
+    assert.ok(M.isCorridor(hall.name));
+    const B = require("../src/base");
+    assert.ok(!B.liveCameras(room.base).includes(hall.name),
+      "a corridor with a camera would not be a place to be alone");
   });
 
-  check("somebody in a lock is unreachable and invisible", () => {
+  const hall = M.CORRIDORS.find((c) => c.section === 0);
+  walker.comp = null;
+  walker.x = hall.x + hall.w / 2; walker.y = hall.y + hall.h / 2;
+  await wait(300);
+
+  // nudge them along the corridor so the sensors register the passage
+  walker.input = { x: hall.axis === "x" ? 0.2 : 0, y: hall.axis === "x" ? 0 : 0.2 };
+  await wait(400);
+  walker.input = { x: 0, y: 0 };
+  await wait(200);
+
+  check("a corridor writes its own transit entries", () => {
+    const entries = readLog(room.evidence, hall.name, { act: 0, now: Date.now() });
+    assert.ok(entries.length > 0, "walking a corridor left no record");
+    assert.ok(entries.every((e) => !("realId" in e)), "an entry leaked a real id");
+  });
+
+  check("stepping into a corridor slams both hatches", () => {
+    const st = require("../src/actions").collisionState(room, Date.now());
+    assert.ok(st.sealed.has(hall.name),
+      "the corridor should have cycled shut behind the walker");
+    const a = M.compartment(hall.ends[0]);
+    const mouth = hall.axis === "x"
+      ? { x: a.x + a.w, y: hall.y + hall.h / 2 }
+      : { x: hall.x + hall.w / 2, y: a.y + a.h };
+    assert.strictEqual(M.free(mouth.x, mouth.y, 12, st), false,
+      "nobody can follow you in while it cycles, and you cannot get out");
+  });
+
+  check("the hatches open again once the cycle is done", () => {
+    const { CORRIDOR_CYCLE_MS } = require("../src/rules");
+    const later = Date.now() + CORRIDOR_CYCLE_MS + 100;
+    const st = require("../src/actions").collisionState(room, later);
+    assert.ok(!st.sealed.has(hall.name));
+  });
+
+  check("a body in a corridor can still be seen, and killed", () => {
     const other = [...room.players.values()].find((p) => p.id !== walker.id && p.alive);
-    other.x = walker.x; other.y = walker.y;
+    other.x = walker.x + 20; other.y = walker.y;
     const { snapshotFor } = require("../src/snapshot");
     const s = snapshotFor(room, other, Date.now());
-    assert.ok(!s.actors.some((a) => a.id === walker.id),
-      "a body inside a lock must not be serialised onto the floor");
+    assert.ok(s.actors.some((a) => a.id === walker.id),
+      "a corridor is a place, not a safe room -- that is the whole point of it");
   });
 
-  await wait(LOCK_MS + 400);
-
-  check("the far hatch opens into the next compartment", () => {
-    assert.strictEqual(walker.lock, null, "the lock should have cycled");
-    assert.strictEqual(walker.comp, "Ładownia");
-    const c = M.compartmentAt(walker.x, walker.y);
-    assert.ok(c && c.name === "Ładownia", "and it must put you inside, not on the wall");
-  });
-
-  check("the passage writes both halves of the transit log", () => {
-    const out = readLog(room.evidence, "Mostek", { act: 0, now: Date.now() });
-    const into = readLog(room.evidence, "Ładownia", { act: 0, now: Date.now() });
-    assert.ok(out.some((e) => e.kind === "out"), "leaving was not recorded");
-    assert.ok(into.some((e) => e.kind === "in"), "arriving was not recorded");
-    assert.ok(into.every((e) => !("realId" in e)), "an entry leaked a real id");
-  });
-
-  walker.input = { x: 0, y: 0 };
 
   // ------------------------------------------------------------- extraction
   const walkerBot = all.find((b) => b.id === walker.id);
@@ -218,7 +234,17 @@ function bot(name, roomCode) {
   // ------------------------------------------------------------- casting
   const magePl = room.players.get(mage.id);
   const victim = [...room.players.values()].find((p) => p.role !== "mage" && p.alive);
-  magePl.x = victim.x + 40; magePl.y = victim.y;
+  // clear the line of fire: the corridor checks above parked a third body
+  // next to the walker, and it was catching the ball instead
+  const room0 = M.sectionOf(0);
+  [...room.players.values()].forEach((p, i) => {
+    if (p === magePl || p === victim) return;
+    const far = room0[(i + 2) % room0.length];
+    p.x = far.x + far.w / 2; p.y = far.y + far.h / 2; p.comp = far.name;
+  });
+  const box0 = M.sectionOf(0)[0];
+  victim.x = box0.x + box0.w / 2; victim.y = box0.y + box0.h / 2; victim.comp = box0.name;
+  magePl.x = victim.x + 40; magePl.y = victim.y; magePl.comp = box0.name;
   magePl.castReadyAt = 0;
   mage.send({ t: "cast", spell: "kula_ognia", ax: -1, ay: 0 });
   await wait(120);

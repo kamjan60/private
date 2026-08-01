@@ -1,179 +1,186 @@
 "use strict";
 /**
- * The wreck: fifteen compartments in three sections, one section per act.
+ * The wreck: fifteen compartments on three decks, joined by corridors.
  *
- * Compartments are sealed boxes joined by airlocks. There is no walkable
- * space between them: the void outside used to be open floor, which let
- * players drift off the ship and made a transit log something you could
- * simply route around.
+ * Corridors are not doors and not a loading screen -- they are rooms in
+ * their own right. They are long enough to be caught halfway down, they hold
+ * several people at once, and crucially **no camera looks into one**. That
+ * makes a corridor the only place on the ship where a killing has no witness
+ * but the walls, which is exactly the space a mage needs and exactly the
+ * space hunters should think twice about entering in company.
  *
- * Walls are solid on all four sides. A hatch is not a gap -- you press
- * against it, it takes you, and it puts you out the far side a couple of
- * seconds later. That delay is the point: nobody follows you through
- * instantly, and fleeing a fight costs the pursuer nothing to match.
+ * They are also logged. The sensors record who went in and who came out, so
+ * "two entered and one left" is the hardest evidence in the game -- and the
+ * disguise is the only thing that can lie about it.
+ *
+ * Everything here is derived from the room grid and a declared link list, so
+ * geometry cannot drift out of step with connectivity.
  */
 
 const { W, H } = require("./rules");
 
-const WALL = 8;           // wall thickness, also the collision margin
-const DOOR_W = 70;   // drawn width of a hatch; walls are solid regardless
+const WALL = 8;                 // wall thickness, also the collision margin
+const ROOM_W = 300, ROOM_H = 360;
+const GAP_X = 140, GAP_Y = 200; // corridor lengths
+const MARGIN = 80;
+const HALL = 76;                // corridor width
 
-const COMPARTMENTS = [
-  // ---------------------------------------------------- act I, pokład górny
-  { name: "Mostek",         section: 0, x: 60,   y: 60,   w: 340, h: 400 },
-  { name: "Ładownia",       section: 0, x: 440,  y: 60,   w: 380, h: 400 },
-  { name: "Mesa",           section: 0, x: 860,  y: 60,   w: 300, h: 400 },
-  { name: "Kwatery",        section: 0, x: 1200, y: 60,   w: 340, h: 400 },
-  { name: "Obserwatorium",  section: 0, x: 1580, y: 60,   w: 360, h: 400 },
+const COLS = 5, ROWS = 3;
+const colX = (i) => MARGIN + i * (ROOM_W + GAP_X);
+const rowY = (r) => MARGIN + r * (ROOM_H + GAP_Y);
 
-  // ---------------------------------------------------- act II, pokład dolny
-  { name: "Medyczny",       section: 1, x: 60,   y: 600,  w: 320, h: 400 },
-  { name: "Kaplica",        section: 1, x: 420,  y: 600,  w: 400, h: 400 },
-  { name: "Warsztat",       section: 1, x: 860,  y: 600,  w: 340, h: 400 },
-  { name: "Kriokomory",     section: 1, x: 1240, y: 600,  w: 320, h: 400 },
-  { name: "Maszynownia",    section: 1, x: 1600, y: 600,  w: 340, h: 400 },
-
-  // ---------------------------------------------------- act III, rdzeń
-  { name: "Reaktor",        section: 2, x: 60,   y: 1140, w: 380, h: 400 },
-  { name: "Archiwum",       section: 2, x: 480,  y: 1140, w: 320, h: 400 },
-  { name: "Śluza",          section: 2, x: 840,  y: 1140, w: 300, h: 400 },
-  { name: "Serwerownia",    section: 2, x: 1180, y: 1140, w: 360, h: 400 },
-  { name: "Zbrojownia",     section: 2, x: 1580, y: 1140, w: 360, h: 400 },
+const NAMES = [
+  ["Mostek", "Ładownia", "Mesa", "Kwatery", "Obserwatorium"],
+  ["Medyczny", "Kaplica", "Warsztat", "Kriokomory", "Maszynownia"],
+  ["Reaktor", "Archiwum", "Śluza", "Serwerownia", "Zbrojownia"]
 ];
+
+const COMPARTMENTS = [];
+for (let r = 0; r < ROWS; r++) {
+  for (let i = 0; i < COLS; i++) {
+    COMPARTMENTS.push({
+      name: NAMES[r][i], kind: "room", section: r,
+      x: colX(i), y: rowY(r), w: ROOM_W, h: ROOM_H, col: i, row: r
+    });
+  }
+}
 
 /**
- * The wreck's connectivity, declared rather than inferred.
- *
- * Every pair here becomes one airlock. Doors are derived from the geometry
- * of the pair, so the two hatches always line up and no compartment can end
- * up with a door that leads nowhere -- which is exactly what happened when
- * doors were hand-placed and the space between rooms was open void.
- *
- * Each section is a chain, and three shafts run down between sections so a
- * new act opens the deck below rather than a disconnected island.
+ * Connectivity. Each deck is a chain, and three shafts run down between
+ * decks so a new act opens the floor below rather than an island.
  */
-const LINKS = [
-  // deck by deck, west to east
-  ["Mostek", "Ładownia"], ["Ładownia", "Mesa"], ["Mesa", "Kwatery"],
-  ["Kwatery", "Obserwatorium"],
-  ["Medyczny", "Kaplica"], ["Kaplica", "Warsztat"], ["Warsztat", "Kriokomory"],
-  ["Kriokomory", "Maszynownia"],
-  ["Reaktor", "Archiwum"], ["Archiwum", "Śluza"], ["Śluza", "Serwerownia"],
-  ["Serwerownia", "Zbrojownia"],
-  // shafts down to the next deck
-  ["Mostek", "Medyczny"], ["Mesa", "Warsztat"], ["Obserwatorium", "Maszynownia"],
-  ["Medyczny", "Reaktor"], ["Warsztat", "Śluza"], ["Maszynownia", "Zbrojownia"]
-];
+const LINKS = [];
+for (let r = 0; r < ROWS; r++) {
+  for (let i = 0; i < COLS - 1; i++) LINKS.push([NAMES[r][i], NAMES[r][i + 1]]);
+}
+for (const i of [0, 2, 4]) {
+  for (let r = 0; r < ROWS - 1; r++) LINKS.push([NAMES[r][i], NAMES[r + 1][i]]);
+}
 
-const BY_NAME = new Map(COMPARTMENTS.map((c) => [c.name, c]));
+const ROOM_BY_NAME = new Map(COMPARTMENTS.map((c) => [c.name, c]));
 
-/** Where the two hatches of a link sit, and which way you face going through. */
-function makeDoor(aName, bName, i) {
-  const a = BY_NAME.get(aName), b = BY_NAME.get(bName);
+/** A corridor is named for what it joins, so a log entry reads as a place. */
+function makeCorridor([aName, bName]) {
+  const a = ROOM_BY_NAME.get(aName), b = ROOM_BY_NAME.get(bName);
   if (!a || !b) throw new Error(`link to nowhere: ${aName} - ${bName}`);
-  const horizontal = Math.abs((a.x + a.w / 2) - (b.x + b.w / 2)) >
-                     Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
-  if (horizontal) {
-    const left = a.x < b.x ? a : b, right = a.x < b.x ? b : a;
-    const y = Math.round(
-      (Math.max(left.y, right.y) + Math.min(left.y + left.h, right.y + right.h)) / 2
-    );
+  const name = `Łącznik ${aName}–${bName}`;
+
+  if (a.row === b.row) {
+    const left = a.col < b.col ? a : b, right = a.col < b.col ? b : a;
     return {
-      id: i, a: left.name, b: right.name, axis: "x",
-      ax: left.x + left.w, ay: y, bx: right.x, by: y
+      name, kind: "corridor", ends: [left.name, right.name], axis: "x",
+      // a corridor opens with the later of the two decks it touches
+      section: Math.max(a.section, b.section),
+      x: left.x + left.w, y: left.y + (ROOM_H - HALL) / 2, w: GAP_X, h: HALL
     };
   }
-  const top = a.y < b.y ? a : b, bottom = a.y < b.y ? b : a;
-  const x = Math.round(
-    (Math.max(top.x, bottom.x) + Math.min(top.x + top.w, bottom.x + bottom.w)) / 2
-  );
+  const top = a.row < b.row ? a : b, bottom = a.row < b.row ? b : a;
   return {
-    id: i, a: top.name, b: bottom.name, axis: "y",
-    ax: x, ay: top.y + top.h, bx: x, by: bottom.y
+    name, kind: "corridor", ends: [top.name, bottom.name], axis: "y",
+    section: Math.max(a.section, b.section),
+    x: top.x + (ROOM_W - HALL) / 2, y: top.y + top.h, w: HALL, h: GAP_Y
   };
 }
 
-const DOORS = LINKS.map(([a, b], i) => makeDoor(a, b, i));
-
-/** Both hatches of every lock this compartment touches, with the far side. */
-function doorsOf(name) {
-  const out = [];
-  for (const d of DOORS) {
-    if (d.a === name) out.push({ door: d, x: d.ax, y: d.ay, to: d.b });
-    if (d.b === name) out.push({ door: d, x: d.bx, y: d.by, to: d.a });
-  }
-  return out;
-}
+const CORRIDORS = LINKS.map(makeCorridor);
+const ZONES = COMPARTMENTS.concat(CORRIDORS);
+const BY_NAME = new Map(ZONES.map((z) => [z.name, z]));
 
 /**
- * The hatch this player is trying to walk through, if any.
- *
- * Walls are solid all the way round -- a hatch is not a gap you slip through
- * but a thing you press against and are then sealed inside.
+ * Openings, derived from geometry: wherever a corridor abuts a room, both
+ * lose that stretch of wall. Nothing is hand-placed, so a doorway cannot end
+ * up leading into vacuum.
  */
-function doorUnder(x, y, dx, dy, compName, reach) {
-  let best = null, bd = reach;
-  for (const h of doorsOf(compName)) {
-    const d = Math.hypot(h.x - x, h.y - y);
-    if (d > bd) continue;
-    // must actually be pushing outward through it, not brushing past
-    const nx = h.x - x, ny = h.y - y, l = Math.hypot(nx, ny) || 1;
-    if ((dx * nx + dy * ny) / l < 0.3) continue;
-    bd = d; best = h;
+const OPENINGS = new Map();     // zone name -> [{ side, from, to }]
+function opening(name, side, from, to) {
+  if (!OPENINGS.has(name)) OPENINGS.set(name, []);
+  OPENINGS.get(name).push({ side, from, to });
+}
+for (const c of CORRIDORS) {
+  const [n1, n2] = c.ends;
+  const r1 = ROOM_BY_NAME.get(n1), r2 = ROOM_BY_NAME.get(n2);
+  if (c.axis === "x") {
+    opening(r1.name, "e", c.y, c.y + c.h);
+    opening(c.name, "w", c.y, c.y + c.h);
+    opening(r2.name, "w", c.y, c.y + c.h);
+    opening(c.name, "e", c.y, c.y + c.h);
+  } else {
+    opening(r1.name, "s", c.x, c.x + c.w);
+    opening(c.name, "n", c.x, c.x + c.w);
+    opening(r2.name, "n", c.x, c.x + c.w);
+    opening(c.name, "s", c.x, c.x + c.w);
   }
-  return best;
 }
 
-function compartment(name) {
-  const c = BY_NAME.get(name);
-  if (!c) throw new Error(`unknown compartment: ${name}`);
-  return c;
+function zone(name) {
+  const z = BY_NAME.get(name);
+  if (!z) throw new Error(`unknown zone: ${name}`);
+  return z;
 }
+const compartment = zone;
+const isCorridor = (name) => { const z = BY_NAME.get(name); return !!z && z.kind === "corridor"; };
+const sectionOf = (act) => COMPARTMENTS.filter((c) => c.section === act);
 
-function sectionOf(act) { return COMPARTMENTS.filter((c) => c.section === act); }
-
-/** Which compartment contains this point, or null for the corridors. */
+/** Which zone contains this point -- room or corridor -- or null for hull. */
 function compartmentAt(x, y) {
-  for (const c of COMPARTMENTS) {
-    if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) return c;
+  for (const z of ZONES) {
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return z;
   }
   return null;
 }
 
 /**
- * A compartment's walls: four solid sides, no gaps.
- *
- * Hatches are not holes. You walk up to one, it takes you, and it puts you
- * out the other side a couple of seconds later -- so there is nothing here
- * for a body to slip through, and no void outside to slip into.
+ * A zone's walls, with its openings cut out. `sealed` closes them again --
+ * that is Rygiel, Zawał, the base's doors, and a deck that has not opened.
  */
-function wallsOf(c) {
-  return [
-    { x1: c.x, y1: c.y, x2: c.x + c.w, y2: c.y },
-    { x1: c.x, y1: c.y + c.h, x2: c.x + c.w, y2: c.y + c.h },
-    { x1: c.x, y1: c.y, x2: c.x, y2: c.y + c.h },
-    { x1: c.x + c.w, y1: c.y, x2: c.x + c.w, y2: c.y + c.h }
-  ];
+function wallsOf(z, sealed) {
+  const segs = [];
+  const sides = {
+    n: { fixed: z.y, from: z.x, to: z.x + z.w, horizontal: true },
+    s: { fixed: z.y + z.h, from: z.x, to: z.x + z.w, horizontal: true },
+    w: { fixed: z.x, from: z.y, to: z.y + z.h, horizontal: false },
+    e: { fixed: z.x + z.w, from: z.y, to: z.y + z.h, horizontal: false }
+  };
+  const holes = sealed ? [] : (OPENINGS.get(z.name) || []);
+  for (const [side, s] of Object.entries(sides)) {
+    const gaps = holes.filter((h) => h.side === side)
+      .map((h) => [h.from, h.to]).sort((a, b) => a[0] - b[0]);
+    let cursor = s.from;
+    for (const [gs, ge] of gaps) {
+      if (gs > cursor) segs.push(seg(s, cursor, gs));
+      cursor = Math.max(cursor, ge);
+    }
+    if (cursor < s.to) segs.push(seg(s, cursor, s.to));
+  }
+  return segs;
+}
+
+function seg(s, from, to) {
+  return s.horizontal
+    ? { x1: from, y1: s.fixed, x2: to, y2: s.fixed }
+    : { x1: s.fixed, y1: from, x2: s.fixed, y2: to };
 }
 
 /**
- * Can a body of radius `r` stand at (x, y)?
+ * Can a body of radius `r` stand here?
  *
- * `state` supplies what is currently shut: `state.sealed` is a Set of
- * compartment names, `state.walls` is a list of temporary Mur / Kotwica
- * segments. Only compartments in an unlocked section are solid -- locked
- * sections are handled by keeping players out of them entirely.
+ * Only zones are floor; the space around them is hull and vacuum, so nobody
+ * walks off the ship and no shove can put them there. A zone whose deck has
+ * not opened yet is closed, which is how an act unlocks its section without
+ * needing a separate gate.
  */
 function free(x, y, r, state) {
   if (x < r || y < r || x > W - r || y > H - r) return false;
-  // Only compartments are floor. Everything else is hull and vacuum, and a
-  // shove must not be able to put a body out there.
-  if (!compartmentAt(x, y)) return false;
-  for (const c of COMPARTMENTS) {
-    // cheap reject: only the compartments we are near can block us
-    if (x < c.x - r - WALL || x > c.x + c.w + r + WALL) continue;
-    if (y < c.y - r - WALL || y > c.y + c.h + r + WALL) continue;
-    for (const s of wallsOf(c)) {
+  const here = compartmentAt(x, y);
+  if (!here) return false;
+  if (state && typeof state.act === "number" && here.section > state.act) return false;
+
+  for (const z of ZONES) {
+    if (x < z.x - r - WALL || x > z.x + z.w + r + WALL) continue;
+    if (y < z.y - r - WALL || y > z.y + z.h + r + WALL) continue;
+    const shut = (state && state.sealed && state.sealed.has(z.name)) ||
+      (state && typeof state.act === "number" && z.section > state.act);
+    for (const s of wallsOf(z, shut)) {
       if (segmentHit(x, y, r + WALL / 2, s)) return false;
     }
   }
@@ -192,17 +199,17 @@ function segmentHit(px, py, r, s) {
   return (px - cx) ** 2 + (py - cy) ** 2 < r * r;
 }
 
-/** A spawn point inside a compartment, clear of its walls. */
-function spawnIn(c, rand = Math.random) {
-  const pad = 40;
+/** A spawn point well inside a zone, clear of its walls. */
+function spawnIn(z, rand = Math.random) {
+  const pad = Math.min(40, Math.min(z.w, z.h) / 3);
   return {
-    x: Math.round(c.x + pad + rand() * (c.w - pad * 2)),
-    y: Math.round(c.y + pad + rand() * (c.h - pad * 2))
+    x: Math.round(z.x + pad + rand() * (z.w - pad * 2)),
+    y: Math.round(z.y + pad + rand() * (z.h - pad * 2))
   };
 }
 
 module.exports = {
-  COMPARTMENTS, LINKS, DOORS, WALL, DOOR_W,
-  compartment, compartmentAt, sectionOf, wallsOf, free, spawnIn,
-  doorsOf, doorUnder, makeDoor
+  COMPARTMENTS, CORRIDORS, ZONES, LINKS, OPENINGS,
+  WALL, ROOM_W, ROOM_H, HALL,
+  zone, compartment, compartmentAt, isCorridor, sectionOf, wallsOf, free, spawnIn
 };

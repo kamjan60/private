@@ -27,7 +27,7 @@ const T = require("./src/tribunal");
 const B = require("./src/base");
 const { readLog, readResidue, readCorpse } = require("./src/evidence");
 const { snapshotFor } = require("./src/snapshot");
-const { compartmentAt, free, COMPARTMENTS, DOORS, wallsOf } = require("./src/map");
+const { compartmentAt, free, ZONES, wallsOf } = require("./src/map");
 const { CLASSES, CLASS_NAMES, itemsOf } = require("./src/classes");
 const { SPELLS, SCHOOLS, PRESETS } = require("./src/spells");
 
@@ -263,11 +263,10 @@ wss.on("connection", (ws) => {
         spells: SPELLS, schools: SCHOOLS, presets: PRESETS, slots: RULES.BOOK_SLOTS,
         // the map is public knowledge: it is the wreck, not information
         // about anybody in it, and the renderer needs the geometry
-        map: COMPARTMENTS.map((c) => ({
-          name: c.name, section: c.section, x: c.x, y: c.y, w: c.w, h: c.h,
-          walls: wallsOf(c)
+        map: ZONES.map((z) => ({
+          name: z.name, kind: z.kind, section: z.section,
+          x: z.x, y: z.y, w: z.w, h: z.h, walls: wallsOf(z, false)
         })),
-        doors: DOORS,
         w: RULES.W, h: RULES.H
       });
       broadcast(room, lobbyMsg(room));

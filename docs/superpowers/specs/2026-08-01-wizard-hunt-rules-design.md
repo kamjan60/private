@@ -78,21 +78,28 @@ W każdym akcie cztery z pięciu przedziałów sekcji dostają artefakt.
 | Pokład dolny (akt II) | Medyczny, Kaplica, Warsztat, Kriokomory, Maszynownia |
 | Rdzeń (akt III) | Reaktor, Archiwum, Śluza, Serwerownia, Ładownia rdzenia |
 
-Przedział jest szczelnym pudełkiem. **Między przedziałami nie ma podłogi** —
-na zewnątrz jest kadłub i próżnia, i nawet Podmuch nie wypchnie tam ciała.
+Poza przedziałami są jeszcze **korytarze** — po jednym na każde połączenie,
+osiemnaście sztuk. Tylko te strefy są podłogą; wokół nich jest kadłub i
+próżnia, więc nikt nie zejdzie ze statku i żaden Podmuch nikogo tam nie
+wypchnie.
 
-Pomieszczenia łączą **śluzy**. Wchodzisz we właz i zostajesz w nim zamknięty
-na 2.5 s, zanim otworzy się druga strona. W środku jesteś w żadnym z
-przedziałów: nikt cię nie widzi, nie ogłuszy, nie trafi i nie zwiąże — i ty
-też nikogo.
+Korytarz **nie jest drzwiami ani ekranem ładowania**. To pełnoprawne
+pomieszczenie: dość długie, żeby dać się w nim dopaść w połowie, dość
+szerokie na kilka osób — i **nie patrzy w nie żadna kamera**. To czyni go
+jedynym miejscem na statku, gdzie zabójstwo nie ma świadka poza ścianami.
+Dokładnie tego potrzebuje mag, i dokładnie dlatego łowca powinien się dwa
+razy zastanowić, zanim wejdzie tam w czyimś towarzystwie.
 
-To opóźnienie jest sensem mechaniki. Nikt nie wejdzie za tobą natychmiast,
-ucieczka z walki kosztuje ścigającego dokładnie tyle samo, a każda zmiana
-pomieszczenia jest aktem, który zapisuje **obie połówki rejestru**: wyjście w
-chwili, gdy właz cię bierze, i wejście dopiero gdy się otwiera.
+**Wejście do korytarza zatrzaskuje oba włazy** na 2.6 s. Nikt za tobą nie
+wejdzie i ty nie wyjdziesz — więc jeśli mag wszedł za tobą, jesteś z nim
+zamknięty, a jeśli to ty weszłeś za nim, była to twoja decyzja.
 
-Rygiel i Zawał zamykają włazy przedziału — i to jest to, za co warto na nie
-wydać ładunek.
+Korytarze są logowane jak wszystko inne, i to czyni je groźnymi w obie
+strony. **„Weszło dwóch, wyszedł jeden"** to najtwardszy dowód w tej grze —
+a przebranie jest jedyną rzeczą, która potrafi o tym skłamać.
+
+Rygiel zamyka otwory strefy. Zawał grzebie pomieszczenie na stałe, ale
+odmawia korytarza: przecięcie statku na pół zablokowałoby rundę.
 
 ---
 
