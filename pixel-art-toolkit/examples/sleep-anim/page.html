@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<title>Sleep — 40×48, 8 klatek</title>
+<style>
+  :root{
+    --bg:#16122a; --bg2:#0c0918; --panel:#1e1938; --line:rgba(176,160,232,0.22);
+    --ink:#e9e4f8; --ink-dim:#9d94bd; --accent:#b0a0e8;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f4f1fc; --bg2:#e8e3f7; --panel:#ffffff; --line:rgba(106,92,168,0.18);
+           --ink:#221b3a; --ink-dim:#655b87; --accent:#6a5ca8; }
+  }
+  :root[data-theme="dark"]{ --bg:#16122a; --bg2:#0c0918; --panel:#1e1938; --line:rgba(176,160,232,0.22);
+    --ink:#e9e4f8; --ink-dim:#9d94bd; --accent:#b0a0e8; }
+  :root[data-theme="light"]{ --bg:#f4f1fc; --bg2:#e8e3f7; --panel:#ffffff; --line:rgba(106,92,168,0.18);
+    --ink:#221b3a; --ink-dim:#655b87; --accent:#6a5ca8; }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    background:radial-gradient(ellipse 90% 55% at 50% 0%, var(--bg2), var(--bg));
+    color:var(--ink); font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; padding:clamp(20px,4vw,48px);
+  }
+  .wrap{ width:100%; max-width:840px; display:flex; flex-direction:column; gap:26px; }
+
+  header h1{ font-size:clamp(21px,3vw,27px); margin:0 0 6px; text-wrap:balance; }
+  header p{ margin:0; color:var(--ink-dim); font-size:14.5px; max-width:68ch; line-height:1.55; }
+
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 24px; }
+  .panel h2{ font-size:12px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 16px; font-weight:600; }
+
+  /* 8-frame strip, 40x48 logical. Pixel offsets, one container width per
+     frame - percentages in background-position resolve against
+     (container - image) width and scatter the strip. */
+  .zz{
+    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAAwCAYAAABgxaPfAAAE8ElEQVR4nO2bL2wUQRTG5zBUViAaNAIFlbiz5BQSkoYgUBWQoCoPV0kQKEQForKqqa2rPFAn0E1FxcmiFrV0mZvZnT9vZr/Z+X7JiTY7s2+/92fezN4pRQghhBBCCCGEEEIImTKzsQ0gpAYOD04b/X/ffrxm/hFC6sNUEEl+uAKBw85hehwenDb0IQZ0QmEwecqFvnOHCz/Zgtum/zk7uWn0z9g22aDv4kilHytqAbBzcOPs5KZ59W4PUid2NOEw/hOC3kWwc3ADzW8knhyxz6qqgdZFsHPoB81fJWJaPMbWNFfXx8DpwGTCTAYb9FcaEHTlwp8Rbp/sIGuDfnxRItRQiFKCE9UuBKhNPdTq62wtJUJbbaKkLV8uUH01BRDjrWZ/Z3nomgXWQUyALvRVXhD0Ro/JYqm1rfYBTaNSji6mALWdMHTuMNSoTuj3MG6vm0b/xM6ZrM1lW20HYdtTA6YEefR4Nvp2k76X4fa6aWL9OUlHIAZ+CxNgPCQSJhY2BjJI+bIK4RECv4UJMA5IMUDCoR89kTgnIOVC/9tJcaaWkhT2TbaScqXIA/JxA2PAD3S9UsSayMN2DUMQEN2RUwZJe+TijAaS34oFpYUurbWfCtS5POgzAShi3dD/25Sw+CLblotJboGnBLq23Dr1g6wPjwgm/BJkaqAmEpPIDKq/Sge9ISDCcJtSJiVsgUtGSldWUHC44m1DTepFurOuNniYROXDbWZ9MG+F4RalPOizPHAbP2Ho1HJhYuaFOgeyXm1GF85mA2oSIWimlLs+CPYi2OBLCTbrvh/T5lT39tpDr1eb5un+rnVMyfvzoWdLydXFndW5L17ujGJTq8cUz9nG9DUKLhqUnM9KuT1j9EMdH622kvf9h+fq+9ef//4+Ot7PKl5fQRkiVcFpnWGyre+eput39+5UygS+urhrnjx7qH7/+uM9NnfBNsWfTs74ky6uLNZpCRK2G3Td4LJ1C7brpZ3bFovQJNSLjWQyx9qWai7bvCGrf0r9lLqPF1s82fC9XorFfOm8EJ9fLkcpci425rJNrwc59PMa1AaSLYi6SfP2zWejYUNz+LJebZrNzY5Syj/hWoFN4kkVmdB5us63OVfaRt/Ockg/6U7VJ3ZstknHn+2+pnunGOdDW2B87qUXIf166SYGVr/QQ8jFfNmYKrnL1sWFq4u7xrRN9Fk9bDauVxvj3L72xdjWtc80TsK+VPrZ5g4hNF76fBtvlfleLnPbfGqzV9rGEPtQbLPZ5zuHM6bg871RqiIoUWD6xsUksG1szGJiGittI4p+LUPx51pwXOaNwZSMruO6z5CqyIQUtJxFUJ/XNU9Cxyml1APXC024tJoor/tR7FjMl82nj1+Cx8eMlQRBzzb+EF4SLObLppsP+t99nF8uZ12/nl8uZ6mKjG6TaUvrc70UJv1c/arrpW/z+4gqgC43QQhOpXDsiA2gsQ7LdRD0TLkd80VPQp8iFlM8fRnqUnW/hna1vsDrJ30GU8IZoMQZls22EPt4BuhP6vhzuVfftTwD9LfNZp/vHEoJvwXWDVEqz1u42DetiG+Bh+xDsDGHfl1Q4890X9O9U4wLYejNbui1EuTWT/R7gFLXh8LvAY47b+rvAbagxp+OTyfC7wFuk0O/JL8E0eEvQe6R+CXIGDa6UvsvQUhZMDAAQPwtMCE18BcLh93SZhJ4YAAAAABJRU5ErkJggg==");
+    background-repeat:no-repeat; image-rendering:pixelated; display:block;
+  }
+  .zz.xl{ width:240px; height:288px; background-size:1920px 288px;
+          animation:dozeXL 1.6s steps(1) infinite; }
+  .zz.md{ width:120px; height:144px; background-size:960px 144px;
+          animation:dozeMD 1.6s steps(1) infinite; }
+
+  @keyframes dozeXL{
+    0%{background-position-x:0;}        12.5%{background-position-x:-240px;}
+    25%{background-position-x:-480px;}  37.5%{background-position-x:-720px;}
+    50%{background-position-x:-960px;}  62.5%{background-position-x:-1200px;}
+    75%{background-position-x:-1440px;} 87.5%{background-position-x:-1680px;}
+  }
+  @keyframes dozeMD{
+    0%{background-position-x:0;}       12.5%{background-position-x:-120px;}
+    25%{background-position-x:-240px;} 37.5%{background-position-x:-360px;}
+    50%{background-position-x:-480px;} 62.5%{background-position-x:-600px;}
+    75%{background-position-x:-720px;} 87.5%{background-position-x:-840px;}
+  }
+
+  .stage{
+    display:flex; justify-content:center; padding:20px 10px;
+    background:radial-gradient(ellipse 55% 70% at 50% 78%, rgba(176,160,232,0.14), transparent 70%);
+    border-radius:12px;
+  }
+  .hero{ display:flex; align-items:center; gap:30px; flex-wrap:wrap; }
+  .hero dl{ margin:0; display:grid; grid-template-columns:auto auto; gap:6px 18px; font-size:13px; }
+  .hero dt{ color:var(--ink-dim); }
+  .hero dd{ margin:0; font-variant-numeric:tabular-nums; }
+
+  .strip{ overflow-x:auto; }
+  .strip img{ image-rendering:pixelated; width:960px; height:144px; display:block;
+    background:repeating-conic-gradient(#ffffff0d 0% 25%, transparent 0% 50%) 0 0/16px 16px;
+    border-radius:8px; }
+
+  @media (prefers-reduced-motion: reduce){ .zz{ animation-play-state:paused; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sleep — 40×48, pętla 8 klatek</h1>
+    <p>Przeciwwaga dla kuli ognia i błyskawicy: tamte są szybkie, kontrastowe i nasycone, ta ma czytać się wolno i miękko — stonowana lawendowa rampa, 200 ms na klatkę, ruch który dryfuje zamiast strzelać. Trzy „Z" niosą całe zaklęcie, rozstawione co trzecią część pętli, żeby zawsze któreś było w połowie wznoszenia.</p>
+  </header>
+
+  <section class="panel">
+    <div class="stage"><div class="zz xl"></div></div>
+  </section>
+
+  <section class="panel hero">
+    <div class="zz md"></div>
+    <dl>
+      <dt>Rozdzielczość</dt><dd>40 × 48 px</dd>
+      <dt>Klatki</dt><dd>8</dd>
+      <dt>Tempo</dt><dd>200 ms / klatkę</dd>
+      <dt>Kolory</dt><dd>7</dd>
+      <dt>Glify</dt><dd>3 × Z, faza co 1/3</dd>
+      <dt>Krąg</dt><dd>elipsa + przerywana runa</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Sprite sheet — 8 × 1, surowy</h2>
+    <div class="strip">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAAwCAYAAABgxaPfAAAE8ElEQVR4nO2bL2wUQRTG5zBUViAaNAIFlbiz5BQSkoYgUBWQoCoPV0kQKEQForKqqa2rPFAn0E1FxcmiFrV0mZvZnT9vZr/Z+X7JiTY7s2+/92fezN4pRQghhBBCCCGEEEIImTKzsQ0gpAYOD04b/X/ffrxm/hFC6sNUEEl+uAKBw85hehwenDb0IQZ0QmEwecqFvnOHCz/Zgtum/zk7uWn0z9g22aDv4kilHytqAbBzcOPs5KZ59W4PUid2NOEw/hOC3kWwc3ADzW8knhyxz6qqgdZFsHPoB81fJWJaPMbWNFfXx8DpwGTCTAYb9FcaEHTlwp8Rbp/sIGuDfnxRItRQiFKCE9UuBKhNPdTq62wtJUJbbaKkLV8uUH01BRDjrWZ/Z3nomgXWQUyALvRVXhD0Ro/JYqm1rfYBTaNSji6mALWdMHTuMNSoTuj3MG6vm0b/xM6ZrM1lW20HYdtTA6YEefR4Nvp2k76X4fa6aWL9OUlHIAZ+CxNgPCQSJhY2BjJI+bIK4RECv4UJMA5IMUDCoR89kTgnIOVC/9tJcaaWkhT2TbaScqXIA/JxA2PAD3S9UsSayMN2DUMQEN2RUwZJe+TijAaS34oFpYUurbWfCtS5POgzAShi3dD/25Sw+CLblotJboGnBLq23Dr1g6wPjwgm/BJkaqAmEpPIDKq/Sge9ISDCcJtSJiVsgUtGSldWUHC44m1DTepFurOuNniYROXDbWZ9MG+F4RalPOizPHAbP2Ho1HJhYuaFOgeyXm1GF85mA2oSIWimlLs+CPYi2OBLCTbrvh/T5lT39tpDr1eb5un+rnVMyfvzoWdLydXFndW5L17ujGJTq8cUz9nG9DUKLhqUnM9KuT1j9EMdH622kvf9h+fq+9ef//4+Ot7PKl5fQRkiVcFpnWGyre+eput39+5UygS+urhrnjx7qH7/+uM9NnfBNsWfTs74ky6uLNZpCRK2G3Td4LJ1C7brpZ3bFovQJNSLjWQyx9qWai7bvCGrf0r9lLqPF1s82fC9XorFfOm8EJ9fLkcpci425rJNrwc59PMa1AaSLYi6SfP2zWejYUNz+LJebZrNzY5Syj/hWoFN4kkVmdB5us63OVfaRt/Ockg/6U7VJ3ZstknHn+2+pnunGOdDW2B87qUXIf166SYGVr/QQ8jFfNmYKrnL1sWFq4u7xrRN9Fk9bDauVxvj3L72xdjWtc80TsK+VPrZ5g4hNF76fBtvlfleLnPbfGqzV9rGEPtQbLPZ5zuHM6bg871RqiIoUWD6xsUksG1szGJiGittI4p+LUPx51pwXOaNwZSMruO6z5CqyIQUtJxFUJ/XNU9Cxyml1APXC024tJoor/tR7FjMl82nj1+Cx8eMlQRBzzb+EF4SLObLppsP+t99nF8uZ12/nl8uZ6mKjG6TaUvrc70UJv1c/arrpW/z+4gqgC43QQhOpXDsiA2gsQ7LdRD0TLkd80VPQp8iFlM8fRnqUnW/hna1vsDrJ30GU8IZoMQZls22EPt4BuhP6vhzuVfftTwD9LfNZp/vHEoJvwXWDVEqz1u42DetiG+Bh+xDsDGHfl1Q4890X9O9U4wLYejNbui1EuTWT/R7gFLXh8LvAY47b+rvAbagxp+OTyfC7wFuk0O/JL8E0eEvQe6R+CXIGDa6UvsvQUhZMDAAQPwtMCE18BcLh93SZhJ4YAAAAABJRU5ErkJggg==" alt="sleep spell sprite sheet, 8 klatek" />
+    </div>
+  </section>
+</div>
+</body>
+</html>
