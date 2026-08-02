@@ -29,6 +29,8 @@
   var ASSETS = {
     hunters: "assets/hunters.png",
     tiles: "assets/tiles.png",
+    props: "assets/props.png",
+    propsFx: "assets/props_fx.png",
     ogien: "assets/fireball.png",
     powietrze: "assets/lightning.png",
     woda: "assets/sleep.png",
@@ -53,6 +55,32 @@
   };
   var TILE = 32;
   var floorCache = {};
+  /** zone -> the lit fittings in it, drawn live rather than baked */
+  var emitCache = {};
+  var PROP_FRAMES = 4;
+
+  /**
+   * What each compartment is furnished with, by index into props.png.
+   *
+   * The rooms were named boxes of identical plating -- a diagram with labels.
+   * A bridge should have consoles and a chapel should have pews, so that
+   * "I was in the Kaplica" is a claim about somewhere you could actually
+   * picture rather than a word.
+   */
+  var ROOM_KIT = {
+    "Mostek": [0, 0, 1, 13], "Ładownia": [2, 2, 2, 3, 3], "Mesa": [13, 13, 4],
+    "Kwatery": [4, 4, 5, 5], "Obserwatorium": [1, 0, 14],
+    "Medyczny": [8, 13, 5], "Kaplica": [6, 6, 7], "Warsztat": [10, 10, 2, 11],
+    "Kriokomory": [8, 8, 8, 5], "Maszynownia": [11, 11, 3, 10],
+    "Reaktor": [12, 11, 11], "Archiwum": [14, 14, 14, 9], "Śluza": [5, 3, 11],
+    "Serwerownia": [9, 9, 9, 1], "Zbrojownia": [5, 5, 2, 10]
+  };
+  var HALL_KIT = [11, 5];
+  /** props that are themselves a light source, and what colour they cast */
+  var EMITTERS = {
+    0: "warm", 1: "cold", 7: "warm", 8: "cold", 9: "cold", 12: "warm", 15: "warm"
+  };
+  var LAMP = 15;
 
   var CLASS_ROW = {};
 
@@ -777,6 +805,23 @@
       }
     });
 
+    // the lit fittings, animating over the baked floor
+    var fxSheet = IMG.propsFx;
+    if (fxSheet.complete && fxSheet.naturalWidth) {
+      DEF.map.forEach(function (c) {
+        if (c.section > S.act) return;
+        var lst = emitCache[c.name];
+        if (!lst) return;
+        lst.forEach(function (o, i) {
+          // each fitting runs on its own offset, so a room never blinks in
+          // unison like a string of fairy lights
+          var f = Math.floor(Date.now() / 150 + i * 1.7 + c.name.length) % PROP_FRAMES;
+          ctx.drawImage(fxSheet, (o.prop * PROP_FRAMES + f) * TILE, 0, TILE, TILE,
+            o.x, o.y, TILE, TILE);
+        });
+      });
+    }
+
     (S.walls || []).forEach(function (w) {
       ctx.strokeStyle = "#8b6b3a"; ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
@@ -1152,17 +1197,29 @@
    * tile's own coordinates so a room looks worked-in without anybody
    * authoring a map, and looks the same every time it is drawn.
    */
+  /** A stable stream of numbers from a room's own name. */
+  function seedOf(name) {
+    var h = 2166136261;
+    for (var i = 0; i < name.length; i++) {
+      h ^= name.charCodeAt(i); h = (h * 16777619) >>> 0;
+    }
+    return function () { h = (1103515245 * h + 12345) & 0x7fffffff; return h / 0x7fffffff; };
+  }
+
   function floorFor(z) {
     if (floorCache[z.name] !== undefined) return floorCache[z.name];
-    var t = IMG.tiles;
+    var t = IMG.tiles, pr = IMG.props;
     if (!t.complete || !t.naturalWidth) return null;   // retry next frame
+    if (!pr.complete || !pr.naturalWidth) return null;
 
     var cvs = document.createElement("canvas");
     cvs.width = z.w; cvs.height = z.h;
     var g = cvs.getContext("2d");
     var hall = z.kind === "corridor";
-    for (var ty = 0; ty * TILE < z.h; ty++) {
-      for (var tx = 0; tx * TILE < z.w; tx++) {
+    var cols = Math.ceil(z.w / TILE), rows = Math.ceil(z.h / TILE);
+
+    for (var ty = 0; ty < rows; ty++) {
+      for (var tx = 0; tx < cols; tx++) {
         var hsh = ((tx * 73856093) ^ (ty * 19349663) ^ z.name.length * 83492791) >>> 0;
         var idx;
         if (hall) {
@@ -1170,7 +1227,7 @@
           // corridor is barely four tiles long, so "touches any edge" paints
           // the whole thing yellow.
           var along = z.w > z.h ? tx : ty;
-          var last = Math.ceil((z.w > z.h ? z.w : z.h) / TILE) - 1;
+          var last = (z.w > z.h ? cols : rows) - 1;
           idx = (along === 0 || along === last) ? 5 : 3 + (hsh % 2);
         } else {
           idx = hsh % 16 === 0 ? 6 : hsh % 23 === 0 ? 7 : hsh % 3;
@@ -1178,6 +1235,73 @@
         g.drawImage(t, idx * TILE, 0, TILE, TILE, tx * TILE, ty * TILE, TILE, TILE);
       }
     }
+
+    // ---------------------------------------------------------- furniture
+    var rnd = seedOf(z.name);
+    var kit = (hall ? HALL_KIT : ROOM_KIT[z.name] || [2, 3]).slice();
+
+    // Cells along the walls, one tile in. Furniture belongs against a wall:
+    // filling the middle would leave nowhere to walk and nowhere to fight.
+    var cells = [];
+    for (var x = 1; x < cols - 1; x++) { cells.push([x, 0]); cells.push([x, rows - 1]); }
+    for (var y = 1; y < rows - 1; y++) { cells.push([0, y]); cells.push([cols - 1, y]); }
+    if (!cells.length) cells.push([0, 0]);
+    for (var i = cells.length - 1; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1));
+      var tmp = cells[i]; cells[i] = cells[j]; cells[j] = tmp;
+    }
+
+    var placed = [];
+    for (var k = 0; k < kit.length && k < cells.length; k++) {
+      placed.push({ prop: kit[k], cx: cells[k][0] * TILE, cy: cells[k][1] * TILE });
+    }
+
+    // ---------------------------------------------------------- lighting
+    // Some rooms keep a working fixture, some do not. A wreck where every
+    // room is evenly lit is not a wreck; a wreck where none are is unplayable.
+    var lamps = hall ? (rnd() < 0.45 ? 1 : 0) : Math.floor(rnd() * 3);
+    for (var l = 0; l < lamps && cells.length > kit.length + l; l++) {
+      var c = cells[kit.length + l];
+      placed.push({ prop: LAMP, cx: c[0] * TILE, cy: c[1] * TILE });
+    }
+
+    // darken everything, then cut the light back in only where something is
+    // actually emitting
+    g.fillStyle = "rgba(3,5,10,0.40)";
+    g.fillRect(0, 0, z.w, z.h);
+
+    g.globalCompositeOperation = "lighter";
+    placed.forEach(function (o) {
+      var kind = EMITTERS[o.prop];
+      if (!kind) return;
+      var lx = o.cx + TILE / 2, ly = o.cy + TILE / 2;
+      var R = o.prop === LAMP ? 118 : 78;
+      var grad = g.createRadialGradient(lx, ly, 2, lx, ly, R);
+      if (kind === "warm") {
+        grad.addColorStop(0, "rgba(255,196,110,0.62)");
+        grad.addColorStop(0.45, "rgba(190,140,76,0.26)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+      } else {
+        grad.addColorStop(0, "rgba(120,200,255,0.5)");
+        grad.addColorStop(0.45, "rgba(70,135,185,0.2)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+      }
+      g.fillStyle = grad;
+      g.fillRect(lx - R, ly - R, R * 2, R * 2);
+    });
+    g.globalCompositeOperation = "source-over";
+
+    // Only the dead fittings are baked. Anything with a light on it is drawn
+    // live every frame instead: a console whose indicators never move reads
+    // as a sticker, not as equipment that is somehow still running.
+    placed.forEach(function (o) {
+      if (EMITTERS[o.prop]) return;
+      g.drawImage(pr, o.prop * TILE, 0, TILE, TILE, o.cx, o.cy, TILE, TILE);
+    });
+    emitCache[z.name] = placed
+      .filter(function (o) { return !!EMITTERS[o.prop]; })
+      .map(function (o) { return { prop: o.prop, x: z.x + o.cx, y: z.y + o.cy }; });
+
     floorCache[z.name] = cvs;
     return cvs;
   }

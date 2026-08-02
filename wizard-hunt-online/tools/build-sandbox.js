@@ -32,7 +32,7 @@ const driver = `__def("driver", function (module, exports, require) {\n` +
 
 // every asset the client asks for, inlined: an Artifact may not fetch
 const ASSET_FILES = {
-  hunters: "hunters.png", tiles: "tiles.png",
+  hunters: "hunters.png", tiles: "tiles.png", props: "props.png", propsFx: "props_fx.png",
   ogien: "fireball.png", powietrze: "lightning.png", woda: "sleep.png",
   ziemia: "fx_earth.png", mrok: "fx_dark.png", swiatlo: "fx_light.png"
 };
