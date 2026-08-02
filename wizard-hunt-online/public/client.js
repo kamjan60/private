@@ -30,6 +30,7 @@
     hunters: "assets/hunters.png",
     tiles: "assets/tiles.png",
     props: "assets/props.png",
+    walls: "assets/walls.png",
     propsFx: "assets/props_fx.png",
     ogien: "assets/fireball.png",
     powietrze: "assets/lightning.png",
@@ -58,6 +59,11 @@
   /** zone -> the lit fittings in it, drawn live rather than baked */
   var emitCache = {};
   var PROP_FRAMES = 4;
+  /** walls.png: one strip, three known rectangles. See make_walls.py. */
+  var WALL_TH = 12, WALL_L = 32, WALL_M = 8;
+  var WALL_H = [0, 0, WALL_L, WALL_TH];
+  var WALL_V = [WALL_L, 0, WALL_TH, WALL_L];
+  var WALL_C = [WALL_L + WALL_TH, 0, WALL_TH, WALL_TH];
 
   /**
    * What each compartment is furnished with, by index into props.png.
@@ -764,7 +770,7 @@
       if (c.section > S.act) return;                 // decks not yet open stay dark
       var hall = c.kind === "corridor";
       var floor = floorFor(c);
-      if (floor) ctx.drawImage(floor, c.x, c.y);
+      if (floor) ctx.drawImage(floor, c.x - WALL_M, c.y - WALL_M);
       else {
         ctx.fillStyle = hall ? "#0a0e18" : "#0d1320";
         ctx.fillRect(c.x, c.y, c.w, c.h);
@@ -776,12 +782,16 @@
       ctx.fillRect(c.x, c.y, c.w, c.h);
       var cd = cyc[c.name];
       var shutNow = cd && Date.now() >= cd.shutAt;
+      // the bulkheads themselves are baked into the floor bitmap now; only
+      // the "this is shut" accent is still drawn live
       var shut = sealed[c.name] || shutNow;
-      ctx.strokeStyle = shut ? "#b05a4a" : hall ? "#1c2740" : "#223050";
-      ctx.lineWidth = shut ? 4 : 3;
-      c.walls.forEach(function (w) {
-        ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
-      });
+      if (shut) {
+        ctx.strokeStyle = "#b05a4a";
+        ctx.lineWidth = 3;
+        c.walls.forEach(function (w) {
+          ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
+        });
+      }
       if (shut) {
         ctx.strokeStyle = "#b05a4a";
         ctx.strokeRect(c.x, c.y, c.w, c.h);
@@ -1212,9 +1222,17 @@
     if (!t.complete || !t.naturalWidth) return null;   // retry next frame
     if (!pr.complete || !pr.naturalWidth) return null;
 
+    var wl = IMG.walls;
+    if (!wl.complete || !wl.naturalWidth) return null;
+
+    // The canvas is grown by a margin on every side: a wall sits ON the
+    // zone's boundary, so half of it would fall outside a canvas cut to the
+    // zone exactly. Everything inside is offset by the same margin.
+    var M = WALL_M;
     var cvs = document.createElement("canvas");
-    cvs.width = z.w; cvs.height = z.h;
+    cvs.width = z.w + M * 2; cvs.height = z.h + M * 2;
     var g = cvs.getContext("2d");
+    g.translate(M, M);
     var hall = z.kind === "corridor";
     var cols = Math.ceil(z.w / TILE), rows = Math.ceil(z.h / TILE);
 
@@ -1301,6 +1319,31 @@
     emitCache[z.name] = placed
       .filter(function (o) { return !!EMITTERS[o.prop]; })
       .map(function (o) { return { prop: o.prop, x: z.x + o.cx, y: z.y + o.cy }; });
+
+    // ---------------------------------------------------------- bulkheads
+    // Stamped along the segments the server sent, which already have the
+    // doorways cut out of them, so an opening is simply a stretch with no
+    // wall stamped over it.
+    z.walls.forEach(function (w) {
+      var x1 = w.x1 - z.x, y1 = w.y1 - z.y, x2 = w.x2 - z.x, y2 = w.y2 - z.y;
+      if (y1 === y2) {
+        var y = y1 - WALL_TH / 2;
+        for (var x = x1; x < x2; x += WALL_L) {
+          var run = Math.min(WALL_L, x2 - x);
+          g.drawImage(wl, WALL_H[0], WALL_H[1], run, WALL_H[3], x, y, run, WALL_H[3]);
+        }
+      } else {
+        var x = x1 - WALL_TH / 2;
+        for (var yy = y1; yy < y2; yy += WALL_L) {
+          var run2 = Math.min(WALL_L, y2 - yy);
+          g.drawImage(wl, WALL_V[0], WALL_V[1], WALL_V[2], run2, x, yy, WALL_V[2], run2);
+        }
+      }
+    });
+    [[0, 0], [z.w, 0], [0, z.h], [z.w, z.h]].forEach(function (c) {
+      g.drawImage(wl, WALL_C[0], WALL_C[1], WALL_C[2], WALL_C[3],
+        c[0] - WALL_TH / 2, c[1] - WALL_TH / 2, WALL_C[2], WALL_C[3]);
+    });
 
     floorCache[z.name] = cvs;
     return cvs;
