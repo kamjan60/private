@@ -331,6 +331,23 @@ function makeDriver(onMessage, opts) {
       case "door": if (!human.alive || human.ejected) B.toggleDoor(room.base, room, String(m.room), t); break;
       case "light": if (!human.alive || human.ejected) B.light(room.base, room, String(m.room), t); break;
       case "again": if (timer) clearInterval(timer); reset(); break;
+
+      /**
+       * Range-only: end the current act now.
+       *
+       * The wreck goes dark across three ten-minute acts, and the things
+       * worth looking at on a handset -- the fog closing in, the lamps and
+       * chest lights staying lit while the bodies fade -- only show up in
+       * act III. Waiting twenty minutes on a phone to check a rendering
+       * change is not testing, it is a hostage situation.
+       *
+       * Winds the act clock back rather than setting the act directly, so
+       * advancement goes through the same path it does in a real round:
+       * artifacts left open are lost, the section opens, vision drops.
+       */
+      case "skipAct":
+        if (room.phase === "play") room.round.actStartedAt = t - RULES.ACT_MS - 1;
+        break;
     }
     flush();
   }

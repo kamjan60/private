@@ -135,6 +135,44 @@ const patch = `
     "<b>brak tu tylko ludzi po drugiej stronie</b>, więc trybunał głosuje losowo.";
   document.querySelector("#sEntry .card .row button").textContent = "Wejdź";
   document.getElementById("nick").value = "Ty";
+
+  /* Range controls, over the play view.
+     Three acts of ten minutes is the real round. On a handset, checking
+     whether the fog and the lit fittings look right in act III should not
+     cost twenty minutes of walking about, so the act clock gets a button.
+     The act still advances through the ordinary path, losses and all. */
+  /* Pinned to the left edge at mid height, and that placement is the third
+     attempt rather than a preference.
+       - floated under the HUD, it went straight through the "Artefakty
+         przepadły" banner, which appears exactly when you have been skipping
+         acts;
+       - appended into the HUD row, it moved as the row re-wrapped (measured
+         it jumping 46px to 76px between two taps), so a finger aimed at it
+         lands on the canvas instead and spawns the joystick.
+     Mid-left is out of the banner's way, out of the log's, out of the thumb
+     cluster bottom-right, and above all it does not move. */
+  var bar = document.createElement("div");
+  bar.id = "poligon";
+  bar.innerHTML = "<span>POLIGON</span><button id='pgAct'>AKT &#9654;</button>";
+  document.getElementById("sGame").appendChild(bar);
+  var css = document.createElement("style");
+  css.textContent =
+    "#poligon{position:absolute;left:6px;top:50%;transform:translateY(-50%);" +
+    "z-index:40;display:none;flex-direction:column;gap:5px;align-items:center;" +
+    "background:rgba(12,10,20,.82);border:1px solid #3a3050;border-radius:10px;" +
+    "padding:6px 5px}" +
+    "#sGame.on #poligon{display:flex}" +
+    "#poligon span{font:600 8px/1 system-ui;letter-spacing:.12em;color:#6d5d8d}" +
+    /* the surrounding HUD is pointer-events:none so touches fall through to
+       the canvas; the button has to opt back in, and only the button, or the
+       bar would eat movement drags that start near the left edge */
+    "#poligon button{pointer-events:auto;font:600 11px/1 system-ui;color:#cfe0ff;" +
+    "background:#1f1a33;border:1px solid #423463;border-radius:7px;" +
+    "padding:9px 7px;min-height:38px;min-width:38px}";
+  document.head.appendChild(css);
+  document.getElementById("pgAct").onclick = function () {
+    window.__sock.send(JSON.stringify({ t: "skipAct" }));
+  };
 })();
 </script>
 `;
