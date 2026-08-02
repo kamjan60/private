@@ -61,11 +61,17 @@
   /** zone -> the lit fittings in it, drawn live rather than baked */
   var emitCache = {};
   var PROP_FRAMES = 4;
-  /** walls.png: one strip, three known rectangles. See make_walls.py. */
-  var WALL_TH = 12, WALL_L = 32, WALL_M = 8;
-  var WALL_H = [0, 0, WALL_L, WALL_TH];
-  var WALL_V = [WALL_L, 0, WALL_TH, WALL_L];
-  var WALL_C = [WALL_L + WALL_TH, 0, WALL_TH, WALL_TH];
+  /**
+   * walls.png: a strip of known rectangles. See make_walls.py.
+   * Feature order: plain, viewport, screen, pipes, placard, vent, damage.
+   */
+  var WALL_TH = 12, WALL_L = 32, WALL_M = 8, WALL_N = 7;
+  var WALL_PLAIN = 0, WALL_VIEWPORT = 1;
+  /** features that may appear on any wall; a viewport needs open space */
+  var WALL_INNER = [2, 3, 4, 5, 6];
+  var wallH = function (i) { return [i * WALL_L, 0, WALL_L, WALL_TH]; };
+  var wallV = function (i) { return [WALL_L * WALL_N + i * WALL_TH, 0, WALL_TH, WALL_L]; };
+  var WALL_C = [WALL_L * WALL_N + WALL_TH * WALL_N, 0, WALL_TH, WALL_TH];
 
   /**
    * What each compartment is furnished with, by index into props.png.
@@ -1338,19 +1344,46 @@
     // Stamped along the segments the server sent, which already have the
     // doorways cut out of them, so an opening is simply a stretch with no
     // wall stamped over it.
-    z.walls.forEach(function (w) {
+    // Which side of this wall faces nothing? A viewport is only honest where
+    // there is genuinely open space beyond it, so the far side is sampled
+    // against the zone list rather than guessed from the room's position.
+    function openBeyond(wx, wy, nx, ny) {
+      var px = wx + nx * 40, py = wy + ny * 40;
+      for (var i = 0; i < DEF.map.length; i++) {
+        var o = DEF.map[i];
+        if (px >= o.x && px <= o.x + o.w && py >= o.y && py <= o.y + o.h) return false;
+      }
+      return true;
+    }
+
+    var wrnd = seedOf(z.name + "|walls");
+    z.walls.forEach(function (w, wi) {
       var x1 = w.x1 - z.x, y1 = w.y1 - z.y, x2 = w.x2 - z.x, y2 = w.y2 - z.y;
-      if (y1 === y2) {
-        var y = y1 - WALL_TH / 2;
-        for (var x = x1; x < x2; x += WALL_L) {
-          var run = Math.min(WALL_L, x2 - x);
-          g.drawImage(wl, WALL_H[0], WALL_H[1], run, WALL_H[3], x, y, run, WALL_H[3]);
+      var horiz = y1 === y2;
+      // outward normal: away from the middle of the zone
+      var nx = horiz ? 0 : (x1 < z.w / 2 ? -1 : 1);
+      var ny = horiz ? (y1 < z.h / 2 ? -1 : 1) : 0;
+
+      var from = horiz ? x1 : y1, to = horiz ? x2 : y2;
+      for (var a = from; a < to; a += WALL_L) {
+        var run = Math.min(WALL_L, to - a);
+        var feat = WALL_PLAIN;
+        // a partial run would cut a fitting in half, so those stay plain
+        if (run === WALL_L) {
+          var r = wrnd();
+          if (r > 0.62) {
+            var midX = z.x + (horiz ? a + WALL_L / 2 : x1);
+            var midY = z.y + (horiz ? y1 : a + WALL_L / 2);
+            var canWindow = openBeyond(midX, midY, nx, ny);
+            var pool = canWindow ? WALL_INNER.concat([WALL_VIEWPORT]) : WALL_INNER;
+            feat = pool[Math.floor(wrnd() * pool.length) % pool.length];
+          }
         }
-      } else {
-        var x = x1 - WALL_TH / 2;
-        for (var yy = y1; yy < y2; yy += WALL_L) {
-          var run2 = Math.min(WALL_L, y2 - yy);
-          g.drawImage(wl, WALL_V[0], WALL_V[1], WALL_V[2], run2, x, yy, WALL_V[2], run2);
+        var src = horiz ? wallH(feat) : wallV(feat);
+        if (horiz) {
+          g.drawImage(wl, src[0], src[1], run, src[3], a, y1 - WALL_TH / 2, run, src[3]);
+        } else {
+          g.drawImage(wl, src[0], src[1], src[2], run, x1 - WALL_TH / 2, a, src[2], run);
         }
       }
     });

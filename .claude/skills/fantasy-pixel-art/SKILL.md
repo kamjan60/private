@@ -143,9 +143,27 @@ A room of one flat fill is a diagram. Three things fix it:
    `lighter`. A room with nothing lit stays dark, and that contrast is the
    atmosphere.
 
-Bake floor, dead props and static pools into one cached canvas per room —
-tiling live is thousands of draw calls a frame. Draw only the lit fittings
+4. **Things bolted to the walls.** A plain riveted band all the way round is
+   still wallpaper. Cut the wall into runs and stamp a fitting on some of
+   them: a viewport, a wall screen, a pipe run, a stencilled placard, a vent,
+   a torn section with the wiring showing. Gate the ones that imply
+   something: a window only goes where there is genuinely open space beyond,
+   which you test by sampling a point past the wall rather than guessing from
+   the room's position. A run shorter than the tile stays plain, or the
+   fitting gets cut in half.
+
+Bake floor, walls, dead props and static pools into one cached canvas per
+room —
+tiling live is thousands of draw calls a frame. Grow that canvas by a margin
+on every side first: a wall sits *on* the boundary, so half its thickness
+falls outside a canvas cut to the room exactly. Draw only the lit fittings
 on top, live, so they can animate.
+
+**And give the space around the rooms something too.** Pure black is not a
+background, it is the absence of one — a very low contrast structural tile
+(frames, girders, conduit) reads as depth without ever competing with a lit
+room. Use a period that is *not* the floor tile's, or the two grids line up
+into one obvious lattice.
 
 ## Palette
 
