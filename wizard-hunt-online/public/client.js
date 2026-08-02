@@ -31,6 +31,7 @@
     tiles: "assets/tiles.png",
     props: "assets/props.png",
     walls: "assets/walls.png",
+    hull: "assets/void.png",
     propsFx: "assets/props_fx.png",
     ogien: "assets/fireball.png",
     powietrze: "assets/lightning.png",
@@ -56,6 +57,7 @@
   };
   var TILE = 32;
   var floorCache = {};
+  var hullPattern = null;
   /** zone -> the lit fittings in it, drawn live rather than baked */
   var emitCache = {};
   var PROP_FRAMES = 4;
@@ -759,6 +761,18 @@
     ctx.fillStyle = "#05070c";
     ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.setTransform(ZOOM, 0, 0, ZOOM, -CAM.x * ZOOM, -CAM.y * ZOOM);
+
+    // The hull's own structure behind everything: frames, girders and
+    // conduit runs. Pure black was not a background, it was the absence of
+    // one. Filled under the world transform so it scrolls with the camera
+    // instead of swimming against it.
+    if (!hullPattern && IMG.hull.complete && IMG.hull.naturalWidth) {
+      hullPattern = ctx.createPattern(IMG.hull, "repeat");
+    }
+    if (hullPattern) {
+      ctx.fillStyle = hullPattern;
+      ctx.fillRect(CAM.x, CAM.y, cv.width / ZOOM, cv.height / ZOOM);
+    }
 
     var sealed = {}, lit = {}, doused = {}, cyc = {};
     (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
