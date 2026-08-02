@@ -277,6 +277,50 @@ function bot(name, roomCode) {
     assert.ok(!("actors" in b.last.state), "the base must not get the field view");
   });
 
+  // ------------------------------------------------------------- illusions
+  // These three were all built server-side and thrown away by the client:
+  // the decoy, the Scout's sensor and the Marksman's tag were never drawn,
+  // and there was no way at all to tell that Cień was up.
+  const E = require("../src/effects");
+  const { snapshotFor } = require("../src/snapshot");
+
+  magePl.castReadyAt = 0;
+  magePl.book.push({ id: "sobowtor", charges: 2, school: "swiatlo" });
+  E.beginCast(room, magePl, "sobowtor", { x: 1, y: 0 }, Date.now(), {});
+  await wait(1200);
+
+  check("Sobowtór leaves a body on the field, and it walks", () => {
+    const d = room.markers.filter((m) => m.kind === "decoy");
+    assert.strictEqual(d.length, 1, "no decoy was created");
+    assert.ok(d[0].cls, "a decoy without a class cannot be mistaken for anybody");
+    assert.ok(typeof d[0].vx === "number", "a stationary twin fools nobody");
+  });
+
+  check("the decoy reaches the client", () => {
+    const s = snapshotFor(room, magePl, Date.now());
+    assert.ok((s.markers || []).some((m) => m.kind === "decoy"),
+      "the decoy must be serialised or it cannot be drawn");
+  });
+
+  magePl.castReadyAt = 0;
+  magePl.book.push({ id: "cien", charges: 2, school: "mrok" });
+  E.beginCast(room, magePl, "cien", { x: 1, y: 0 }, Date.now(), {});
+  await wait(900);
+
+  check("Cień hides you from others and tells you it is up", () => {
+    const mine = snapshotFor(room, magePl, Date.now());
+    const me = mine.actors.find((a) => a.id === magePl.id);
+    assert.ok(me, "you always see your own body");
+    assert.strictEqual(me.invisible, true,
+      "without this flag the only way to know the spell is up is to be shot at");
+
+    const other = [...room.players.values()].find((p) => p.id !== magePl.id && p.alive);
+    other.x = magePl.x + 20; other.y = magePl.y;
+    const theirs = snapshotFor(room, other, Date.now());
+    assert.ok(!theirs.actors.some((a) => a.id === magePl.id),
+      "an invisible body must be absent from everybody else's snapshot");
+  });
+
   // ------------------------------------------------------------- interrupt
   magePl.castReadyAt = 0;
   const cop = [...room.players.values()].find((p) => p.role !== "mage" && p.alive);

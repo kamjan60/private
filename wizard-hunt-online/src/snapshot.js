@@ -37,7 +37,11 @@ function actorView(o, now) {
     x: Math.round(o.x), y: Math.round(o.y), dir: o.dir, step: o.step,
     stunned: o.stunUntil > now, down: o.down,
     channel: o.channel ? o.channel.kind : null,
-    casting: !!o.windup
+    casting: !!o.windup,
+    // only ever true on your own body -- everyone else's is culled entirely
+    // before this runs. Without it the mage has no way to tell whether Cień
+    // is still up.
+    invisible: o.invisibleUntil > now
   };
 }
 
@@ -52,7 +56,19 @@ function silhouette(o) {
 
 function forLiving(room, me, now) {
   const r = visionOf(room, me, now);
-  const near = (o) => Math.hypot(o.x - me.x, o.y - me.y) <= r;
+  /** compartments this player's own drone is currently lighting up */
+  const droned = new Set(
+    room.markers
+      .filter((m) => m.kind === "drone" && m.by === me.id && m.until > now)
+      .map((m) => m.room)
+  );
+  const seen = (o) => {
+    if (Math.hypot(o.x - me.x, o.y - me.y) <= r) return true;
+    if (!droned.size) return false;
+    const c = compartmentAt(o.x, o.y);
+    return !!c && droned.has(c.name);
+  };
+  const near = seen;
 
   const actors = [];
   for (const o of room.players.values()) {

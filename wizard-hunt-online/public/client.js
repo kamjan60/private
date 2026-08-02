@@ -765,7 +765,40 @@
       }
     });
 
+    // Sensors under the bodies, decoys among them, tags over them. None of
+    // these were drawn at all before -- the server made them and the client
+    // threw them away, so the decoy, the Scout's sensor and the Marksman's
+    // tag simply did not exist on screen.
+    (S.markers || []).forEach(function (m) {
+      if (m.kind !== "sensor") return;
+      ctx.fillStyle = "#8cf096";
+      ctx.fillRect(m.x - 3, m.y - 3, 6, 6);
+      ctx.strokeStyle = "rgba(140,240,150,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 10 + Math.sin(Date.now() / 400) * 3, 0, 6.284);
+      ctx.stroke();
+    });
+
     (S.actors || []).forEach(function (a) { drawActor(a); });
+
+    (S.markers || []).forEach(function (m) {
+      if (m.kind === "decoy") {
+        // the twin renders as a real body, because one that shimmered would
+        // be useless: the whole job is to be mistaken for somebody
+        drawActor({
+          id: "decoy", name: "?", cls: m.cls, x: m.x, y: m.y,
+          dir: m.dir || 0, step: m.step || 0
+        }, 0.92);
+      } else if (m.kind === "tag") {
+        var t = null;
+        (S.actors || []).forEach(function (a) { if (a.id === m.targetId) t = a; });
+        if (!t) return;
+        ctx.strokeStyle = "#78d0ff"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(t.x, t.y - 6, 22, 0, 6.284); ctx.stroke();
+        ctx.fillStyle = "#78d0ff"; ctx.font = "10px system-ui";
+        ctx.fillText("ZNACZNIK", t.x - 24, t.y - 32);
+      }
+    });
 
     (S.pings || []).forEach(function (p) {
       ctx.strokeStyle = p.kind === "podejrzany" ? "#ff6b6b" : "#7ce8a8";
@@ -1004,9 +1037,14 @@
     return cvs;
   }
 
-  function drawActor(a) {
+  function drawActor(a, alpha) {
     var row = CLASS_ROW[a.cls] || 0;
     var dir = a.dir || 0;
+    // Cień: your own body goes see-through, because otherwise the only way to
+    // tell whether the spell is still up is to be shot at.
+    var fade = a.invisible ? 0.34 : (alpha === undefined ? 1 : alpha);
+    var prev = ctx.globalAlpha;
+    if (fade !== 1) ctx.globalAlpha = prev * fade;
     if (SHEET.complete && SHEET.naturalWidth) {
       ctx.drawImage(SHEET, (a.step ? 32 : 0), (row * 4 + dir) * 32, 32, 32,
         Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
@@ -1032,6 +1070,13 @@
     // at the same height read as one nonsense word
     var lift = 28 + (parseInt(String(a.id).replace(/\D/g, ""), 10) % 3) * 9;
     ctx.fillText(a.name, a.x - ctx.measureText(a.name).width / 2, a.y - lift);
+
+    if (a.invisible) {
+      ctx.fillStyle = "#c682ff";
+      ctx.font = "9px system-ui";
+      ctx.fillText("CIEŃ", a.x - 11, a.y + 22);
+    }
+    ctx.globalAlpha = prev;
   }
   requestAnimationFrame(draw);
   fit();

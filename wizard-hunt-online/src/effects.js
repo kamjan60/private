@@ -18,7 +18,7 @@ const {
   W, H
 } = require("./rules");
 const { spell } = require("./spells");
-const { compartmentAt, isCorridor } = require("./map");
+const { compartmentAt, isCorridor, free } = require("./map");
 const { addResidue, eraseLog, makeCorpse } = require("./evidence");
 const R = require("./round");
 
@@ -249,12 +249,19 @@ function apply(room, p, s, w, now, api) {
       if (asCls) { p.disguisedAs = asCls; p.disguiseUntil = now + s.durationMs; }
       break;
     }
-    case "decoy":
+    case "decoy": {
+      // "a copy of the mage walks off": a stationary twin fools nobody, so
+      // it inherits a heading and strolls until it fades
+      const len = Math.hypot(w.aim.x, w.aim.y) || 1;
+      const vx = (w.aim.x / len) * 1.15, vy = (w.aim.y / len) * 1.15;
       room.markers.push({
-        kind: "decoy", x: Math.round(at.x), y: Math.round(at.y),
+        kind: "decoy", x: Math.round(p.x), y: Math.round(p.y), vx, vy,
+        dir: Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 1 : 2) : (vy < 0 ? 3 : 0),
+        step: 0, phase: 0,
         cls: p.disguisedAs || p.cls, until: now + s.durationMs
       });
       break;
+    }
     case "blind": {
       const t = nearestTarget(room, p, range);
       if (t) t.blindUntil = now + s.durationMs;
@@ -302,6 +309,18 @@ function stepProjectiles(room, now, api) {
   });
 
   room.walls = room.walls.filter((w) => w.until > now);
+
+  // decoys walk, and stop at a wall rather than strolling into vacuum
+  for (const m of room.markers) {
+    if (m.kind !== "decoy" || !m.vx) continue;
+    if (free(m.x + m.vx, m.y + m.vy, 12, { sealed: new Set(), walls: [], act: room.round.act })) {
+      m.x += m.vx; m.y += m.vy;
+      m.phase += 1.15;
+      m.step = Math.floor(m.phase / 10) % 2;
+    } else {
+      m.vx = 0; m.vy = 0;
+    }
+  }
   room.markers = room.markers.filter((m) => m.until > now);
   room.pings = room.pings.filter((p) => p.until > now);
 }

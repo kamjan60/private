@@ -1749,7 +1749,7 @@ const {
   W, H
 } = require("./rules");
 const { spell } = require("./spells");
-const { compartmentAt, isCorridor } = require("./map");
+const { compartmentAt, isCorridor, free } = require("./map");
 const { addResidue, eraseLog, makeCorpse } = require("./evidence");
 const R = require("./round");
 
@@ -1980,12 +1980,19 @@ function apply(room, p, s, w, now, api) {
       if (asCls) { p.disguisedAs = asCls; p.disguiseUntil = now + s.durationMs; }
       break;
     }
-    case "decoy":
+    case "decoy": {
+      // "a copy of the mage walks off": a stationary twin fools nobody, so
+      // it inherits a heading and strolls until it fades
+      const len = Math.hypot(w.aim.x, w.aim.y) || 1;
+      const vx = (w.aim.x / len) * 1.15, vy = (w.aim.y / len) * 1.15;
       room.markers.push({
-        kind: "decoy", x: Math.round(at.x), y: Math.round(at.y),
+        kind: "decoy", x: Math.round(p.x), y: Math.round(p.y), vx, vy,
+        dir: Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 1 : 2) : (vy < 0 ? 3 : 0),
+        step: 0, phase: 0,
         cls: p.disguisedAs || p.cls, until: now + s.durationMs
       });
       break;
+    }
     case "blind": {
       const t = nearestTarget(room, p, range);
       if (t) t.blindUntil = now + s.durationMs;
@@ -2033,6 +2040,18 @@ function stepProjectiles(room, now, api) {
   });
 
   room.walls = room.walls.filter((w) => w.until > now);
+
+  // decoys walk, and stop at a wall rather than strolling into vacuum
+  for (const m of room.markers) {
+    if (m.kind !== "decoy" || !m.vx) continue;
+    if (free(m.x + m.vx, m.y + m.vy, 12, { sealed: new Set(), walls: [], act: room.round.act })) {
+      m.x += m.vx; m.y += m.vy;
+      m.phase += 1.15;
+      m.step = Math.floor(m.phase / 10) % 2;
+    } else {
+      m.vx = 0; m.vy = 0;
+    }
+  }
   room.markers = room.markers.filter((m) => m.until > now);
   room.pings = room.pings.filter((p) => p.until > now);
 }
@@ -2493,7 +2512,11 @@ function actorView(o, now) {
     x: Math.round(o.x), y: Math.round(o.y), dir: o.dir, step: o.step,
     stunned: o.stunUntil > now, down: o.down,
     channel: o.channel ? o.channel.kind : null,
-    casting: !!o.windup
+    casting: !!o.windup,
+    // only ever true on your own body -- everyone else's is culled entirely
+    // before this runs. Without it the mage has no way to tell whether Cień
+    // is still up.
+    invisible: o.invisibleUntil > now
   };
 }
 
@@ -2508,7 +2531,19 @@ function silhouette(o) {
 
 function forLiving(room, me, now) {
   const r = visionOf(room, me, now);
-  const near = (o) => Math.hypot(o.x - me.x, o.y - me.y) <= r;
+  /** compartments this player's own drone is currently lighting up */
+  const droned = new Set(
+    room.markers
+      .filter((m) => m.kind === "drone" && m.by === me.id && m.until > now)
+      .map((m) => m.room)
+  );
+  const seen = (o) => {
+    if (Math.hypot(o.x - me.x, o.y - me.y) <= r) return true;
+    if (!droned.size) return false;
+    const c = compartmentAt(o.x, o.y);
+    return !!c && droned.has(c.name);
+  };
+  const near = seen;
 
   const actors = [];
   for (const o of room.players.values()) {
@@ -3760,7 +3795,40 @@ module.exports = { makeDriver };
       }
     });
 
+    // Sensors under the bodies, decoys among them, tags over them. None of
+    // these were drawn at all before -- the server made them and the client
+    // threw them away, so the decoy, the Scout's sensor and the Marksman's
+    // tag simply did not exist on screen.
+    (S.markers || []).forEach(function (m) {
+      if (m.kind !== "sensor") return;
+      ctx.fillStyle = "#8cf096";
+      ctx.fillRect(m.x - 3, m.y - 3, 6, 6);
+      ctx.strokeStyle = "rgba(140,240,150,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 10 + Math.sin(Date.now() / 400) * 3, 0, 6.284);
+      ctx.stroke();
+    });
+
     (S.actors || []).forEach(function (a) { drawActor(a); });
+
+    (S.markers || []).forEach(function (m) {
+      if (m.kind === "decoy") {
+        // the twin renders as a real body, because one that shimmered would
+        // be useless: the whole job is to be mistaken for somebody
+        drawActor({
+          id: "decoy", name: "?", cls: m.cls, x: m.x, y: m.y,
+          dir: m.dir || 0, step: m.step || 0
+        }, 0.92);
+      } else if (m.kind === "tag") {
+        var t = null;
+        (S.actors || []).forEach(function (a) { if (a.id === m.targetId) t = a; });
+        if (!t) return;
+        ctx.strokeStyle = "#78d0ff"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(t.x, t.y - 6, 22, 0, 6.284); ctx.stroke();
+        ctx.fillStyle = "#78d0ff"; ctx.font = "10px system-ui";
+        ctx.fillText("ZNACZNIK", t.x - 24, t.y - 32);
+      }
+    });
 
     (S.pings || []).forEach(function (p) {
       ctx.strokeStyle = p.kind === "podejrzany" ? "#ff6b6b" : "#7ce8a8";
@@ -3999,9 +4067,14 @@ module.exports = { makeDriver };
     return cvs;
   }
 
-  function drawActor(a) {
+  function drawActor(a, alpha) {
     var row = CLASS_ROW[a.cls] || 0;
     var dir = a.dir || 0;
+    // Cień: your own body goes see-through, because otherwise the only way to
+    // tell whether the spell is still up is to be shot at.
+    var fade = a.invisible ? 0.34 : (alpha === undefined ? 1 : alpha);
+    var prev = ctx.globalAlpha;
+    if (fade !== 1) ctx.globalAlpha = prev * fade;
     if (SHEET.complete && SHEET.naturalWidth) {
       ctx.drawImage(SHEET, (a.step ? 32 : 0), (row * 4 + dir) * 32, 32, 32,
         Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
@@ -4027,6 +4100,13 @@ module.exports = { makeDriver };
     // at the same height read as one nonsense word
     var lift = 28 + (parseInt(String(a.id).replace(/\D/g, ""), 10) % 3) * 9;
     ctx.fillText(a.name, a.x - ctx.measureText(a.name).width / 2, a.y - lift);
+
+    if (a.invisible) {
+      ctx.fillStyle = "#c682ff";
+      ctx.font = "9px system-ui";
+      ctx.fillText("CIEŃ", a.x - 11, a.y + 22);
+    }
+    ctx.globalAlpha = prev;
   }
   requestAnimationFrame(draw);
   fit();
