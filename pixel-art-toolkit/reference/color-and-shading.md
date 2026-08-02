@@ -2,7 +2,7 @@
 
 Condensed from `willibrandon/pixel-plugin`'s `pixel-art-professional` skill docs
 (MIT licensed, Copyright (c) 2025 Brandon Williams — see ATTRIBUTION.md). That
-plugin applies this through Aseprite MCP tools; here it's just the technique
+plugin applied this through Aseprite MCP tools; here it is the technique only, plotted with Pillow
 knowledge, applied by hand in `pixel_lib.py` drawing code.
 
 ## Shading types

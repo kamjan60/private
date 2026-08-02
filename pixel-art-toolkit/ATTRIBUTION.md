@@ -37,3 +37,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+
+## Update, 2026-08
+
+The technique notes in `reference/` began as a distillation of that plugin's
+prose. They have since been rewritten around the pipeline actually used
+here — plotting pixels with Pillow, deterministic LCG seeding, sheet index
+contracts, and baked interior lighting — and the rules in the two skills
+(`fantasy-pixel-art`, `spell-fx`) are now derived from mistakes made and
+fixed in this repository rather than from the original text. The MIT notice
+above still stands for what was borrowed.

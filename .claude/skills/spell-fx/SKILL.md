@@ -9,7 +9,7 @@ description: >
   "status effect", "attack animation", or wants an existing effect
   restyled, retimed, or looped. Effects are generated procedurally with
   Python/Pillow — no external API, no Aseprite.
-version: 1.0.0
+version: 2.0.0
 ---
 
 # Spell FX Animation
@@ -109,6 +109,29 @@ Driven by `phase = f / FRAMES * 2π` the loop closes by construction. Check
 that any extra motion — drifting particles, orbiters — also completes a
 whole number of cycles.
 
+### 11. Draw order is anatomy here too
+
+A dust bed drawn as a **disc** before the shards rising out of it swallowed
+every shard, and the earth impact read as a brown blob. Ground haze belongs
+flat and low, laid down first; anything rising out of it is drawn after and
+above it. If a part of an effect vanishes, check the order before you touch
+the shape.
+
+### 12. Give every instance its own phase
+
+Several copies of one effect on a single clock pulse together and read as a
+single blinking object rather than several independent ones. Offset each by
+its index — `(now / step + i * k) % frames` — so a room full of guttering
+fittings never blinks in unison.
+
+### 13. Static and animated parts belong in different sheets
+
+When an effect sits on something that gets pre-rendered — a floor, a cached
+background — split it: the dead parts bake into the cache, the lit parts
+draw live on top from a second sheet laid out `(item * frames + frame)`.
+Baking an animated element freezes it, and drawing everything live throws
+away the cache.
+
 ## Timing
 
 | Effect | ms/frame | Frames |
@@ -165,6 +188,16 @@ needs its own keyframe set.
 
 Always pair the animation with a `prefers-reduced-motion` rule that pauses
 it.
+
+## Verify in place, not in isolation
+
+An effect that reads perfectly on a contact sheet can disappear in the game:
+a lighting pass, a fog vignette or a dark floor will eat a subtle one.
+Screenshot it where it will actually be seen before calling it done.
+
+See the sister skill **fantasy-pixel-art** for sprites, tiles, props and
+baked interior lighting; the rules about draw order, deterministic seeds and
+sheet index contracts are shared between them.
 
 ## Troubleshooting
 
