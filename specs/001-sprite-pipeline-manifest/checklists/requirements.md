@@ -65,6 +65,16 @@ asked:
 3. Whether stages 3–5 ship together with 1–2. Default: no. The user said
    1 and 2 first, and stated the rest were "dalsze etapy".
 
+**Amended after Phase 0 research.** The spec asserted that Act III dims the
+sprites. It does not — it shrinks the vision radius, and the compartment
+wash is drawn before the actors so it never touches them. The only thing
+that dims a hunter is the fog. User Story 2's outcome survived the
+correction unchanged, which is the argument for writing acceptance criteria
+against observable brightness rather than against a mechanism; the "why"
+paragraph, one acceptance scenario, FR-011 and SC-004 did not, and were
+corrected. A second defect surfaced in the same read and is recorded as
+out-of-scope FR-011a rather than absorbed silently.
+
 **One thing the spec asserts that is worth challenging at planning time**:
 FR-012 (the emissive layer must still obey invisibility). It is written as
 a constraint because getting it wrong silently breaks Cień — an unshaded

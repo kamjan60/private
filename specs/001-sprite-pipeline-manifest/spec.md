@@ -55,20 +55,28 @@ W Akcie III wrak ciemnieje. Gracz nadal widzi, że lampka na piersi łowcy się
 Ciemność robi się **gęstsza**, a nie po prostu bardziej szara.
 
 **Why this priority**: Akt III to mechanika, wokół której zbudowana jest cała
-końcówka rundy, a dziś przygaszenie zjada również to, co ma świecić. Przez to
+końcówka rundy, a dziś lampka gaśnie razem z ciałem, które ją niesie. Przez to
 najciemniejszy akt czyta się jak akt pierwszy z filtrem, zamiast jak wrak bez
 prądu. Poprawka jest widoczna natychmiast i nie rusza żadnej zasady gry.
 
-**Independent Test**: Wejść w przygaszony przedział i porównać jasność
-pikseli emisyjnych z jasnością korpusu tej samej postaci. Bez zmiany są
-przygaszone tym samym współczynnikiem; po zmianie korpus ciemnieje, a piksele
+> **Sprostowanie z fazy badawczej**: pierwsza wersja tej historii mówiła, że
+> to akt przygasza sylwetki. Nieprawda — akt jedynie zawęża promień widzenia,
+> a wygaszenie przedziału (Zgaszenie) dotyka podłogi, nie ludzi na niej.
+> Jedyne, co przygasza łowcę, to mgła, i robi to płasko: lampa na skraju
+> widzenia blaknie dokładnie tak szybko jak ciało, które ją trzyma. Skutek
+> opisany w tej historii zostaje bez zmian, przyczyna była nazwana błędnie.
+> Szczegóły w [research.md](./research.md), R1.
+
+**Independent Test**: Stanąć tak, by inny łowca był na skraju widzenia, i
+porównać jasność jego pikseli emisyjnych z jasnością jego korpusu. Bez zmiany
+mgła przygasza jedno i drugie tak samo; po zmianie korpus blaknie, a piksele
 emisyjne zostają.
 
 **Acceptance Scenarios**:
 
-1. **Given** przedział przygaszony przez akt lub przez Zgaszenie, **When**
-   rysowany jest łowca, **Then** jego elementy emisyjne mają pełną jasność,
-   a reszta sylwetki jest przygaszona.
+1. **Given** łowca na skraju promienia widzenia, **When** jest rysowany,
+   **Then** jego elementy emisyjne mają pełną jasność, a reszta sylwetki jest
+   przygaszona przez mgłę.
 2. **Given** przedział w pełnym świetle, **When** rysowany jest ten sam
    łowca, **Then** wygląda tak jak dotychczas — zmiana nie może być widoczna
    przy pełnym świetle.
@@ -204,9 +212,13 @@ pozioma, zanim jakikolwiek tekst zostanie przeczytany.
 
 - **FR-010**: Generator MUSI wydzielać piksele świecące własnym światłem jako
   osobną warstwę, odrębną od korpusu sylwetki.
-- **FR-011**: Warstwa emisyjna MUSI być rysowana po przejściu przygaszającym,
-  zachowując pełną jasność niezależnie od poziomu oświetlenia przedziału i od
-  aktu.
+- **FR-011**: Warstwa emisyjna MUSI być rysowana po mgle, zachowując pełną
+  jasność niezależnie od odległości od patrzącego i od aktu.
+- **FR-011a**: *Poza zakresem, zapisane, żeby nie zginęło.* Wygaszony
+  przedział nie przygasza dziś stojących w nim ludzi — pokój ciemnieje wokół
+  w pełni oświetlonych łowców. To osobna usterka, znaleziona przy okazji, i
+  wymaga własnej decyzji: żeby ją naprawić, trzeba przygaszać sylwetki
+  światłem przedziału, czego renderer w ogóle jeszcze nie robi.
 - **FR-012**: Warstwa emisyjna MUSI podlegać przezroczystości postaci, tak by
   niewidzialność pozostała pełna.
 - **FR-013**: Zwłoki MUSZĄ być rysowane bez warstwy emisyjnej.
@@ -261,8 +273,8 @@ pozioma, zanim jakikolwiek tekst zostanie przeczytany.
 - **SC-003**: Dodanie czwartego przedmiotu do dowolnej klasy wymaga zmiany w
   jednej tabeli i uruchomienia generatora — zero zmian w kliencie i zero
   zmian w liczbach gdziekolwiek indziej.
-- **SC-004**: W najciemniejszym akcie element świecący na sylwetce jest co
-  najmniej trzykrotnie jaśniejszy od sąsiadującego z nim korpusu tej samej
+- **SC-004**: Na skraju promienia widzenia element świecący na sylwetce jest
+  co najmniej trzykrotnie jaśniejszy od sąsiadującego z nim korpusu tej samej
   postaci.
 - **SC-005**: Postać pod zaklęciem niewidzialności nie ma na sobie ani
   jednego piksela jaśniejszego niż reszta jej sylwetki.
