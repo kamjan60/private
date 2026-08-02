@@ -90,7 +90,7 @@ constraints this repository actually documents and enforces — README,
 |---|---|---|
 | Server is authoritative, including the fog; cull before serialising | README §Architecture, `snapshot.js` | **Pass** — renderer-only change, no snapshot fields added |
 | No new runtime dependencies; no build step | `package.json` (one dep), no bundler | **Pass** — JSON and a PNG, read by existing code paths |
-| The artifact must remain one offline file | `tools/build-sandbox.js` | **Pass with a flag** — R6 warns the emissive sheet's size is unmeasured; SC-007's budget covers the manifest only |
+| The artifact must remain one offline file | the app's `tools/build-sandbox.js` | **Pass with a flag** — R6 warns the emissive sheet's size is unmeasured; SC-007's budget covers the manifest only |
 | Sprite-sheet order is a documented coupling | README, `classes.js` header comment | **Improved** — the coupling stops being a comment and becomes a tested contract |
 | Pixel art is verified by looking, not by reasoning | `.claude/skills/fantasy-pixel-art/SKILL.md` | **Carried into quickstart** — step 4 requires reading the screenshot, and leaves the composite mode to be decided by eye |
 
@@ -121,10 +121,10 @@ specs/001-sprite-pipeline-manifest/
 ### Source Code (repository root)
 
 ```text
-pixel-art-toolkit/examples/wizard-hunt/
+tools/pixel-art-toolkit/examples/wizard-hunt/
 └── make_hunters.py                # emits the sheet; gains the manifest and the emissive split
 
-wizard-hunt-online/
+apps/wizard-hunt-online/
 ├── public/
 │   ├── client.js                  # sheetRow() dies; manifest lookup and the glow pass
 │   └── assets/
@@ -139,9 +139,11 @@ wizard-hunt-online/
     └── wiring.test.js             # PNG-header test replaced by manifest agreement
 ```
 
-**Structure Decision**: The existing layout is kept exactly. This feature
-changes five files and adds two assets; it introduces no directory, no
-module boundary and no layer. The generator stays the only thing that knows
+**Structure Decision**: This feature introduced no directory, module boundary
+or layer of its own — it changed five files and added two assets. The `apps/`
+and `tools/` prefixes above came from a later repository-wide reorganisation
+of the top level and are unrelated to the feature; paths are shown in their
+current form so they still resolve. The generator stays the only thing that knows
 sheet geometry, which is precisely the property being formalised — the
 manifest is that knowledge written down instead of re-derived by every
 consumer.

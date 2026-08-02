@@ -1,6 +1,6 @@
 """Old-RPG / dark-fantasy wizard: 32x32, 4 directions x 3-frame walk cycle.
 
-Worked example for pixel-art-toolkit/pixel_lib.py — every technique here is
+Worked example for tools/pixel-art-toolkit/pixel_lib.py — every technique here is
 documented in ../../reference/ (color/shading, dithering, animation timing).
 """
 import os

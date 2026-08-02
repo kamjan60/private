@@ -3,7 +3,7 @@
 **Feature**: Manifest sprite'ów i warstwa nieoświetlana
 **Date**: 2026-08-02
 
-Everything below runs from `wizard-hunt-online/` unless stated. No build
+Everything below runs from `apps/wizard-hunt-online/` unless stated. No build
 step, no new dependencies.
 
 ## Prerequisites
@@ -19,10 +19,10 @@ python3 -c "import PIL; print(PIL.__version__)"
 ## 1. Regenerate the art and the manifest
 
 ```bash
-python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters.png       public/assets/
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters_glow.png  public/assets/
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters.json      public/assets/
+python3 ../../tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
+cp ../../tools/pixel-art-toolkit/examples/wizard-hunt/hunters.png       public/assets/
+cp ../../tools/pixel-art-toolkit/examples/wizard-hunt/hunters_glow.png  public/assets/
+cp ../../tools/pixel-art-toolkit/examples/wizard-hunt/hunters.json      public/assets/
 ```
 
 **Expect**: 24 states listed, every name `"<class>/<itemId>"`.
@@ -34,7 +34,7 @@ python3 -c "import json;m=json.load(open('public/assets/hunters.json'));print(le
 **Determinism** (contract guarantee 5) — running it twice changes nothing:
 
 ```bash
-md5sum public/assets/hunters.json && python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py && md5sum ../pixel-art-toolkit/examples/wizard-hunt/hunters.json
+md5sum public/assets/hunters.json && python3 ../../tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py && md5sum ../../tools/pixel-art-toolkit/examples/wizard-hunt/hunters.json
 ```
 
 ---

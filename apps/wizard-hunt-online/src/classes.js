@@ -11,7 +11,7 @@
  * without regenerating fails `npm test` naming the missing state.
  *
  * What still has to be done in step with
- * pixel-art-toolkit/examples/wizard-hunt/make_hunters.py is the *set* of
+ * tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py is the *set* of
  * classes and item ids -- add one here, run the generator, copy the three
  * files into public/assets/.
  *

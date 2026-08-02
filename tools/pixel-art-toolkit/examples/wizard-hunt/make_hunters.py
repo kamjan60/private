@@ -548,7 +548,7 @@ def item_art(g, b, pal, item, facing):
 
 # ---------------------------------------------------------------- classes
 #
-# Order must match CLASS_NAMES in ../../wizard-hunt-online/src/classes.js, and
+# Order must match CLASS_NAMES in apps/wizard-hunt-online/src/classes.js, and
 # each item list must match that class's items in the same order. The client
 # indexes sheet rows by both positions, so an edit here without an edit there
 # hands players somebody else's body and somebody else's kit.

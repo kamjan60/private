@@ -28,8 +28,8 @@ shippable; either can go out without the other.
 
 Paths are repository-relative. Two trees are involved:
 
-- `pixel-art-toolkit/examples/wizard-hunt/` — the Python generator
-- `wizard-hunt-online/` — server, client, tests, artifact build
+- `tools/pixel-art-toolkit/examples/wizard-hunt/` — the Python generator
+- `apps/wizard-hunt-online/` — server, client, tests, artifact build
 
 ---
 
@@ -39,9 +39,9 @@ Paths are repository-relative. Two trees are involved:
 unmeasurable the moment implementation starts, and three success criteria
 (SC-006, SC-007, SC-008) are comparisons against them.
 
-- [X] T001 Capture the full-light baseline screenshot by running `node test/browser.js` from `wizard-hunt-online/` on the current HEAD and copying the output PNG to the scratchpad as `baseline-full-light.png` — SC-006 compares against this and it cannot be recreated later
-- [X] T002 [P] Record the baseline artifact size with `node tools/build-sandbox.js && ls -l sandbox/artifact.html` in `wizard-hunt-online/`, noting the byte count for the SC-007 budget
-- [X] T003 [P] Record the baseline test duration with `time npm test` in `wizard-hunt-online/` for SC-008
+- [X] T001 Capture the full-light baseline screenshot by running `node test/browser.js` from `apps/wizard-hunt-online/` on the current HEAD and copying the output PNG to the scratchpad as `baseline-full-light.png` — SC-006 compares against this and it cannot be recreated later
+- [X] T002 [P] Record the baseline artifact size with `node tools/build-sandbox.js && ls -l sandbox/artifact.html` in `apps/wizard-hunt-online/`, noting the byte count for the SC-007 budget
+- [X] T003 [P] Record the baseline test duration with `time npm test` in `apps/wizard-hunt-online/` for SC-008
 
 ---
 
@@ -55,7 +55,7 @@ call sites.
 
 **⚠️ CRITICAL**: No user story work begins until this is done.
 
-- [X] T004 Extract a single sprite-draw helper in `wizard-hunt-online/public/client.js` that every sheet blit goes through, taking (class, item, dir, step, x, y, alpha) and internally calling the existing `sheetRow`; convert `drawActor` and the spell-wheel portrait to use it, changing no visible output
+- [X] T004 Extract a single sprite-draw helper in `apps/wizard-hunt-online/public/client.js` that every sheet blit goes through, taking (class, item, dir, step, x, y, alpha) and internally calling the existing `sheetRow`; convert `drawActor` and the spell-wheel portrait to use it, changing no visible output
 - [X] T005 Verify T004 changed nothing visible. **Method corrected during execution**: a straight pixel diff against `baseline-full-light.png` is unsound, because the screenshot is of a live round — bots have moved and the act clock has advanced, so two runs of *identical* code never match. Instead compare the old-vs-new mean channel difference against the new-vs-new difference between two runs; the refactor is clean only if its contribution sits at or below the game's own run-to-run noise. Measured: old-vs-new 4.39/4.16/4.17, new-vs-new 5.61/5.65/5.73 — under the noise floor
 
 **Checkpoint**: One place decides where a sprite lives. Both stories can start.
@@ -78,23 +78,23 @@ it must pass with zero edits to `client.js`.
 > sheet, because that is the proof they test something the old header check
 > did not.
 
-- [X] T006 [P] [US1] Add a manifest/table agreement test in `wizard-hunt-online/test/wiring.test.js`: every `class/itemId` pair from `classes.js` has a state in `public/assets/hunters.json`, and every state maps back to a real pair — the failure message names the offending state (SC-002)
-- [X] T007 [P] [US1] Add a manifest/sheet geometry test in `wizard-hunt-online/test/wiring.test.js`: rows are contiguous from 0, and the sum of every state's `directions` times `size.y` equals the PNG height exactly — a gap fails and names the first unclaimed row (FR-005)
-- [X] T008 [US1] Add a manifest self-consistency test in `wizard-hunt-online/test/wiring.test.js`: `version` is 1, state names are unique, `directions` is non-empty, and every sheet named in `sheets` exists on disk
+- [X] T006 [P] [US1] Add a manifest/table agreement test in `apps/wizard-hunt-online/test/wiring.test.js`: every `class/itemId` pair from `classes.js` has a state in `public/assets/hunters.json`, and every state maps back to a real pair — the failure message names the offending state (SC-002)
+- [X] T007 [P] [US1] Add a manifest/sheet geometry test in `apps/wizard-hunt-online/test/wiring.test.js`: rows are contiguous from 0, and the sum of every state's `directions` times `size.y` equals the PNG height exactly — a gap fails and names the first unclaimed row (FR-005)
+- [X] T008 [US1] Add a manifest self-consistency test in `apps/wizard-hunt-online/test/wiring.test.js`: `version` is 1, state names are unique, `directions` is non-empty, and every sheet named in `sheets` exists on disk
 
 ### Implementation for User Story 1
 
-- [X] T009 [US1] Build the state table in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py` from the existing `CLASSES` list, naming each state `"<class>/<itemId>"` and recording its first row, direction count and frame count as the sheet is written
+- [X] T009 [US1] Build the state table in `tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py` from the existing `CLASSES` list, naming each state `"<class>/<itemId>"` and recording its first row, direction count and frame count as the sheet is written
 - [X] T010 [US1] Emit `hunters.json` from `make_hunters.py` per `contracts/hunters-manifest.md` — version, size, sheets, directions, states — with sorted keys and a stable field order so regenerating an unchanged sheet produces a byte-identical file (contract guarantee 5)
-- [X] T011 [US1] Copy the generated `hunters.png` and `hunters.json` into `wizard-hunt-online/public/assets/` and confirm T006–T008 now pass
-- [X] T012 [US1] Add a manifest loader in `wizard-hunt-online/public/client.js` that prefers `window.__MANIFEST` and otherwise fetches `assets/hunters.json`, refusing an unknown `version`, and gate the first frame on it — matching how `window.__ASSETS` is already preferred over `ASSETS` for images
-- [X] T013 [US1] Make a missing or unparseable manifest a hard stop in `wizard-hunt-online/public/client.js`: show a message naming the file, and draw no frame at all rather than a frame of wrong bodies followed by an error (FR-008)
-- [X] T014 [US1] Replace the body of the T004 resolver in `wizard-hunt-online/public/client.js` with a name lookup — `states[cls + "/" + itemId].row + clamp(dir, 0, directions - 1)` — reading `size`, `directions` and `frames` from the manifest instead of assuming 32, 4 and 2
-- [X] T015 [US1] Map the wire's `it` index back to an item id in `wizard-hunt-online/public/client.js` using `DEF.classes`, so the state name is built from identifiers rather than positions (FR-002)
-- [X] T016 [US1] Implement the unknown-state fallback in `wizard-hunt-online/public/client.js`: draw `states[0]` and `console.warn` exactly once per session, never per frame (FR-004)
-- [X] T017 [US1] Delete `sheetRow` and the `(class * 3 + item) * 4 + dir` arithmetic from `wizard-hunt-online/public/client.js`, then grep the repository for `* 3`, `* 4` and `sheetRow` to confirm no consumer computes a row (contract, consumer guarantee 1)
-- [X] T018 [US1] Remove the superseded PNG-header test `the sprite sheet has a row for every class and every item` from `wizard-hunt-online/test/wiring.test.js` (FR-009)
-- [X] T019 [US1] Inline the manifest as literal JSON into `window.__MANIFEST` in `wizard-hunt-online/tools/build-sandbox.js` — as text, not base64 — and confirm no `fetch` remains on the artifact path
+- [X] T011 [US1] Copy the generated `hunters.png` and `hunters.json` into `apps/wizard-hunt-online/public/assets/` and confirm T006–T008 now pass
+- [X] T012 [US1] Add a manifest loader in `apps/wizard-hunt-online/public/client.js` that prefers `window.__MANIFEST` and otherwise fetches `assets/hunters.json`, refusing an unknown `version`, and gate the first frame on it — matching how `window.__ASSETS` is already preferred over `ASSETS` for images
+- [X] T013 [US1] Make a missing or unparseable manifest a hard stop in `apps/wizard-hunt-online/public/client.js`: show a message naming the file, and draw no frame at all rather than a frame of wrong bodies followed by an error (FR-008)
+- [X] T014 [US1] Replace the body of the T004 resolver in `apps/wizard-hunt-online/public/client.js` with a name lookup — `states[cls + "/" + itemId].row + clamp(dir, 0, directions - 1)` — reading `size`, `directions` and `frames` from the manifest instead of assuming 32, 4 and 2
+- [X] T015 [US1] Map the wire's `it` index back to an item id in `apps/wizard-hunt-online/public/client.js` using `DEF.classes`, so the state name is built from identifiers rather than positions (FR-002)
+- [X] T016 [US1] Implement the unknown-state fallback in `apps/wizard-hunt-online/public/client.js`: draw `states[0]` and `console.warn` exactly once per session, never per frame (FR-004)
+- [X] T017 [US1] Delete `sheetRow` and the `(class * 3 + item) * 4 + dir` arithmetic from `apps/wizard-hunt-online/public/client.js`, then grep the repository for `* 3`, `* 4` and `sheetRow` to confirm no consumer computes a row (contract, consumer guarantee 1)
+- [X] T018 [US1] Remove the superseded PNG-header test `the sprite sheet has a row for every class and every item` from `apps/wizard-hunt-online/test/wiring.test.js` (FR-009)
+- [X] T019 [US1] Inline the manifest as literal JSON into `window.__MANIFEST` in `apps/wizard-hunt-online/tools/build-sandbox.js` — as text, not base64 — and confirm no `fetch` remains on the artifact path
 - [X] T020 [US1] Run the reorder proof from `quickstart.md` step 2a end to end. **Outcome differed from the task as written, in the feature's favour**: a pure reorder of `classes.js` no longer fails the tests, because it is no longer a defect — names bind, so the sprite stays correct without regenerating. Verified directly: with Technik's items reordered and the sheet untouched, a player carrying `rygiel` resolves to `Technik/rygiel` (row 92), where the old arithmetic would have drawn `Technik/generator` (row 84). The loud-failure case is a renamed or added item, proven separately: `Technik/kamera-v2` fails with `no sprite state "Technik/kamera-v2" -- rerun make_hunters.py`
 
 **Checkpoint**: US1 is complete and shippable. The class-order footgun is gone
@@ -118,20 +118,20 @@ target the fog. The doused-actor gap is out of scope and recorded as FR-011a.
 
 ### Tests for User Story 2
 
-- [X] T021 [P] [US2] Add a brightness assertion to `wizard-hunt-online/test/browser.js`: sample canvas pixels at an actor near the fog's edge via `page.evaluate` and assert an emissive pixel is at least 3× the luminance of an adjacent body pixel (SC-004)
-- [X] T022 [P] [US2] **Metric corrected during execution** (first version reported the implementation broken when it was correct: with source-over a full-alpha glow replaces an already-bright body pixel and shows a small delta, while a 0.34 glow replaces a dimmed one and shows a larger delta, so the *gain* rose under invisibility while the sprite correctly dimmed; now measures absolute brightness of glow-touched pixels). Verified it catches the bug by deliberately removing the alpha multiply: 657 vs 657. Add an invisibility assertion to `wizard-hunt-online/test/browser.js`: with Cień up, assert no pixel of the caster's own sprite exceeds the luminance of the rest of it (SC-005) — this is the failure that is silent, so it gets a test rather than a look
+- [X] T021 [P] [US2] Add a brightness assertion to `apps/wizard-hunt-online/test/browser.js`: sample canvas pixels at an actor near the fog's edge via `page.evaluate` and assert an emissive pixel is at least 3× the luminance of an adjacent body pixel (SC-004)
+- [X] T022 [P] [US2] **Metric corrected during execution** (first version reported the implementation broken when it was correct: with source-over a full-alpha glow replaces an already-bright body pixel and shows a small delta, while a 0.34 glow replaces a dimmed one and shows a larger delta, so the *gain* rose under invisibility while the sprite correctly dimmed; now measures absolute brightness of glow-touched pixels). Verified it catches the bug by deliberately removing the alpha multiply: 657 vs 657. Add an invisibility assertion to `apps/wizard-hunt-online/test/browser.js`: with Cień up, assert no pixel of the caster's own sprite exceeds the luminance of the rest of it (SC-005) — this is the failure that is silent, so it gets a test rather than a look
 
 ### Implementation for User Story 2
 
-- [X] T023 [US2] Split emissive pixels into a second image in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`: write glow colours to `hunters_glow.png` in the identical layout, transparent everywhere else, leaving the base sheet otherwise unchanged
+- [X] T023 [US2] Split emissive pixels into a second image in `tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`: write glow colours to `hunters_glow.png` in the identical layout, transparent everywhere else, leaving the base sheet otherwise unchanged
 - [X] T024 [US2] Add `sheets.emissive` to the manifest emitted by `make_hunters.py`, keeping it optional per the contract so a manifest without one stays valid
-- [X] T025 [US2] Load the emissive sheet in `wizard-hunt-online/public/client.js` through the existing `ASSETS` / `window.__ASSETS` mechanism, reading its filename from the manifest rather than hardcoding it
-- [X] T026 [US2] Collect glow draws during the actor pass in `wizard-hunt-online/public/client.js` — position, row, step and the actor's own alpha — instead of drawing them inline
-- [X] T027 [US2] Draw the collected glow sprites after the fog fill in `wizard-hunt-online/public/client.js`, restoring the world transform for the pass and multiplying by each actor's recorded alpha so invisibility still applies (FR-011, FR-012)
-- [X] T028 [US2] **No code needed**: corpses are drawn as rectangles, never from the sheet, so FR-013 holds by construction. Suppress the emissive layer for corpses in `wizard-hunt-online/public/client.js` — dead kit does not glow (FR-013)
-- [X] T029 [US2] **No code needed**: base feeds draw coloured blocks with no sheet and no fog, so FR-015 holds by construction. Apply the same glow rule to the base camera feeds in `wizard-hunt-online/public/client.js`, so the base and the field do not render two different games (FR-015)
+- [X] T025 [US2] Load the emissive sheet in `apps/wizard-hunt-online/public/client.js` through the existing `ASSETS` / `window.__ASSETS` mechanism, reading its filename from the manifest rather than hardcoding it
+- [X] T026 [US2] Collect glow draws during the actor pass in `apps/wizard-hunt-online/public/client.js` — position, row, step and the actor's own alpha — instead of drawing them inline
+- [X] T027 [US2] Draw the collected glow sprites after the fog fill in `apps/wizard-hunt-online/public/client.js`, restoring the world transform for the pass and multiplying by each actor's recorded alpha so invisibility still applies (FR-011, FR-012)
+- [X] T028 [US2] **No code needed**: corpses are drawn as rectangles, never from the sheet, so FR-013 holds by construction. Suppress the emissive layer for corpses in `apps/wizard-hunt-online/public/client.js` — dead kit does not glow (FR-013)
+- [X] T029 [US2] **No code needed**: base feeds draw coloured blocks with no sheet and no fog, so FR-015 holds by construction. Apply the same glow rule to the base camera feeds in `apps/wizard-hunt-online/public/client.js`, so the base and the field do not render two different games (FR-015)
 - [X] T030 [US2] **Decided: `source-over`.** The glow is one or two pixels per sprite, so `lighter` adds no bloom worth having while still risking a blown-out lamp over a lit compartment; research R2 pre-registered source-over as the tie-break. Decide the composite mode by looking: screenshot the glow pass with `source-over` and with `globalCompositeOperation = "lighter"` over both a doused compartment and a lit one, then pick — research.md R2 left this open deliberately, and `source-over` wins any tie
-- [X] T031 [US2] **Measured: artifact 244 394 -> 256 829 B (+12.1 KB)**, accounted as manifest 2 762 B (inside its 5 120 B budget), glow sheet 3 453 B base64 (outside that budget by design, R6), client.js +6 156 B. R6's fallback not needed. Offline run verified: 24 states inline, **zero network requests**, canvas renders, no console errors. Inline `hunters_glow.png` in `wizard-hunt-online/tools/build-sandbox.js` and measure the artifact's growth against the T002 baseline; if the second sheet blows the budget, take R6's fallback and widen the base sheet by a frame column instead of shipping a second image
+- [X] T031 [US2] **Measured: artifact 244 394 -> 256 829 B (+12.1 KB)**, accounted as manifest 2 762 B (inside its 5 120 B budget), glow sheet 3 453 B base64 (outside that budget by design, R6), client.js +6 156 B. R6's fallback not needed. Offline run verified: 24 states inline, **zero network requests**, canvas renders, no console errors. Inline `hunters_glow.png` in `apps/wizard-hunt-online/tools/build-sandbox.js` and measure the artifact's growth against the T002 baseline; if the second sheet blows the budget, take R6's fallback and widen the base sheet by a frame column instead of shipping a second image
 - [X] T032 [US2] Confirm SC-006 by diffing a full-light screenshot against `baseline-full-light.png` from T001 — at full light the change must be invisible
 
 **Checkpoint**: US2 is complete and shippable. Both P1 stories done.
@@ -140,9 +140,9 @@ target the fog. The doused-actor gap is out of scope and recorded as FR-011a.
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [X] T033 [P] Update the sprite-sheet section of `wizard-hunt-online/README.md`: the coupling is now a manifest and a test, not a comment and a hope
-- [X] T034 [P] Update the ORDER MATTERS header comment in `wizard-hunt-online/src/classes.js` — reordering is now safe after regeneration, and the comment should say what is actually true
-- [X] T035 [P] Note the manifest and the emissive layer in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`'s module docstring, replacing the row-formula description
+- [X] T033 [P] Update the sprite-sheet section of `apps/wizard-hunt-online/README.md`: the coupling is now a manifest and a test, not a comment and a hope
+- [X] T034 [P] Update the ORDER MATTERS header comment in `apps/wizard-hunt-online/src/classes.js` — reordering is now safe after regeneration, and the comment should say what is actually true
+- [X] T035 [P] Note the manifest and the emissive layer in `tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`'s module docstring, replacing the row-formula description
 - [X] T036 Record the emissive-layer rule in `.claude/skills/fantasy-pixel-art/SKILL.md` — a lit fitting drawn under the darkening pass is a lit fitting that goes out, which is the same class of mistake as drawing the background dim instead of dimming it
 - [X] T037 Run `quickstart.md` end to end, including the deliberate-failure steps 2a, 2b and 3, and confirm every SC in its Done-when table
 - [X] T038 Confirm SC-008 with `time npm test` against the T003 baseline
@@ -206,16 +206,16 @@ scheduled is how a task list stops being a plan and becomes a wish.
 
 ```bash
 # Both must FAIL before any implementation lands:
-Task: "Manifest/table agreement test in wizard-hunt-online/test/wiring.test.js"
-Task: "Manifest/sheet geometry test in wizard-hunt-online/test/wiring.test.js"
+Task: "Manifest/table agreement test in apps/wizard-hunt-online/test/wiring.test.js"
+Task: "Manifest/sheet geometry test in apps/wizard-hunt-online/test/wiring.test.js"
 ```
 
 ## Parallel Example: US2 alongside US1
 
 ```bash
 # Different files, different stories, no shared state:
-Task: "Brightness assertion in wizard-hunt-online/test/browser.js"
-Task: "Emissive split in pixel-art-toolkit/examples/wizard-hunt/make_hunters.py"
+Task: "Brightness assertion in apps/wizard-hunt-online/test/browser.js"
+Task: "Emissive split in tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py"
 ```
 
 ---

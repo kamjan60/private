@@ -396,7 +396,7 @@ Obecny `server.js` ma 601 linii i trzyma wszystko. Ten projekt tego nie
 udźwignie — rozbijam na moduły o jednej odpowiedzialności każdy:
 
 ```
-wizard-hunt-online/
+apps/wizard-hunt-online/
   server.js          # http + websocket, nic więcej
   src/
     rules.js         # stałe i strojenie

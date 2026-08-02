@@ -1,9 +1,10 @@
 # Contract — `hunters.json`
 
-**Producer**: `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`
-**Consumers**: `wizard-hunt-online/public/client.js`, `test/wiring.test.js`,
-`tools/build-sandbox.js`
-**Location**: `wizard-hunt-online/public/assets/hunters.json`
+**Producer**: `tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`
+**Consumers**: `apps/wizard-hunt-online/` — `public/client.js`,
+`test/wiring.test.js`, `tools/build-sandbox.js` (the app's own tools/, not the
+repo-root one)
+**Location**: `apps/wizard-hunt-online/public/assets/hunters.json`
 
 This is the only interface this feature exposes. It replaces an implicit
 contract — the row formula `(class * 3 + item) * 4 + direction` — that was

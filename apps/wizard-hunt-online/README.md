@@ -10,7 +10,7 @@ layer of it. Argument happens on voice; the game supplies pings, not a chat
 box, because typing on a phone mid-round does not work.
 
 The full design and the reasoning behind each rule is in
-[`docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md`](../docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md).
+[`docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md`](../../docs/superpowers/specs/2026-08-01-wizard-hunt-rules-design.md).
 
 ## Run it
 
@@ -216,8 +216,8 @@ adding an item without one fails `npm test` naming the missing state.
 Regenerate with:
 
 ```bash
-python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters{.png,_glow.png,.json} public/assets/
+python3 ../../tools/pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
+cp ../../tools/pixel-art-toolkit/examples/wizard-hunt/hunters{.png,_glow.png,.json} public/assets/
 ```
 
 `hunters_glow.png` carries only the pixels that are their own light source —
