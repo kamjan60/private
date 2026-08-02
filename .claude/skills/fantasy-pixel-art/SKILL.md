@@ -89,6 +89,18 @@ periods.
 coloured rectangle. The same rectangle with a dimmer halo bleeding one pixel
 onto the surface around it is a lamp.
 
+**A lit fitting drawn under the darkening pass goes out.** If the scene has
+fog, a vignette or a night wash, whatever is supposed to emit has to be drawn
+*after* it — as its own layer on its own sheet, transparent everywhere else.
+Otherwise the dark gets uniformly greyer instead of denser, and the one thing
+that was meant to survive it is the first thing lost. Same mistake as drawing
+the background dim rather than dimming it, one pass later in the pipeline.
+
+That layer skips the darkness and **must not skip anything else**. If a
+sprite can fade — stealth, death, distance — the emissive pass multiplies by
+the same alpha the body used. Miss it and an invisible character glows,
+which is worse than never having the layer.
+
 **Detached particles must clear the silhouette.** Embers inside the body are
 invisible. Push them outside the shape or do not draw them.
 

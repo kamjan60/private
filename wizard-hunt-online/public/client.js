@@ -123,7 +123,28 @@
     MANIFEST = m;
     STATES = {};
     m.states.forEach(function (s) { STATES[s.name] = s; });
+    if (m.sheets && m.sheets.emissive) {
+      GLOW = new Image();
+      GLOW.src = (window.__ASSETS && window.__ASSETS.huntersGlow) ||
+        ("assets/" + m.sheets.emissive);
+    }
   }
+
+  /**
+   * The unshaded layer: pixels that are their own light source.
+   *
+   * SS14 marks a sprite layer unshaded and its renderer skips the lighting
+   * pass for it. There are no shaders here and no lighting pass -- there is
+   * one radial gradient painted over the whole viewport after the sprites.
+   * So the equivalent of "unshaded" is draw order: these are collected during
+   * the actor pass and blitted again *after* the fog.
+   *
+   * Without this a lamp at the edge of somebody's vision fades at exactly the
+   * rate the body carrying it fades, and the darkest act reads as the first
+   * one under a filter rather than as a wreck with no power.
+   */
+  var GLOW = null;
+  var glowQueue = [];
 
   /**
    * A hunter's row, by name.
@@ -155,15 +176,45 @@
    * which is how a formula ends up duplicated and how a second pass ends up
    * only half applied.
    */
-  function drawSprite(cls, it, dir, step, x, y, w, h) {
+  function drawSprite(cls, it, dir, step, x, y, w, h, alpha) {
     if (!SHEET.complete || !SHEET.naturalWidth || !STATES) return false;
     var st = stateFor(cls, it);
     var sz = MANIFEST.size;
     var d = Math.max(0, Math.min(dir || 0, st.directions - 1));
-    ctx.drawImage(SHEET,
-      Math.min(step || 0, st.frames - 1) * sz.x, (st.row + d) * sz.y, sz.x, sz.y,
-      x, y, w, h);
+    var sx = Math.min(step || 0, st.frames - 1) * sz.x, sy = (st.row + d) * sz.y;
+    ctx.drawImage(SHEET, sx, sy, sz.x, sz.y, x, y, w, h);
+    // Queued rather than drawn: the fog has not been painted yet.
+    //
+    // Only callers that pass an explicit alpha get queued, and that is a
+    // guard rather than a convenience. The queue replays under the world
+    // transform, so anything drawn in screen space -- the spell wheel's
+    // portrait, which is painted after the fog anyway -- would have its glow
+    // replayed a frame later at world coordinates that happen to match its
+    // screen ones, dropping a stray light somewhere on the map.
+    if (GLOW && typeof alpha === "number" && alpha > 0 && !window.__noGlow) {
+      glowQueue.push([sx, sy, sz.x, sz.y, x, y, w, h, alpha]);
+    }
     return true;
+  }
+
+  /**
+   * Replay the queue on top of the fog.
+   *
+   * The alpha carried per entry is the one thing in this feature that fails
+   * silently. A layer that ignores darkness must not also ignore
+   * transparency: skip that multiply and Cień lights the mage up in exactly
+   * the dark he needs it for.
+   */
+  function drawGlowQueue() {
+    if (!GLOW || !GLOW.complete || !GLOW.naturalWidth) { glowQueue.length = 0; return; }
+    var prev = ctx.globalAlpha;
+    for (var i = 0; i < glowQueue.length; i++) {
+      var q = glowQueue[i];
+      ctx.globalAlpha = prev * q[8];
+      ctx.drawImage(GLOW, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]);
+    }
+    ctx.globalAlpha = prev;
+    glowQueue.length = 0;
   }
 
   var cv = $("cv"), ctx = cv.getContext("2d");
@@ -1029,6 +1080,13 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, cv.width, cv.height);
 
+    // and now the lights, on top of the dark. Back under the world transform,
+    // because the queue holds world coordinates -- the fog is the only thing
+    // in this renderer that lives in screen space.
+    ctx.setTransform(ZOOM, 0, 0, ZOOM, -CAM.x * ZOOM, -CAM.y * ZOOM);
+    drawGlowQueue();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
     var r0 = (window.devicePixelRatio || 1);
 
     // You are the one shut in. Say so: the fog closing to the walls on its
@@ -1474,11 +1532,12 @@
   function drawActor(a, alpha) {
     // Cień: your own body goes see-through, because otherwise the only way to
     // tell whether the spell is still up is to be shot at.
-    var fade = a.invisible ? 0.34 : (alpha === undefined ? 1 : alpha);
+    var fade = (a.invisible || window.__forceInvisible)
+      ? 0.34 : (alpha === undefined ? 1 : alpha);
     var prev = ctx.globalAlpha;
     if (fade !== 1) ctx.globalAlpha = prev * fade;
     if (!drawSprite(a.cls, a.it, a.dir, a.step,
-        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32)) {
+        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32, fade)) {
       ctx.fillStyle = "#8b9ac0";
       ctx.fillRect(a.x - 8, a.y - 16, 16, 24);
     }

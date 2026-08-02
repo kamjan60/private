@@ -3,11 +3,17 @@
  * The eight hunter classes and the three loadout items each of them picks
  * from before the round.
  *
- * ORDER MATTERS. The client indexes sprite-sheet rows by a class's position
- * in CLASS_NAMES, so reordering this object silently hands every player
- * somebody else's body. The generator that draws the sheet
- * (pixel-art-toolkit/examples/wizard-hunt/make_hunters.py) carries the same
- * list and has to be edited in step.
+ * Order used to matter, dangerously: the client computed sprite rows from a
+ * class's position here, so reordering this object handed every player
+ * somebody else's body with no error anywhere. It no longer does. Sprites are
+ * looked up by name through public/assets/hunters.json, so a reorder is
+ * invisible once the sheet is regenerated, and renaming or adding an item
+ * without regenerating fails `npm test` naming the missing state.
+ *
+ * What still has to be done in step with
+ * pixel-art-toolkit/examples/wizard-hunt/make_hunters.py is the *set* of
+ * classes and item ids -- add one here, run the generator, copy the three
+ * files into public/assets/.
  *
  * Classes are unique within a round, which is why the table has exactly
  * MAX_PLAYERS entries. A transit log entry naming a class therefore names a

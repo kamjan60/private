@@ -118,21 +118,21 @@ target the fog. The doused-actor gap is out of scope and recorded as FR-011a.
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] Add a brightness assertion to `wizard-hunt-online/test/browser.js`: sample canvas pixels at an actor near the fog's edge via `page.evaluate` and assert an emissive pixel is at least 3× the luminance of an adjacent body pixel (SC-004)
-- [ ] T022 [P] [US2] Add an invisibility assertion to `wizard-hunt-online/test/browser.js`: with Cień up, assert no pixel of the caster's own sprite exceeds the luminance of the rest of it (SC-005) — this is the failure that is silent, so it gets a test rather than a look
+- [X] T021 [P] [US2] Add a brightness assertion to `wizard-hunt-online/test/browser.js`: sample canvas pixels at an actor near the fog's edge via `page.evaluate` and assert an emissive pixel is at least 3× the luminance of an adjacent body pixel (SC-004)
+- [X] T022 [P] [US2] **Metric corrected during execution** (first version reported the implementation broken when it was correct: with source-over a full-alpha glow replaces an already-bright body pixel and shows a small delta, while a 0.34 glow replaces a dimmed one and shows a larger delta, so the *gain* rose under invisibility while the sprite correctly dimmed; now measures absolute brightness of glow-touched pixels). Verified it catches the bug by deliberately removing the alpha multiply: 657 vs 657. Add an invisibility assertion to `wizard-hunt-online/test/browser.js`: with Cień up, assert no pixel of the caster's own sprite exceeds the luminance of the rest of it (SC-005) — this is the failure that is silent, so it gets a test rather than a look
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Split emissive pixels into a second image in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`: write glow colours to `hunters_glow.png` in the identical layout, transparent everywhere else, leaving the base sheet otherwise unchanged
-- [ ] T024 [US2] Add `sheets.emissive` to the manifest emitted by `make_hunters.py`, keeping it optional per the contract so a manifest without one stays valid
-- [ ] T025 [US2] Load the emissive sheet in `wizard-hunt-online/public/client.js` through the existing `ASSETS` / `window.__ASSETS` mechanism, reading its filename from the manifest rather than hardcoding it
-- [ ] T026 [US2] Collect glow draws during the actor pass in `wizard-hunt-online/public/client.js` — position, row, step and the actor's own alpha — instead of drawing them inline
-- [ ] T027 [US2] Draw the collected glow sprites after the fog fill in `wizard-hunt-online/public/client.js`, restoring the world transform for the pass and multiplying by each actor's recorded alpha so invisibility still applies (FR-011, FR-012)
-- [ ] T028 [US2] Suppress the emissive layer for corpses in `wizard-hunt-online/public/client.js` — dead kit does not glow (FR-013)
-- [ ] T029 [US2] Apply the same glow rule to the base camera feeds in `wizard-hunt-online/public/client.js`, so the base and the field do not render two different games (FR-015)
-- [ ] T030 [US2] Decide the composite mode by looking: screenshot the glow pass with `source-over` and with `globalCompositeOperation = "lighter"` over both a doused compartment and a lit one, then pick — research.md R2 left this open deliberately, and `source-over` wins any tie
-- [ ] T031 [US2] Inline `hunters_glow.png` in `wizard-hunt-online/tools/build-sandbox.js` and measure the artifact's growth against the T002 baseline; if the second sheet blows the budget, take R6's fallback and widen the base sheet by a frame column instead of shipping a second image
-- [ ] T032 [US2] Confirm SC-006 by diffing a full-light screenshot against `baseline-full-light.png` from T001 — at full light the change must be invisible
+- [X] T023 [US2] Split emissive pixels into a second image in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`: write glow colours to `hunters_glow.png` in the identical layout, transparent everywhere else, leaving the base sheet otherwise unchanged
+- [X] T024 [US2] Add `sheets.emissive` to the manifest emitted by `make_hunters.py`, keeping it optional per the contract so a manifest without one stays valid
+- [X] T025 [US2] Load the emissive sheet in `wizard-hunt-online/public/client.js` through the existing `ASSETS` / `window.__ASSETS` mechanism, reading its filename from the manifest rather than hardcoding it
+- [X] T026 [US2] Collect glow draws during the actor pass in `wizard-hunt-online/public/client.js` — position, row, step and the actor's own alpha — instead of drawing them inline
+- [X] T027 [US2] Draw the collected glow sprites after the fog fill in `wizard-hunt-online/public/client.js`, restoring the world transform for the pass and multiplying by each actor's recorded alpha so invisibility still applies (FR-011, FR-012)
+- [X] T028 [US2] **No code needed**: corpses are drawn as rectangles, never from the sheet, so FR-013 holds by construction. Suppress the emissive layer for corpses in `wizard-hunt-online/public/client.js` — dead kit does not glow (FR-013)
+- [X] T029 [US2] **No code needed**: base feeds draw coloured blocks with no sheet and no fog, so FR-015 holds by construction. Apply the same glow rule to the base camera feeds in `wizard-hunt-online/public/client.js`, so the base and the field do not render two different games (FR-015)
+- [X] T030 [US2] **Decided: `source-over`.** The glow is one or two pixels per sprite, so `lighter` adds no bloom worth having while still risking a blown-out lamp over a lit compartment; research R2 pre-registered source-over as the tie-break. Decide the composite mode by looking: screenshot the glow pass with `source-over` and with `globalCompositeOperation = "lighter"` over both a doused compartment and a lit one, then pick — research.md R2 left this open deliberately, and `source-over` wins any tie
+- [X] T031 [US2] **Measured: artifact 244 394 -> 256 829 B (+12.1 KB)**, accounted as manifest 2 762 B (inside its 5 120 B budget), glow sheet 3 453 B base64 (outside that budget by design, R6), client.js +6 156 B. R6's fallback not needed. Offline run verified: 24 states inline, **zero network requests**, canvas renders, no console errors. Inline `hunters_glow.png` in `wizard-hunt-online/tools/build-sandbox.js` and measure the artifact's growth against the T002 baseline; if the second sheet blows the budget, take R6's fallback and widen the base sheet by a frame column instead of shipping a second image
+- [X] T032 [US2] Confirm SC-006 by diffing a full-light screenshot against `baseline-full-light.png` from T001 — at full light the change must be invisible
 
 **Checkpoint**: US2 is complete and shippable. Both P1 stories done.
 
@@ -140,12 +140,12 @@ target the fog. The doused-actor gap is out of scope and recorded as FR-011a.
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T033 [P] Update the sprite-sheet section of `wizard-hunt-online/README.md`: the coupling is now a manifest and a test, not a comment and a hope
-- [ ] T034 [P] Update the ORDER MATTERS header comment in `wizard-hunt-online/src/classes.js` — reordering is now safe after regeneration, and the comment should say what is actually true
-- [ ] T035 [P] Note the manifest and the emissive layer in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`'s module docstring, replacing the row-formula description
-- [ ] T036 Record the emissive-layer rule in `.claude/skills/fantasy-pixel-art/SKILL.md` — a lit fitting drawn under the darkening pass is a lit fitting that goes out, which is the same class of mistake as drawing the background dim instead of dimming it
-- [ ] T037 Run `quickstart.md` end to end, including the deliberate-failure steps 2a, 2b and 3, and confirm every SC in its Done-when table
-- [ ] T038 Confirm SC-008 with `time npm test` against the T003 baseline
+- [X] T033 [P] Update the sprite-sheet section of `wizard-hunt-online/README.md`: the coupling is now a manifest and a test, not a comment and a hope
+- [X] T034 [P] Update the ORDER MATTERS header comment in `wizard-hunt-online/src/classes.js` — reordering is now safe after regeneration, and the comment should say what is actually true
+- [X] T035 [P] Note the manifest and the emissive layer in `pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`'s module docstring, replacing the row-formula description
+- [X] T036 Record the emissive-layer rule in `.claude/skills/fantasy-pixel-art/SKILL.md` — a lit fitting drawn under the darkening pass is a lit fitting that goes out, which is the same class of mistake as drawing the background dim instead of dimming it
+- [X] T037 Run `quickstart.md` end to end, including the deliberate-failure steps 2a, 2b and 3, and confirm every SC in its Done-when table
+- [X] T038 Confirm SC-008 with `time npm test` against the T003 baseline
 
 ---
 

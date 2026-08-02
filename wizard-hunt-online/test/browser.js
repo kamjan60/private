@@ -185,6 +185,66 @@ function bot(name, room) {
     return lit > 40;
   }));
 
+  // ------------------------------------------------------- the glow layer
+  //
+  // Measured as the difference between a frame with the emissive pass and one
+  // without, sampled ONLY inside the player's own sprite box at the exact
+  // centre of the canvas.
+  //
+  // The first version of this compared whole frames and passed before the
+  // feature existed, which is the "test that measures nothing" the plan warned
+  // about: bots walk and effects animate between two frames, so a whole-frame
+  // difference is mostly the game moving. The player's own 32px box is the one
+  // region that holds still as long as nobody touches the controls, so that is
+  // where the measurement goes. Averaged over three pairs to damp what is left.
+  const probe = async (invisible) => page.evaluate(async (inv) => {
+    const c = document.getElementById("cv"), g = c.getContext("2d");
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const Z = 2, box = 34 * Z * (window.devicePixelRatio || 1);
+    const x = Math.round(c.width / 2 - box / 2), y = Math.round(c.height / 2 - box / 2);
+    const snap = () => g.getImageData(x, y, Math.round(box), Math.round(box)).data;
+
+    window.__forceInvisible = !!inv;
+    let gain = 0, bright = 0;
+    for (let pass = 0; pass < 3; pass++) {
+      window.__noGlow = false;
+      await frame();
+      const lit = snap();
+      window.__noGlow = true;
+      await frame();
+      const dark = snap();
+      for (let i = 0; i < lit.length; i += 4) {
+        const a = lit[i] + lit[i + 1] + lit[i + 2];
+        const d = a - (dark[i] + dark[i + 1] + dark[i + 2]);
+        if (d > gain) gain = d;
+        // absolute brightness of pixels the glow pass actually touched
+        if (d > 5 && a > bright) bright = a;
+      }
+    }
+    window.__noGlow = false;
+    window.__forceInvisible = false;
+    return { gain, bright };
+  }, invisible);
+
+  const solid = await probe(false);
+  ok("the emissive layer survives the fog", solid.gain > 30,
+    "brightest gain from the glow pass: " + solid.gain);
+
+  // SC-005, the failure that is silent. A layer that ignores darkness must
+  // not also ignore transparency, or Cień lights the mage up in exactly the
+  // dark he needs.
+  //
+  // Measured as the absolute brightness of the pixels the glow pass touched,
+  // NOT as its gain over the no-glow frame. The first version compared gains
+  // and reported the implementation broken when it was correct: with
+  // source-over, a full-alpha glow replaces an already-bright body pixel and
+  // shows a small delta, while a 0.34 glow replaces a dimmed one and shows a
+  // larger delta. The gain went *up* under invisibility while the sprite
+  // itself correctly went dimmer.
+  const faded = await probe(true);
+  ok("the glow obeys invisibility", faded.bright < solid.bright * 0.85,
+    "brightest lit pixel: solid " + solid.bright + " vs invisible " + faded.bright);
+
   ok("no console errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await page.screenshot({ path: "/tmp/claude-0/-home-user-private/52e79e33-cf85-553d-ae79-08317ac3905c/scratchpad/wizard-mobile.png" });

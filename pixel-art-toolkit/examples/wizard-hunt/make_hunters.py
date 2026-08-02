@@ -18,13 +18,24 @@ Equipment is drawn too. Each class picks one of three items before the round,
 and the sheet carries all three, so what somebody is carrying is part of how
 they look rather than a line in a menu.
 
-Sheet layout, coupled to the client and to src/classes.js:
+Three files are written:
 
-    columns  the two walk frames
-    rows     (class * 3 + item) * 4 + direction,  direction = down/left/right/up
+    hunters.png       the bodies
+    hunters_glow.png  only the pixels that are their own light source
+    hunters.json      what is where, by name
 
-Reordering CLASSES or any class's item list without editing classes.js in
-step silently hands every player somebody else's body.
+That last one used to be a formula instead -- `(class * 3 + item) * 4 +
+direction` -- copied into the client and implied by classes.js, so reordering
+either axis silently handed players somebody else's body with no error
+anywhere. Rows are now decided here, once, while the sprite is being drawn,
+and written down. Nothing downstream recomputes them, and a name cannot drift
+the way an index can. Reordering CLASSES is safe after a regeneration;
+renaming an item without one fails the test suite by name.
+
+The glow sheet exists because the client has no shaders. SS14 marks a layer
+unshaded and skips lighting for it; here the equivalent is draw order, so
+these pixels are blitted after the fog and a lamp stops fading at the same
+rate as the body carrying it.
 """
 import json
 import os
@@ -627,10 +638,38 @@ def hunter(cfg, item, facing, step):
 
 FRAMES = 2
 
+
+def emissive(img, pal):
+    """The pixels that are their own light source, on a transparent field.
+
+    A second sheet rather than a channel trick, because the client has no
+    shaders: SS14 marks a layer unshaded and skips lighting for it, and with
+    one canvas and one gradient the only equivalent is draw order. These
+    pixels get drawn *after* the fog, so a lamp at the edge of somebody's
+    vision stops fading at the same rate as the body carrying it.
+
+    What counts as emissive is the generator's own existing convention -- a
+    class's `glow` and `glow_lo` are the powered colours, used for the chest
+    light, the Technik's lamp, the Strażnik's lit visor, the Runarz's etching
+    and every item indicator. Amber goggle glass is *not* here: a lens
+    catching light is not a lens producing it.
+    """
+    out = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    keep = {pal["glow"], pal["glow_lo"]}
+    src, dst = img.load(), out.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            c = src[x, y]
+            if c in keep:
+                dst[x, y] = c
+    return out
+
+
 states = []
 row = 0
 rows_total = sum(len(cfg[4]) for cfg in CLASSES) * len(DIRS)
 sheet = Image.new("RGBA", (S * FRAMES, S * rows_total), (0, 0, 0, 0))
+glow_sheet = Image.new("RGBA", (S * FRAMES, S * rows_total), (0, 0, 0, 0))
 
 for cfg in CLASSES:
     for item in cfg[4]:
@@ -643,10 +682,14 @@ for cfg in CLASSES:
         for di, _d in enumerate(DIRS):
             for step in range(FRAMES):
                 f = hunter(cfg, item, _d, step)
-                sheet.paste(f, (step * S, (row + di) * S), f)
+                at = (step * S, (row + di) * S)
+                sheet.paste(f, at, f)
+                gl = emissive(f, cfg[3])
+                glow_sheet.paste(gl, at, gl)
         row += len(DIRS)
 
 sheet.save(os.path.join(OUT, "hunters.png"))
+glow_sheet.save(os.path.join(OUT, "hunters_glow.png"))
 
 # The manifest, after RSI's meta.json. Field order is the insertion order of
 # these literals and `states` is built in draw order, so regenerating an
@@ -659,7 +702,7 @@ sheet.save(os.path.join(OUT, "hunters.png"))
 manifest = {
     "version": 1,
     "size": {"x": S, "y": S},
-    "sheets": {"base": "hunters.png"},
+    "sheets": {"base": "hunters.png", "emissive": "hunters_glow.png"},
     "directions": list(DIRS),
     "states": states,
 }

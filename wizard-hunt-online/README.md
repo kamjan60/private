@@ -203,17 +203,29 @@ snapshot is culled per player *before* it is serialised. A body outside your
 vision is absent from the message, not hidden in it, so stripping the overlay
 client-side reveals nothing.
 
-Both the class order **and** each class's item order in `src/classes.js` must
-match `CLASSES` in `../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`.
-The sheet is laid out `(class * 3 + item) * 4 + direction`, so a reordering on
-either axis silently hands players somebody else's body or somebody else's
-kit. A test reads the PNG header and fails if the sheet has the wrong number
-of rows, but it cannot see a reordering — only a resize. Regenerate with:
+Sprites are looked up **by name**. The generator writes `hunters.json`
+alongside the sheet — frame size, direction order, and one named state per
+`class/item` — and nothing downstream computes a row. That replaced a formula
+(`(class * 3 + item) * 4 + direction`) that lived in three files at once and
+was enforced by nothing: reordering either axis handed players somebody else's
+body with no error anywhere, and since classes are unique per round, a wrong
+silhouette is forged evidence rather than a cosmetic bug.
+
+So reordering `classes.js` is now safe after a regeneration, and renaming or
+adding an item without one fails `npm test` naming the missing state.
+Regenerate with:
 
 ```bash
 python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters.png public/assets/
+cp ../pixel-art-toolkit/examples/wizard-hunt/hunters{.png,_glow.png,.json} public/assets/
 ```
+
+`hunters_glow.png` carries only the pixels that are their own light source —
+chest lights, the Technik's lamp, the Strażnik's lit visor. They are drawn
+**after** the fog, so a lamp at the edge of your vision stops fading at the
+same rate as the body carrying it, and the dark gets denser instead of just
+greyer. It still obeys transparency: a layer that ignored that would light the
+mage up through his own Cień.
 
 ## Not built yet
 
