@@ -104,6 +104,14 @@ without an artifact; his Filtr still sees entries the mage erased.
 
 Eight, one per seat, each picking one of three items before the round.
 
+They are eight people rather than one silhouette in eight hats: builds differ
+at the shoulder and the waist, skin and hair differ, and each wears as much or
+as little over the face as the job allows. **The chosen item is drawn on the
+body**, so kit is something you observe rather than something people claim.
+That trades one bluff for a sharper question — nobody can lie about carrying
+the Stabilizator, but everybody can see who is carrying it and has revived
+nobody. A disguise borrows the whole appearance, kit included.
+
 | Class | Vision | Notes |
 |---|---|---|
 | Strażnik | 210 | survives a hit; slower |
@@ -195,10 +203,12 @@ snapshot is culled per player *before* it is serialised. A body outside your
 vision is absent from the message, not hidden in it, so stripping the overlay
 client-side reveals nothing.
 
-The class order in `src/classes.js` must match `CLASSES` in
-`../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`; the client indexes
-sheet rows by class position, so a reordering silently hands every player
-somebody else's body. Regenerate with:
+Both the class order **and** each class's item order in `src/classes.js` must
+match `CLASSES` in `../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py`.
+The sheet is laid out `(class * 3 + item) * 4 + direction`, so a reordering on
+either axis silently hands players somebody else's body or somebody else's
+kit. A test reads the PNG header and fails if the sheet has the wrong number
+of rows, but it cannot see a reordering — only a resize. Regenerate with:
 
 ```bash
 python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py

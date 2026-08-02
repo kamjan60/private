@@ -97,6 +97,17 @@
   var LAMP = 15;
 
   var CLASS_ROW = {};
+  /**
+   * Sprite-sheet row. The sheet holds every class three times over, once per
+   * item, so what somebody is carrying shows on the body -- see
+   * make_hunters.py, whose layout this formula is the other half of.
+   *
+   * `it` is an apparent item: under a disguise the server sends the borrowed
+   * class's kit, never the mage's own.
+   */
+  function sheetRow(cls, it, dir) {
+    return ((CLASS_ROW[cls] || 0) * 3 + (it || 0)) * 4 + (dir || 0);
+  }
 
   var cv = $("cv"), ctx = cv.getContext("2d");
   var ZOOM = 2, CAM = { x: 0, y: 0 };
@@ -360,6 +371,17 @@
     var c = DEF.classes.filter(function (x) { return x.name === cls; })[0];
     if (!c) return null;
     return c.items.filter(function (x) { return x.id === id; })[0] || null;
+  }
+
+  /** Your own kit as a sheet offset. The server sends everyone else's already
+   *  resolved; your own body is drawn from what you picked. */
+  function myItemIndex() {
+    var c = ROLE && DEF.classes.filter(function (x) { return x.name === ROLE.cls; })[0];
+    if (!c) return 0;
+    for (var i = 0; i < c.items.length; i++) {
+      if (c.items[i].id === ROLE.item) return i;
+    }
+    return 0;
   }
 
   /** 64 px circles cannot hold "Plecak z kamizelkami". */
@@ -1128,10 +1150,10 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     // your mage in the middle: the book belongs to somebody
-    var row = CLASS_ROW[ROLE.cls] || 0;
+    var row = sheetRow(ROLE.cls, myItemIndex(), 0);
     var sz = 34 * r0;
     if (SHEET.complete && SHEET.naturalWidth) {
-      ctx.drawImage(SHEET, 0, row * 4 * 32, 32, 32, cx - sz / 2, cy - sz / 2, sz, sz);
+      ctx.drawImage(SHEET, 0, row * 32, 32, 32, cx - sz / 2, cy - sz / 2, sz, sz);
     }
     ctx.strokeStyle = "rgba(198,130,255,0.5)"; ctx.lineWidth = 2 * r0;
     ctx.beginPath(); ctx.arc(cx, cy, sz * 0.78, 0, 6.284); ctx.stroke();
@@ -1397,15 +1419,14 @@
   }
 
   function drawActor(a, alpha) {
-    var row = CLASS_ROW[a.cls] || 0;
-    var dir = a.dir || 0;
+    var row = sheetRow(a.cls, a.it, a.dir);
     // Cień: your own body goes see-through, because otherwise the only way to
     // tell whether the spell is still up is to be shot at.
     var fade = a.invisible ? 0.34 : (alpha === undefined ? 1 : alpha);
     var prev = ctx.globalAlpha;
     if (fade !== 1) ctx.globalAlpha = prev * fade;
     if (SHEET.complete && SHEET.naturalWidth) {
-      ctx.drawImage(SHEET, (a.step ? 32 : 0), (row * 4 + dir) * 32, 32, 32,
+      ctx.drawImage(SHEET, (a.step ? 32 : 0), row * 32, 32, 32,
         Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
     } else {
       ctx.fillStyle = "#8b9ac0";

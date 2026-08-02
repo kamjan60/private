@@ -143,6 +143,19 @@ function findItem(className, itemId) {
 }
 
 /**
+ * Which of the class's three items this is, as a sprite-sheet offset.
+ *
+ * The sheet holds every class three times over, once per item, so kit shows
+ * on the body. An item that does not belong to the class -- which is what a
+ * disguise produces -- falls back to the first, because half a disguise is
+ * worse than none.
+ */
+function itemIndex(className, itemId) {
+  const i = itemsOf(className).findIndex((it) => it.id === itemId);
+  return i < 0 ? 0 : i;
+}
+
+/**
  * Deal one unique class to each player. Fewer than eight players means some
  * classes simply do not appear -- and their absence is itself information a
  * careful hunter can use, which is intended.
@@ -181,5 +194,5 @@ function statsFor(className, itemId) {
 }
 
 module.exports = {
-  CLASSES, CLASS_NAMES, classRow, itemsOf, findItem, dealClasses, statsFor
+  CLASSES, CLASS_NAMES, classRow, itemsOf, findItem, itemIndex, dealClasses, statsFor
 };

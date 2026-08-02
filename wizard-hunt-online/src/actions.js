@@ -14,7 +14,7 @@ const {
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
   PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS
 } = require("./rules");
-const { findItem } = require("./classes");
+const { findItem, itemIndex } = require("./classes");
 const { free, compartmentAt, isCorridor } = require("./map");
 const { logTransit, makeCorpse } = require("./evidence");
 const { apparentClass, pushEvent, alive, hunters } = require("./room");
@@ -170,7 +170,7 @@ function hit(room, target, source, school, api) {
   target.channel = null;
   room.corpses.push(makeCorpse({
     x: Math.round(target.x), y: Math.round(target.y),
-    cls: target.cls, name: target.name,
+    cls: target.cls, it: itemIndex(target.cls, target.item), name: target.name,
     id: Number(String(target.id).replace(/\D/g, "")) || 1,
     school, t: now
   }));

@@ -242,6 +242,13 @@ Mag wybiera **także wyposażenie swojej klasy przykrywkowej** i musi umieć
 je odegrać. Podał się za Chirurga ze stabilizatorem — niech kogoś
 podniesie. Przykrywka jest rolą, nie etykietą.
 
+**Wyposażenie widać na sylwetce.** Arkusz sprite'ów rysuje każdą klasę
+trzy razy — po razie na przedmiot — więc to, co ktoś niesie, jest
+obserwacją, nie deklaracją. Zamienia to jeden blef na ostrzejsze
+pytanie: nikt nie skłamie, że wziął stabilizator, ale każdy widzi, kto
+go nosi i nikogo nie podniósł. Przebranie pożycza cały wygląd razem ze
+sprzętem — inaczej sylwetka przeczyłaby twarzy i wydawała maga za darmo.
+
 ### Trzy style z tych samych dziesięciu slotów
 
 * **Rzeźnik** (ogień/woda) — zabija wprost, zostawia czytelny podpis.

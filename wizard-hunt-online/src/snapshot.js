@@ -13,7 +13,7 @@
 
 const { W, H } = require("./rules");
 const { visionMult } = require("./round");
-const { apparentClass } = require("./room");
+const { apparentClass, apparentItem } = require("./room");
 const { liveCameras } = require("./base");
 const { compartmentAt } = require("./map");
 
@@ -51,7 +51,7 @@ function visionOf(room, p, now) {
 /** A body as somebody else sees it: apparent class, no role, no book. */
 function actorView(o, now) {
   return {
-    id: o.id, name: o.name, cls: apparentClass(o),
+    id: o.id, name: o.name, cls: apparentClass(o), it: apparentItem(o),
     x: Math.round(o.x), y: Math.round(o.y), dir: o.dir, step: o.step,
     stunned: o.stunUntil > now, down: o.down,
     channel: o.channel ? o.channel.kind : null,
@@ -67,7 +67,8 @@ function actorView(o, now) {
  *  and nothing that would let it put a name to either. */
 function silhouette(o) {
   return {
-    cls: apparentClass(o), x: Math.round(o.x), y: Math.round(o.y),
+    cls: apparentClass(o), it: apparentItem(o),
+    x: Math.round(o.x), y: Math.round(o.y),
     dir: o.dir, step: o.step
   };
 }
@@ -118,7 +119,7 @@ function forLiving(room, me, now) {
     },
     actors,
     corpses: room.corpses.filter(near).map((c) => ({
-      id: c.id, x: c.x, y: c.y, cls: c.cls, name: c.name
+      id: c.id, x: c.x, y: c.y, cls: c.cls, it: c.it, name: c.name
     })),
     artifacts: room.round.artifacts
       .filter((a) => a.act <= room.round.act && near(a))
@@ -157,7 +158,7 @@ function forBase(room, me, now) {
     // Fałszywa sylwetka: the mage feeds the base a class that is not there
     for (const f of room.markers) {
       if (f.kind === "fake-silhouette" && f.room === name && f.until > now) {
-        bodies.push({ cls: f.cls, x: f.x, y: f.y, dir: 0, step: 0 });
+        bodies.push({ cls: f.cls, it: f.it, x: f.x, y: f.y, dir: 0, step: 0 });
       }
     }
     return { room: name, bodies };
@@ -171,7 +172,7 @@ function forBase(room, me, now) {
       watching
     },
     feeds,
-    corpses: room.corpses.map((c) => ({ id: c.id, x: c.x, y: c.y, cls: c.cls, name: c.name })),
+    corpses: room.corpses.map((c) => ({ id: c.id, x: c.x, y: c.y, cls: c.cls, it: c.it, name: c.name })),
     artifacts: room.round.artifacts
       .filter((a) => a.act <= room.round.act)
       .map((a) => ({ id: a.id, x: a.x, y: a.y, state: a.state, room: a.room })),

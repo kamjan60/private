@@ -1,17 +1,30 @@
-"""Hunter classes for "I'm Not a Wizard, Harry" - techno-gothic, 32x32.
+"""Hunter sprites for "I'm Not a Wizard, Harry" - people, 32x32.
 
-Dark fantasy wearing high tech: blackened plate and heavy cloaks, but with
-powered lenses, glowing rune-etching and cabling. The palette does most of
-that work - everything structural sits at near-black slate so the one
-saturated per-class glow reads as *powered* rather than as paint.
+The first sheet drew eight sealed helmets on eight identical blocks, and it
+read as a squad of robots. Nothing about that was the palette: a head with no
+face, a torso with no neck and no layers, and one silhouette copy-pasted eight
+times gives you machines no matter what colour you paint them.
 
-Six classes, each with its own headgear silhouette, weapon and glow hue,
-because in a multiplayer round you must name who you saw at a glance. The
-shared dark body keeps them a squad; the head and the weapon carry the
-identity.
+So this sheet is built the other way round. There is one human body function
+driven by a *build* -- shoulder width, waist, torso length, leg spacing,
+posture -- and eight builds that differ enough to tell apart by outline
+alone. On top of that each class gets its own face: skin tone, hair, and a
+head treatment showing as much of the person as the job allows. The Strażnik
+wears a hard shell with the visor up; the Chirurg wears a respirator over the
+mouth and nothing over the eyes; the Archiwista wears reading optics and is
+the only one going grey.
 
-Sheet layout: columns are the two walk frames, rows are class*4 + direction
-(down/left/right/up).
+Equipment is drawn too. Each class picks one of three items before the round,
+and the sheet carries all three, so what somebody is carrying is part of how
+they look rather than a line in a menu.
+
+Sheet layout, coupled to the client and to src/classes.js:
+
+    columns  the two walk frames
+    rows     (class * 3 + item) * 4 + direction,  direction = down/left/right/up
+
+Reordering CLASSES or any class's item list without editing classes.js in
+step silently hands every player somebody else's body.
 """
 import os
 
@@ -19,42 +32,57 @@ from PIL import Image
 
 S = 32
 DIRS = ["down", "left", "right", "up"]
-OUT = os.path.dirname(__file__)
+OUT = os.path.dirname(os.path.abspath(__file__))
 
-# shared techno-gothic base
-PLATE_HI = (92, 100, 118, 255)
-PLATE    = (52, 57, 70, 255)
-PLATE_D  = (33, 36, 46, 255)
-PLATE_XD = (20, 22, 29, 255)
-LEATHER  = (58, 46, 38, 255)
-BOOT     = (26, 26, 34, 255)
-BRASS    = (146, 116, 58, 255)
-BRASS_D  = (98, 76, 34, 255)
-CABLE    = (40, 42, 52, 255)
-STEEL    = (128, 136, 152, 255)
-VOID     = (12, 13, 18, 255)
-
-# Order must match CLASS_NAMES in ../../wizard-hunt-online/src/classes.js:
-# the client indexes sheet rows by class position, so a reordering here
-# silently gives every player somebody else's body.
-CLASSES = [
-    ("Strażnik", (44, 46, 56, 255), (26, 27, 34, 255),
-     (196, 210, 232, 255), (108, 124, 150, 255), "greathelm", "hammer"),
-    ("Zwiadowca", (36, 62, 46, 255), (22, 40, 30, 255),
-     (140, 240, 150, 255), (52, 138, 70, 255), "hood", "crossbow"),
-    ("Strzelec", (30, 52, 96, 255), (18, 32, 62, 255),
-     (120, 208, 255, 255), (44, 118, 172, 255), "visorcap", "rifle"),
-    ("Inkwizytor", (74, 30, 38, 255), (46, 18, 24, 255),
-     (255, 168, 72, 255), (166, 96, 26, 255), "widebrim", "pistol"),
-    ("Chirurg", (58, 56, 40, 255), (36, 34, 24, 255),
-     (216, 232, 120, 255), (128, 146, 48, 255), "beak", "censer"),
-    ("Runarz", (56, 34, 74, 255), (34, 20, 46, 255),
-     (198, 130, 255, 255), (110, 62, 158, 255), "techcowl", "rod"),
-    ("Archiwista", (40, 46, 62, 255), (24, 28, 40, 255),
-     (159, 180, 216, 255), (86, 104, 142, 255), "datavisor", "slate"),
-    ("Technik", (62, 48, 28, 255), (38, 30, 18, 255),
-     (255, 210, 122, 255), (166, 124, 48, 255), "lamphelm", "torch"),
+# ---------------------------------------------------------------- palette
+# Four skin tones and four hair colours, dealt out so the squad reads as
+# eight people rather than one person in eight hats.
+SKINS = [
+    ((206, 158, 122, 255), (156, 112, 84, 255), (232, 186, 150, 255)),
+    ((236, 196, 158, 255), (184, 140, 108, 255), (252, 220, 188, 255)),
+    ((162, 114, 82, 255), (114, 76, 54, 255), (196, 148, 112, 255)),
+    ((120, 82, 60, 255), (82, 54, 40, 255), (154, 110, 82, 255)),
 ]
+HAIRS = {
+    "brown": ((58, 44, 38, 255), (86, 66, 54, 255)),
+    "black": ((32, 30, 34, 255), (56, 54, 60, 255)),
+    "sand":  ((122, 98, 62, 255), (162, 136, 92, 255)),
+    "grey":  ((132, 130, 128, 255), (170, 168, 164, 255)),
+    "red":   ((124, 66, 40, 255), (162, 96, 58, 255)),
+}
+
+EYE      = (30, 34, 44, 255)
+STUBBLE  = (86, 70, 62, 255)
+# Trousers are squad issue and deliberately not derived from the coat: a dark
+# saturated coat shades to near-black, and on the first pass the Inkwizytor,
+# Runarz and Technik lost their legs into their own hems and walked around as
+# blobs. One neutral slate for everybody also does something useful -- the
+# builds differ, the uniform below the waist does not, so they still read as
+# one squad.
+TROUSER  = (58, 56, 66, 255)
+TROUSER_LO = (40, 38, 48, 255)
+BOOT     = (26, 24, 30, 255)
+# The vest is issued kit and so is one grey for everybody. Deriving it from
+# each class's coat put a dark purple plate on a dark purple coat and the
+# Runarz's whole torso read as a single slab -- the layering was there in the
+# code and invisible on screen. The class colour now lives only in the coat,
+# which is the larger area anyway.
+VEST     = (60, 64, 78, 255)
+VEST_HI  = (92, 98, 116, 255)
+VEST_LO  = (36, 39, 48, 255)
+STRAP    = (72, 54, 38, 255)
+STRAP_HI = (104, 78, 54, 255)
+STEEL    = (120, 132, 152, 255)
+STEEL_LO = (72, 82, 98, 255)
+GEAR     = (84, 90, 104, 255)
+GEAR_HI  = (116, 124, 142, 255)
+RUBBER   = (40, 42, 48, 255)
+BRASS    = (146, 116, 58, 255)
+GLASS    = (214, 150, 72, 255)
+GLASS_HI = (242, 196, 118, 255)
+CANVAS   = (78, 76, 64, 255)
+CANVAS_LO = (48, 48, 40, 255)
+CANVAS_HI = (108, 104, 86, 255)
 
 
 class G:
@@ -63,233 +91,567 @@ class G:
         self.p = self.img.load()
 
     def put(self, x, y, c):
-        if 0 <= x < S and 0 <= y < S:
-            self.p[x, y] = c
+        if 0 <= int(x) < S and 0 <= int(y) < S:
+            self.p[int(x), int(y)] = c
 
     def span(self, y, x0, x1, c):
         for x in range(int(x0), int(x1) + 1):
             self.put(x, y, c)
 
-    def spans(self, t, c):
-        for y, x0, x1 in t:
+    def rect(self, x0, y0, x1, y1, c):
+        for y in range(int(y0), int(y1) + 1):
             self.span(y, x0, x1, c)
 
 
-def head(g, kind, dy, glow, glow_d, cloak, cloak_d, back, side, facing):
-    if kind == "widebrim":
-        g.spans([(5 + dy, 13, 18), (6 + dy, 12, 19), (7 + dy, 12, 19)], PLATE_D)
-        g.spans([(8 + dy, 7, 24), (9 + dy, 8, 23)], PLATE_XD)     # wide brim
-        if not back:
-            g.spans([(10 + dy, 12, 19), (11 + dy, 12, 19)], VOID)
-            g.spans([(10 + dy, 13, 14)], glow)                    # single lens
-            g.put(15, 10 + dy, glow_d)
-    elif kind == "greathelm":
-        g.spans([(5 + dy, 12, 19), (6 + dy, 11, 20), (7 + dy, 11, 20),
-                 (8 + dy, 11, 20), (9 + dy, 11, 20), (10 + dy, 11, 20),
-                 (11 + dy, 12, 19)], PLATE if not back else PLATE_D)
-        g.span(6 + dy, 11, 12, PLATE_HI)
-        if not back:
-            g.spans([(8 + dy, 12, 19)], VOID)                     # visor slit
-            g.spans([(8 + dy, 13, 14), (8 + dy, 17, 18)], glow)
-        g.spans([(4 + dy, 15, 16)], BRASS)                        # crest spike
-    elif kind == "hood":
-        g.spans([(5 + dy, 13, 18), (6 + dy, 11, 20), (7 + dy, 10, 21),
-                 (8 + dy, 10, 21), (9 + dy, 10, 21), (10 + dy, 11, 20),
-                 (11 + dy, 12, 19)], cloak)
-        g.spans([(6 + dy, 11, 13), (7 + dy, 10, 12)], cloak_d)
-        if not back:
-            g.spans([(9 + dy, 12, 19), (10 + dy, 13, 18)], VOID)  # shadowed face
-            g.spans([(9 + dy, 13, 14), (9 + dy, 17, 18)], glow)
-    elif kind == "beak":
-        g.spans([(5 + dy, 13, 18), (6 + dy, 12, 19), (7 + dy, 12, 19),
-                 (8 + dy, 12, 19), (9 + dy, 12, 19)], PLATE_D)
-        if not back:
-            g.spans([(7 + dy, 13, 14), (7 + dy, 17, 18)], glow)   # goggle lenses
-            # the beak, jutting toward whichever way the class is facing
-            bx = 19 if facing != "left" else 12
-            step = 1 if facing != "left" else -1
-            for i in range(4):
-                g.put(bx + step * i, 10 + dy + i // 2, BRASS if i < 2 else BRASS_D)
-    elif kind == "visorcap":
-        g.spans([(6 + dy, 12, 19), (7 + dy, 11, 20), (8 + dy, 11, 20),
-                 (9 + dy, 11, 20), (10 + dy, 11, 20), (11 + dy, 12, 19)], PLATE)
-        g.span(7 + dy, 11, 12, PLATE_HI)
-        if not back:
-            g.spans([(9 + dy, 11, 20)], VOID)                    # long optic bar
-            g.spans([(9 + dy, 12, 18)], glow)
-        # rangefinder stalk, the marksman's silhouette tell
-        g.spans([(5 + dy, 18, 19), (6 + dy, 19, 20)], BRASS)
-    elif kind == "techcowl":
-        g.spans([(5 + dy, 12, 19), (6 + dy, 11, 20), (7 + dy, 11, 20),
-                 (8 + dy, 11, 20), (9 + dy, 11, 20), (10 + dy, 12, 19)], PLATE_D)
-        g.spans([(6 + dy, 11, 12)], PLATE_HI)
-        if not back:
-            g.spans([(8 + dy, 12, 19)], VOID)
-            g.spans([(8 + dy, 14, 17)], glow)                     # single wide band
-        for i, yy in enumerate(range(11, 17)):                    # cables to the back
-            g.put(9 - (i // 3), yy + dy, CABLE)
-            g.put(22 + (i // 3), yy + dy, CABLE)
-    elif kind == "datavisor":
-        # low scribe's cap: the silhouette has to stay flat, because this is
-        # the class people confuse with the Chirurg down a dark corridor and
-        # the confusion should come from the body, not from a copied hat
-        g.spans([(6 + dy, 12, 19), (7 + dy, 11, 20), (8 + dy, 11, 20),
-                 (9 + dy, 11, 20)], PLATE_D)
-        g.span(7 + dy, 11, 13, PLATE_HI)
-        if not back:
-            g.spans([(10 + dy, 12, 19)], VOID)
-            # one lens, not two: the asymmetry is the reading-eye tell
-            side_x = (16, 18) if facing != "left" else (13, 15)
-            g.span(10 + dy, side_x[0], side_x[1], glow)
-            g.put(side_x[0] - 1 if facing != "left" else side_x[1] + 1, 10 + dy, glow_d)
-        g.spans([(4 + dy, 19, 19), (5 + dy, 19, 19)], BRASS)      # stub aerial
-    elif kind == "lamphelm":
-        g.spans([(6 + dy, 12, 19), (7 + dy, 11, 20), (8 + dy, 11, 20),
-                 (9 + dy, 11, 20), (10 + dy, 11, 20), (11 + dy, 12, 19)],
-                PLATE if not back else PLATE_D)
-        g.span(7 + dy, 11, 12, PLATE_HI)
-        # the lamp: the one class that carries its own light source, which is
-        # exactly what act III is about
-        g.spans([(3 + dy, 14, 17), (4 + dy, 14, 17)], BRASS)
-        g.span(4 + dy, 15, 16, glow)
-        if not back:
-            g.spans([(9 + dy, 12, 19)], VOID)                     # rebreather grille
-            for x in range(13, 19, 2):
-                g.put(x, 9 + dy, glow_d)
-            g.spans([(11 + dy, 13, 18)], PLATE_D)
+# ---------------------------------------------------------------- the body
+#
+# A build is the whole of what makes two hunters different at a glance, before
+# any hat or weapon: how wide they are at the shoulder, how wide at the waist,
+# where the shoulders sit, and how far apart the feet are.
+#
+#   sh     shoulder half-width      5 lean .. 8 heavy
+#   wa     waist half-width         4 lean .. 8 heavy
+#   top    y of the shoulders       13 tall .. 16 short
+#   legw   half-width of a leg      1 or 2
+#   gap    space between the legs
+#   lean   1 = shoulders pushed forward, for the ones who stoop
+
+def build(sh=6, wa=6, top=15, legw=1, gap=3, lean=0):
+    return dict(sh=sh, wa=wa, top=top, legw=legw, gap=gap, lean=lean)
 
 
-def weapon(g, kind, dy, glow, glow_d, facing):
-    left = facing == "left"
-    gx = 6 if left else 25          # off-hand side keeps it clear of the body
-    if kind == "pistol":
-        g.spans([(18 + dy, gx - 1, gx + 2), (19 + dy, gx - 1, gx + 2)], PLATE)
-        g.put(gx + (2 if not left else -1), 18 + dy, glow)
-    elif kind == "sword":
-        for y in range(6 + dy, 22 + dy):
-            g.put(gx, y, STEEL)
-            g.put(gx + 1, y, glow_d)
-        g.span(21 + dy, gx - 2, gx + 3, BRASS)
-        g.put(gx, 5 + dy, glow)
-    elif kind == "hammer":
-        for y in range(10 + dy, 24 + dy):
-            g.put(gx, y, LEATHER)
-        g.spans([(9 + dy, gx - 2, gx + 2), (10 + dy, gx - 2, gx + 2),
-                 (11 + dy, gx - 2, gx + 2)], PLATE)
-        g.span(10 + dy, gx - 2, gx - 1, glow)
-    elif kind == "rifle":
-        # long barrel - reads as the only ranged weapon on the squad
-        step = 1 if not left else -1
-        for i in range(11):
-            g.put(gx + step * (i - 4), 18 + dy, STEEL if i > 3 else PLATE)
-        g.spans([(19 + dy, gx - 2, gx + 2)], PLATE_D)
-        g.put(gx + step * 7, 18 + dy, glow)
-    elif kind == "crossbow":
-        for y in range(15 + dy, 22 + dy):
-            g.put(gx, y, LEATHER)
-        g.spans([(17 + dy, gx - 2, gx + 2)], PLATE_D)
-        g.spans([(16 + dy, gx - 3, gx - 2), (16 + dy, gx + 2, gx + 3)], STEEL)
-        g.put(gx, 15 + dy, glow)
-    elif kind == "censer":
-        for y in range(12 + dy, 19 + dy):
-            g.put(gx, y, CABLE)                                   # hanging chain
-        g.spans([(19 + dy, gx - 1, gx + 1), (20 + dy, gx - 1, gx + 1)], BRASS)
-        g.put(gx, 20 + dy, glow)
-    elif kind == "rod":
-        for y in range(8 + dy, 24 + dy):
-            g.put(gx, y, PLATE_D)
-        g.spans([(7 + dy, gx - 1, gx + 1), (8 + dy, gx - 1, gx + 1)], glow)
-        g.put(gx, 6 + dy, glow_d)
-    elif kind == "slate":
-        # held flat at the chest rather than out to the side: this is the one
-        # hunter whose hands are busy reading instead of pointing. Chest-held
-        # means it has to disappear when he turns his back, or the screen
-        # glows through him.
-        if facing == "up":
-            g.spans([(16 + dy, 14, 17), (17 + dy, 14, 17)], PLATE_D)  # its harness
-            return
-        cx = 12 if left else 19
-        g.spans([(15 + dy, cx - 3, cx + 3), (16 + dy, cx - 3, cx + 3),
-                 (17 + dy, cx - 3, cx + 3), (18 + dy, cx - 3, cx + 3),
-                 (19 + dy, cx - 3, cx + 3)], PLATE_D)
-        g.spans([(16 + dy, cx - 2, cx + 2), (17 + dy, cx - 2, cx + 2),
-                 (18 + dy, cx - 2, cx + 2)], glow_d)
-        g.spans([(16 + dy, cx - 2, cx + 2), (18 + dy, cx - 1, cx + 1)], glow)
-        g.spans([(14 + dy, cx - 3, cx + 3)], BRASS_D)
-    elif kind == "torch":
-        for y in range(14 + dy, 22 + dy):
-            g.put(gx, y, LEATHER)
-        g.spans([(19 + dy, gx - 1, gx + 1), (20 + dy, gx - 1, gx + 1)], BRASS)
-        # cutting flame, short and bright - the Technik is the walking lamp
-        g.put(gx, 13 + dy, glow)
-        g.put(gx, 12 + dy, glow_d)
-        g.spans([(21 + dy, gx - 2, gx + 2)], PLATE_D)             # gas bottle
-
-
-def hunter(cfg, facing, step):
-    name, cloak, cloak_d, glow, glow_d, hkind, wkind = cfg
-    g = G()
-    dy = -1 if step == 1 else 0
+def body(g, b, pal, facing, step):
+    """Everything from the collar down. Layered on purpose: trousers, coat,
+    vest over the coat, straps over the vest. One flat block from shoulder to
+    hip is the single biggest reason a sprite reads as manufactured."""
+    coat, coat_hi, coat_lo = pal["coat"], pal["coat_hi"], pal["coat_lo"]
+    vest, vest_hi, vest_lo = VEST, VEST_HI, VEST_LO
+    skin, skin_lo, skin_hi = pal["skin"]
     back = facing == "up"
     side = facing in ("left", "right")
+    top, sh, wa = b["top"], b["sh"], b["wa"]
+    lf, rt = 16 - sh, 15 + sh          # shoulder line
+    lw, rw = 16 - wa, 15 + wa          # waist line
 
-    # legs animate; they sit against the cloak so the motion stays visible
-    off = 2 if step == 0 else -2
-    la = off
-    ra = -off if not side else off // 2
-    for x0, a in ((12, la), (17, ra)):
-        for y in range(24 + dy, 29 + dy):
-            g.span(y, x0 + a, x0 + 2 + a, PLATE_D if y % 4 == 3 else PLATE)
-        g.spans([(29 + dy, x0 + a, x0 + 2 + a), (30 + dy, x0 + a, x0 + 2 + a)], BOOT)
+    # legs: they swing, and the swing is what sells the walk at this size
+    off = 1 if step == 0 else -1
+    w = b["legw"]
+    lx, rx = 16 - b["gap"] - w, 15 + b["gap"] + w
+    for cx0, a in ((lx, off), (rx, -off)):
+        g.rect(cx0 - w + a, 24, cx0 + w + a, 28, TROUSER)
+        g.rect(cx0 - w + a, 24, cx0 - w + a, 28, TROUSER_LO)     # outer edge shaded
+        g.rect(cx0 - w + a, 29, cx0 + w + a, 31, BOOT)
+        g.span(29, cx0 - w + a, cx0 + w + a, (44, 42, 50, 255))  # boot cuff
 
-    # cloak: the class colour, and the only large area of hue on the sprite
-    g.spans([(13 + dy, 10, 21), (14 + dy, 9, 22), (15 + dy, 9, 22),
-             (16 + dy, 8, 23), (17 + dy, 8, 23), (18 + dy, 8, 23),
-             (19 + dy, 8, 23), (20 + dy, 9, 22), (21 + dy, 9, 22),
-             (22 + dy, 10, 21), (23 + dy, 11, 20)], cloak)
-    for y in range(13, 24):
-        g.put(8 if y > 15 else 9, y + dy, cloak_d)
-        g.span(y + dy, 21 if y > 15 else 20, 23 if y > 15 else 22, cloak_d)
+    # coat: shoulders at the top, hem flaring past the waist
+    for y in range(top, 25):
+        t = (y - top) / max(1, 24 - top)
+        x0 = round(lf + (lw - lf) * t * 0.4)
+        x1 = round(rt + (rw - rt) * t * 0.4)
+        g.span(y, x0, x1, coat)
+        g.put(x0, y, coat_lo)
+        g.put(x1, y, coat_hi)
+    g.span(top, lf + 1, rt - 1, coat_hi)
+    g.rect(lw, 23, rw, 24, coat_lo)
 
     if not back:
-        # blackened breastplate over the cloak, with a lit rune seam
-        g.spans([(14 + dy, 12, 19), (15 + dy, 12, 19), (16 + dy, 12, 19),
-                 (17 + dy, 12, 19), (18 + dy, 12, 19), (19 + dy, 13, 18),
-                 (20 + dy, 13, 18)], PLATE_D)
-        for y in range(14, 20):
-            g.put(12, y + dy, PLATE_HI)
-        g.spans([(16 + dy, 15, 16)], glow_d)
-        g.put(15, 15 + dy, glow)
-        g.span(21 + dy, 12, 19, BRASS_D)                # belt
+        # armour vest, shorter than the coat so two layers stay visible
+        g.rect(lf + 2, top + 1, rt - 2, top + 5, vest)
+        g.rect(lf + 3, top + 6, rt - 3, top + 7, vest)      # tapered to the waist,
+        g.span(top + 2, lf + 3, rt - 3, vest_hi)            # so it is not a slab
+        g.span(top + 7, lf + 3, rt - 3, vest_lo)
+        g.put(lf + 2, top + 1, vest_lo)                     # notched at the collar
+        g.put(rt - 2, top + 1, vest_lo)
+        g.put(15, top + 3, pal["glow_lo"])          # chest status light
+        g.put(16, top + 3, pal["glow"])
+        # straps: one over a shoulder, one round the waist. Asymmetry is the
+        # cheapest thing that stops a figure looking stamped out
+        for y in range(top + 1, top + 8):
+            g.put(lf + 3 + (y - top) // 3, y, STRAP)
+        g.span(top + 8, lw, rw, STRAP)
+        g.span(top + 8, 15, 16, STRAP_HI)
     else:
-        # back view: a powered spine unit instead of the chest rune
-        g.spans([(14 + dy, 13, 18), (15 + dy, 13, 18), (16 + dy, 13, 18),
-                 (17 + dy, 13, 18)], PLATE_XD)
-        for y in range(14, 18):
-            g.put(15, y + dy, glow_d)
-            g.put(16, y + dy, glow_d)
+        g.rect(lf + 3, top + 1, rt - 3, top + 5, coat_lo)   # pack on the back
+        g.rect(15, top + 1, 16, top + 5, pal["glow_lo"])
 
-    weapon(g, wkind, dy, glow, glow_d, facing)
-    head(g, hkind, dy, glow, glow_d, cloak, cloak_d, back, side, facing)
+    # arms: one shoulder armoured, the other sleeve rolled back to skin
+    g.rect(lf - 2, top + 1, lf - 1, top + 8, coat)
+    g.rect(rt + 1, top + 1, rt + 2, top + 5, coat)
+    # an arm the same colour as the torso, touching the torso, is not an arm.
+    # One shaded column on the inner edge is all it takes to detach them
+    g.rect(lf - 1, top + 2, lf - 1, top + 8, coat_lo)
+    g.rect(rt + 1, top + 2, rt + 1, top + 5, coat_lo)
+    g.rect(lf - 2, top, lf, top + 1, STEEL_LO)              # pauldron, one side
+    g.span(top, lf - 2, lf - 1, STEEL)
+    g.rect(rt + 1, top + 6, rt + 2, top + 8, skin)          # rolled sleeve
+    g.put(rt + 1, top + 6, skin_hi)
+
+    if side:
+        # turned: the far arm disappears behind the body and the near one
+        # crosses it, or the figure reads as facing you with a twisted head
+        g.rect(lf - 2, top, lf, top + 8, coat)
+        g.rect(lf - 1, top + 4, rt, top + 5, coat_hi)
+
+
+def face(g, b, pal, facing, hair_kind, stubble=False, mouth=True):
+    """Nine pixels of person. The eyes sit two apart with the bridge of the
+    nose between them: two adjacent lit pixels read as a visor slit, which is
+    the whole robot problem in miniature."""
+    skin, skin_lo, skin_hi = pal["skin"]
+    top = b["top"]
+    hy = top - 10                       # head top; head is nine rows tall
+    x0, x1 = 12, 19
+    back = facing == "up"
+
+    g.rect(14, top - 1, 17, top, skin_lo)                   # neck
+    g.rect(x0, hy, x1, hy + 8, skin)
+    g.rect(x0, hy, x0, hy + 8, skin_lo)
+    g.rect(x1, hy, x1, hy + 8, skin_hi)
+    g.span(hy + 1, x0 + 1, x1 - 1, skin_hi)
+    g.span(hy + 3, x0 + 1, x1 - 1, skin_lo)                 # brow shadow
+
+    if facing in ("left", "right"):
+        # A turned head is not a front head with an eye rubbed out. Both eyes
+        # go to the leading side, the far one drops entirely, and a nose sticks
+        # out at the edge -- without that the walk cycle plays four directions
+        # of somebody staring straight at the camera.
+        d = 1 if facing == "right" else -1
+        eye_x, nose_x = 16 + d * 2, x1 if d > 0 else x0
+        g.put(eye_x, hy + 4, EYE)
+        g.put(eye_x - d, hy + 4, skin_lo)                   # brow beside it
+        g.put(nose_x, hy + 4, skin_hi)                      # the nose, at the edge
+        g.put(nose_x, hy + 5, skin_lo)
+        if mouth:
+            g.put(16 + d * 2, hy + 7, skin_lo)
+    elif not back:
+        g.put(14, hy + 4, EYE)
+        g.put(17, hy + 4, EYE)
+        g.put(15, hy + 4, skin_lo)                          # the bridge of the nose
+        g.put(16, hy + 4, skin_lo)
+        if mouth:
+            g.span(hy + 7, 15, 16, skin_lo)
+    if stubble:
+        g.span(hy + 8, x0 + 1, x1 - 1, STUBBLE)
+
+    hc, hh = HAIRS[hair_kind]
+    return hy, hc, hh
+
+
+def hair(g, hy, hc, hh, facing, style="short"):
+    back = facing == "up"
+    side = facing in ("left", "right")
+    if style != "bald":
+        if style == "crop":
+            g.span(hy, 13, 18, hc)
+            g.span(hy - 1, 14, 17, hc)
+            g.span(hy - 1, 15, 16, hh)
+        else:
+            g.span(hy - 1, 13, 18, hc)
+            g.span(hy, 12, 19, hc)
+            g.put(12, hy + 1, hc)
+            g.put(19, hy + 1, hc)
+            g.span(hy - 1, 15, 17, hh)
+        if side:
+            # the trailing side of the skull, so a turned head has a back to it
+            t0, t1 = (12, 13) if facing == "right" else (18, 19)
+            g.rect(t0, hy, t1, hy + 3, hc)
+    if back and style != "bald":
+        # walking away, you see skull and nape -- not a bare face with a wig
+        # on top, which is what the first pass drew for half the squad
+        g.rect(12, hy, 19, hy + 7, hc)
+        g.span(hy + 1, 14, 17, hh)
+
+
+# ---------------------------------------------------------------- heads
+#
+# Eight treatments, each showing as much of the person as the job allows.
+# The rules learned the hard way: nothing dark may cross the brow, because at
+# this size a band there covers both eyes at once and the face becomes a
+# visor; and any cloth over the head needs three pixels of thickness with a
+# lit inner rim, or it reads as long hair rather than as something worn.
+
+def head_shell(g, b, pal, facing):          # Strażnik: hard shell, visor up
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], stubble=True)
+    back = facing == "up"
+    g.span(hy - 1, 12, 19, STEEL_LO)
+    g.span(hy, 11, 20, STEEL)
+    g.rect(11, hy + 1, 11, hy + 5, STEEL_LO)
+    g.rect(20, hy + 1, 20, hy + 5, STEEL_LO)
+    g.span(hy + 1, 12, 19, STEEL_LO)
+    g.rect(12, hy - 3, 19, hy - 2, STEEL)                   # visor swung up
+    g.span(hy - 3, 13, 18, STEEL_LO)
+    g.span(hy - 2, 13, 18, pal["glow_lo"])                  # glass lit underneath:
+    g.put(14, hy - 2, pal["glow"])                          # lit on top it is a hatband
+    g.put(11, hy - 2, GEAR); g.put(20, hy - 2, GEAR)        # hinges
+    if back:
+        g.rect(12, hy + 1, 19, hy + 6, STEEL_LO)            # shell from behind
+        g.span(hy + 3, 13, 18, STEEL)
+    else:
+        g.rect(11, hy + 6, 11, hy + 7, STRAP)               # chinstrap
+        g.rect(20, hy + 6, 20, hy + 7, STRAP)
+
+
+def head_goggles(g, b, pal, facing):        # Zwiadowca: goggles up, scarf down
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"])
+    hair(g, hy, hc, hh, facing)
+    g.span(hy + 2, 12, 19, RUBBER)                          # strap round the back
+    if facing == "up":
+        return                                              # from behind, only the strap
+    g.rect(12, hy - 1, 19, hy + 1, RUBBER)
+    g.rect(13, hy, 15, hy + 1, GLASS)
+    g.rect(16, hy, 18, hy + 1, GLASS)
+    g.put(13, hy, GLASS_HI); g.put(16, hy, GLASS_HI)
+    g.put(15, hy, STEEL); g.put(16, hy, STEEL)              # bridge between cups
+    g.put(11, hy, GEAR); g.put(20, hy, GEAR)                # pivots break the outline
+    g.rect(13, hy + 8, 18, b["top"], (96, 72, 58, 255))     # scarf at the throat
+
+
+def head_headset(g, b, pal, facing):        # Strzelec: nothing on the face
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], stubble=True)
+    hair(g, hy, hc, hh, facing)
+    g.span(hy, 12, 19, GEAR)                                # band on the hairline
+    g.span(hy - 1, 14, 17, GEAR_HI)
+    g.rect(11, hy + 1, 11, hy + 4, GEAR)                    # earcups
+    g.rect(20, hy + 1, 20, hy + 4, GEAR)
+    if facing != "up":
+        g.put(20, hy + 5, STEEL_LO)                         # optic arm past the eye
+        g.put(20, hy + 4, GLASS_HI)                         # lens beside it, never over
+        g.rect(11, hy + 5, 11, hy + 7, RUBBER)              # boom mic to the jaw
+        g.put(12, hy + 7, RUBBER)
+
+
+def head_hood(g, b, pal, facing):           # Inkwizytor: hood over a soft cap
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], mouth=False)
+    # cloth three pixels thick, dark outside and lit on the inner rim. Without
+    # that thickness a hood is a flat curtain beside the cheeks and reads as
+    # long hair -- it did, through two passes, and recolouring did not help
+    g.span(hy - 3, 14, 17, CANVAS_LO)
+    g.span(hy - 2, 12, 19, CANVAS)
+    g.rect(10, hy - 1, 21, hy + 1, CANVAS)
+    g.rect(9, hy + 2, 11, b["top"] + 2, CANVAS)
+    g.rect(20, hy + 2, 22, b["top"] + 2, CANVAS)
+    g.rect(9, hy + 2, 9, b["top"] + 2, CANVAS_LO)
+    g.rect(22, hy + 2, 22, b["top"] + 2, CANVAS_LO)
+    g.span(b["top"] + 2, 9, 11, CANVAS_LO)
+    g.span(b["top"] + 2, 20, 22, CANVAS_LO)
+    g.rect(11, hy + 1, 11, hy + 7, CANVAS_HI)               # lit rim of the opening
+    g.rect(20, hy + 1, 20, hy + 7, CANVAS_HI)
+    g.span(hy, 12, 19, CANVAS_HI)
+    if facing != "up":
+        g.rect(12, hy + 1, 19, hy + 2, (40, 40, 34, 255))   # shadow on the brow
+        g.put(14, hy + 4, EYE)
+        g.put(17, hy + 4, EYE)
+    else:
+        g.rect(12, hy, 19, hy + 7, CANVAS)
+
+
+def head_mask(g, b, pal, facing):           # Chirurg: respirator, eyes bare
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], mouth=False)
+    hair(g, hy, hc, hh, facing)
+    if facing == "up":
+        return
+    # the cup covers the mouth and nothing else: wider than four pixels it
+    # stops being worn on a face and becomes the bottom half of a helmet
+    g.span(hy + 5, 13, 18, pal["skin"][1])                  # cheekbone kept bare
+    g.rect(14, hy + 6, 17, hy + 8, GEAR)
+    g.span(hy + 6, 14, 17, GEAR_HI)
+    g.span(hy + 8, 14, 17, STEEL_LO)
+    g.put(13, hy + 6, RUBBER); g.put(18, hy + 6, RUBBER)    # straps to the ears
+    g.put(12, hy + 5, RUBBER); g.put(19, hy + 5, RUBBER)
+    g.put(15, hy + 7, pal["glow_lo"]); g.put(16, hy + 7, pal["glow"])
+
+
+def head_circlet(g, b, pal, facing):        # Runarz: shaved, etched, banded
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], stubble=True)
+    hair(g, hy, hc, hh, facing, style="bald")
+    g.span(hy, 12, 19, pal["skin"][2])                      # bare scalp catching light
+    g.span(hy + 1, 12, 19, STEEL_LO)                        # the band itself
+    g.span(hy + 1, 13, 18, STEEL)
+    if facing != "up":
+        g.put(13, hy + 1, pal["glow"])
+        g.put(18, hy + 1, pal["glow_lo"])
+        g.put(12, hy + 6, pal["glow_lo"])                   # etching down the temple
+        g.put(12, hy + 7, pal["glow_lo"])
+    g.put(15, hy - 1, STEEL_LO)                             # stud on the crown
+    g.put(16, hy - 1, STEEL)
+
+
+def head_optics(g, b, pal, facing):         # Archiwista: older, reading optics
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"])
+    hair(g, hy, hc, hh, facing, style="crop")
+    if facing == "up":
+        return
+    g.span(hy + 4, 13, 18, STEEL_LO)                        # the frame, thin
+    g.rect(13, hy + 4, 14, hy + 4, GLASS)
+    g.rect(17, hy + 4, 18, hy + 4, GLASS)
+    g.put(13, hy + 4, GLASS_HI)
+    g.put(14, hy + 4, EYE); g.put(17, hy + 4, EYE)          # eyes read through them
+    g.put(12, hy + 3, STEEL_LO); g.put(19, hy + 3, STEEL_LO)
+    g.span(hy + 6, 14, 17, pal["skin"][1])                  # lines round the mouth
+    g.put(13, hy + 2, pal["skin"][1])
+    g.put(18, hy + 2, pal["skin"][1])
+
+
+def head_cap(g, b, pal, facing):            # Technik: flat cap, lamp on it
+    hy, hc, hh = face(g, b, pal, facing, pal["hair"], stubble=True)
+    hair(g, hy, hc, hh, facing)
+    g.span(hy - 1, 12, 19, (52, 50, 46, 255))
+    g.span(hy, 11, 20, (68, 66, 60, 255))
+    g.span(hy, 13, 17, (92, 88, 80, 255))
+    if facing != "up":
+        g.span(hy + 1, 11, 20, (40, 38, 34, 255))           # the peak, one row
+        g.rect(19, hy - 2, 20, hy - 1, BRASS)               # lamp clipped to it
+        g.put(20, hy - 2, pal["glow"])
+        g.put(21, hy - 1, pal["glow_lo"])                   # spill, so it is a lamp
+
+
+# ---------------------------------------------------------------- items
+#
+# Twenty-four, three per class. Held out to the side where the body will not
+# swallow them, and suppressed on the back view -- a chest-held slate went on
+# glowing through a hunter who had turned away, which is the same draw-order
+# trap as the hood.
+
+def item_art(g, b, pal, item, facing):
+    if facing == "up" and item not in ("dron", "kamizelki", "zaklocacz", "generator"):
+        return
+    glow, glow_lo = pal["glow"], pal["glow_lo"]
+    left = facing == "left"
+    hx = 12 if left else 19             # the hand, on whichever side leads
+    d = -1 if left else 1
+    y = b["top"] + 5
+
+    def bar(x0, x1, yy, c):
+        g.span(yy, min(x0, x1), max(x0, x1), c)
+
+    if item == "tarcza":                                    # Strażnik
+        g.rect(hx + d * 2, y - 6, hx + d * 4, y + 4, STEEL_LO)
+        g.rect(hx + d * 3, y - 5, hx + d * 3, y + 3, STEEL)
+        g.put(hx + d * 3, y - 1, glow)
+    elif item == "kamizelki":
+        g.rect(hx + d * 2, y - 4, hx + d * 4, y + 1, (68, 62, 50, 255))
+        g.span(y - 3, hx + d * 2, hx + d * 4, (96, 88, 70, 255))
+        g.put(hx + d * 3, y, glow_lo)
+    elif item == "kotwica":
+        for i in range(6):
+            g.put(hx + d * 2, y - 4 + i, STEEL_LO)
+        bar(hx + d, y + 2, hx + d * 4, STEEL)
+        g.put(hx + d * 2, y - 5, glow)
+
+    elif item == "dron":                                    # Zwiadowca
+        g.rect(hx + d * 2, y - 7, hx + d * 5, y - 6, GEAR)
+        g.put(hx + d * 2, y - 8, STEEL); g.put(hx + d * 5, y - 8, STEEL)
+        g.put(hx + d * 3, y - 5, glow)
+    elif item == "czujnik":
+        g.rect(hx + d * 3, y - 3, hx + d * 3, y + 3, STEEL_LO)
+        g.rect(hx + d * 2, y - 5, hx + d * 4, y - 4, GEAR)
+        g.put(hx + d * 3, y - 5, glow)
+    elif item == "optyka":
+        g.rect(hx + d * 2, y - 2, hx + d * 4, y, GEAR)      # a long scope, carried
+        g.put(hx + d * 4, y - 1, glow)
+
+    elif item == "karabin":                                 # Strzelec
+        for i in range(9):
+            g.put(hx + d * (i - 1), y, STEEL if i > 3 else GEAR)
+        g.span(y + 1, min(hx, hx + d * 2), max(hx, hx + d * 2), STEEL_LO)
+        g.put(hx + d * 8, y, glow)
+    elif item == "siatka":
+        g.rect(hx + d, y - 1, hx + d * 4, y + 1, GEAR)
+        g.rect(hx + d * 2, y - 2, hx + d * 3, y - 2, STEEL_LO)   # the drum
+        g.put(hx + d * 4, y, glow)
+    elif item == "znacznik":
+        g.rect(hx + d, y - 1, hx + d * 3, y, GEAR)
+        g.put(hx + d * 3, y - 2, glow)
+        g.put(hx + d * 4, y - 3, glow_lo)
+
+    elif item == "kadzidlo":                                # Inkwizytor
+        for i in range(4):
+            g.put(hx + d * 2, y - 4 + i, (40, 42, 52, 255))     # the chain
+        g.rect(hx + d, y, hx + d * 3, y + 2, BRASS)
+        g.put(hx + d * 2, y + 3, glow)
+    elif item == "kajdany":
+        g.rect(hx + d * 2, y - 1, hx + d * 3, y, STEEL_LO)
+        g.rect(hx + d * 2, y + 2, hx + d * 3, y + 3, STEEL_LO)
+        g.put(hx + d * 2, y + 1, STEEL)
+    elif item == "wykrywacz":
+        for i in range(7):
+            g.put(hx + d * 2, y - 5 + i, STEEL_LO)
+        g.put(hx + d * 2, y - 6, glow)
+        g.put(hx + d, y - 6, glow_lo); g.put(hx + d * 3, y - 6, glow_lo)
+
+    elif item == "stabilizator":                            # Chirurg
+        g.rect(hx + d * 2, y - 2, hx + d * 3, y, GEAR)
+        g.rect(hx + d * 2, y + 1, hx + d * 3, y + 1, STEEL)
+        g.put(hx + d * 2, y - 3, glow); g.put(hx + d * 3, y - 3, glow_lo)
+    elif item == "stymulanty":
+        for i in range(3):                                  # vials on a bandolier
+            g.put(hx + d * (2 + i), y - 2, GLASS)
+            g.put(hx + d * (2 + i), y - 1, glow_lo)
+    elif item == "autopsja":
+        g.rect(hx + d * 2, y - 1, hx + d * 5, y - 1, STEEL)     # a saw blade
+        for i in range(2, 6):
+            g.put(hx + d * i, y - 2, STEEL_LO if i % 2 else GEAR_HI)
+        g.rect(hx + d, y - 1, hx + d, y + 1, STRAP)
+
+    elif item == "ekstraktor":                              # Runarz
+        g.rect(hx + d * 2, y - 1, hx + d * 3, y + 1, GEAR)
+        g.put(hx + d * 4, y - 2, STEEL); g.put(hx + d * 4, y + 2, STEEL)
+        g.put(hx + d * 4, y, glow)
+    elif item == "pieczec":
+        g.rect(hx + d * 2, y - 2, hx + d * 4, y, BRASS)
+        g.span(y - 1, hx + d * 2, hx + d * 4, glow_lo)
+        g.put(hx + d * 3, y - 1, glow)
+    elif item == "zaklocacz":
+        g.rect(hx + d * 2, y - 2, hx + d * 4, y + 1, GEAR)
+        for i in range(3):
+            g.put(hx + d * 3, y - 3 - i, STEEL_LO)          # aerial
+        g.put(hx + d * 3, y - 6, glow)
+
+    elif item == "czytnik":                                 # Archiwista
+        g.rect(hx + d, y - 3, hx + d * 4, y + 1, GEAR)
+        g.rect(hx + d * 2, y - 2, hx + d * 3, y, glow_lo)
+        g.span(y - 2, hx + d * 2, hx + d * 3, glow)
+    elif item == "kopia":
+        g.rect(hx + d, y - 2, hx + d * 4, y + 1, (52, 50, 56, 255))
+        g.put(hx + d * 2, y - 1, GEAR_HI); g.put(hx + d * 4, y - 1, GEAR_HI)
+        g.put(hx + d * 3, y + 1, glow_lo)
+    elif item == "filtr":
+        g.rect(hx + d * 2, y - 3, hx + d * 3, y + 1, GEAR)
+        g.span(y - 3, hx + d * 2, hx + d * 3, STEEL)
+        g.put(hx + d * 2, y, glow)
+
+    elif item == "generator":                               # Technik
+        g.rect(hx + d * 2, y - 3, hx + d * 4, y + 1, GEAR)
+        g.span(y - 1, hx + d * 2, hx + d * 4, glow)
+        g.span(y, hx + d * 2, hx + d * 4, glow_lo)
+    elif item == "kamera":
+        g.rect(hx + d * 3, y - 2, hx + d * 3, y + 2, STEEL_LO)
+        g.rect(hx + d * 2, y - 4, hx + d * 4, y - 3, GEAR)
+        g.put(hx + d * 4, y - 3, glow)
+    elif item == "rygiel":
+        g.rect(hx + d * 2, y - 1, hx + d * 2, y + 3, STEEL_LO)
+        g.rect(hx + d, y - 3, hx + d * 3, y - 2, STEEL)     # a heavy bolt driver
+        g.put(hx + d * 2, y - 4, glow_lo)
+
+
+# ---------------------------------------------------------------- classes
+#
+# Order must match CLASS_NAMES in ../../wizard-hunt-online/src/classes.js, and
+# each item list must match that class's items in the same order. The client
+# indexes sheet rows by both positions, so an edit here without an edit there
+# hands players somebody else's body and somebody else's kit.
+
+def pal_for(skin, hair_kind, coat, glow):
+    def sh(c, f):
+        return (int(c[0] * f), int(c[1] * f), int(c[2] * f), 255)
+    return dict(
+        skin=SKINS[skin], hair=hair_kind,
+        coat=coat, coat_hi=sh(coat, 1.32), coat_lo=sh(coat, 0.62),
+        glow=glow, glow_lo=sh(glow, 0.55),
+    )
+
+
+CLASSES = [
+    # name, build, head, palette, three items in classes.js order
+    ("Strażnik",
+     build(sh=8, wa=7, top=14, legw=2, gap=3),
+     head_shell,
+     pal_for(2, "black", (54, 58, 68), (196, 210, 232, 255)),
+     ["tarcza", "kamizelki", "kotwica"]),
+
+    ("Zwiadowca",
+     build(sh=5, wa=4, top=14, legw=1, gap=3),
+     head_goggles,
+     pal_for(1, "sand", (48, 62, 50), (140, 240, 150, 255)),
+     ["dron", "czujnik", "optyka"]),
+
+    ("Strzelec",
+     build(sh=6, wa=5, top=15, legw=1, gap=3),
+     head_headset,
+     pal_for(0, "brown", (58, 62, 52), (120, 208, 255, 255)),
+     ["karabin", "siatka", "znacznik"]),
+
+    ("Inkwizytor",
+     build(sh=6, wa=6, top=13, legw=1, gap=2),
+     head_hood,
+     pal_for(3, "black", (72, 44, 44), (255, 168, 72, 255)),
+     ["kadzidlo", "kajdany", "wykrywacz"]),
+
+    ("Chirurg",
+     build(sh=5, wa=5, top=16, legw=1, gap=2),
+     head_mask,
+     pal_for(1, "red", (74, 76, 62), (216, 232, 120, 255)),
+     ["stabilizator", "stymulanty", "autopsja"]),
+
+    ("Runarz",
+     build(sh=7, wa=7, top=16, legw=2, gap=2),
+     head_circlet,
+     pal_for(2, "black", (62, 46, 74), (198, 130, 255, 255)),
+     ["ekstraktor", "pieczec", "zaklocacz"]),
+
+    ("Archiwista",
+     build(sh=5, wa=7, top=15, legw=1, gap=3, lean=1),
+     head_optics,
+     pal_for(1, "grey", (52, 56, 68), (159, 180, 216, 255)),
+     ["czytnik", "kopia", "filtr"]),
+
+    ("Technik",
+     build(sh=7, wa=6, top=16, legw=2, gap=3),
+     head_cap,
+     pal_for(3, "brown", (70, 56, 40), (255, 210, 122, 255)),
+     ["generator", "kamera", "rygiel"]),
+]
+
+
+def hunter(cfg, item, facing, step):
+    _, b, headfn, pal, _ = cfg
+    g = G()
+    bb = dict(b)
+    if b["lean"] and facing != "up":
+        bb["top"] = b["top"] + 1                            # a stoop, one pixel
+    body(g, bb, pal, facing, step)
+    item_art(g, bb, pal, item, facing)
+    headfn(g, bb, pal, facing)
     return g.img
 
 
-sheet = Image.new("RGBA", (S * 2, S * 4 * len(CLASSES)), (0, 0, 0, 0))
+ROWS = len(CLASSES) * 3 * len(DIRS)
+sheet = Image.new("RGBA", (S * 2, S * ROWS), (0, 0, 0, 0))
 for ci, cfg in enumerate(CLASSES):
-    for di, d in enumerate(DIRS):
-        for step in range(2):
-            f = hunter(cfg, d, step)
-            sheet.paste(f, (step * S, (ci * 4 + di) * S), f)
+    for ii, item in enumerate(cfg[4]):
+        for di, d in enumerate(DIRS):
+            for step in range(2):
+                f = hunter(cfg, item, d, step)
+                sheet.paste(f, (step * S, ((ci * 3 + ii) * 4 + di) * S), f)
 
 sheet.save(os.path.join(OUT, "hunters.png"))
-sheet.resize((sheet.width * 3, sheet.height * 3), Image.NEAREST).save(
-    os.path.join(OUT, "hunters_preview.png"))
 
-# a contact sheet of just the front-facing pose, for reviewing the classes
-row = Image.new("RGBA", (S * len(CLASSES), S), (0, 0, 0, 0))
+# a contact sheet of the front pose, one row per class, one column per item:
+# the only honest way to check that eight people read as eight people
+PAD = 4
+row = Image.new("RGBA", ((S + PAD) * 3, (S + PAD) * len(CLASSES)), (22, 28, 42, 255))
 for ci, cfg in enumerate(CLASSES):
-    f = hunter(cfg, "down", 0)
-    row.paste(f, (ci * S, 0), f)
-row.resize((row.width * 6, S * 6), Image.NEAREST).save(
+    for ii, item in enumerate(cfg[4]):
+        f = hunter(cfg, item, "down", 0)
+        row.paste(f, (ii * (S + PAD), ci * (S + PAD)), f)
+row.resize((row.width * 5, row.height * 5), Image.NEAREST).save(
     os.path.join(OUT, "hunters_classes.png"))
-print("done", sheet.size, [c[0] for c in CLASSES])
+
+# and every class side by side at the size it is actually played at
+line = Image.new("RGBA", ((S + 2) * len(CLASSES), S + 4), (22, 28, 42, 255))
+for ci, cfg in enumerate(CLASSES):
+    f = hunter(cfg, cfg[4][0], "down", 0)
+    line.paste(f, (ci * (S + 2) + 1, 2), f)
+line.resize((line.width * 3, line.height * 3), Image.NEAREST).save(
+    os.path.join(OUT, "hunters_actual.png"))
+
+# all four facings, so the turned and back views get looked at too
+turn = Image.new("RGBA", ((S + PAD) * 4, (S + PAD) * len(CLASSES)), (22, 28, 42, 255))
+for ci, cfg in enumerate(CLASSES):
+    for di, d in enumerate(DIRS):
+        f = hunter(cfg, cfg[4][0], d, 0)
+        turn.paste(f, (di * (S + PAD), ci * (S + PAD)), f)
+turn.resize((turn.width * 5, turn.height * 5), Image.NEAREST).save(
+    os.path.join(OUT, "hunters_facings.png"))
+
+print("done", sheet.size, ROWS, "rows:", [c[0] for c in CLASSES])

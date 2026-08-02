@@ -9,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { SPELLS } = require("../src/spells");
-const { CLASS_NAMES, CLASSES, itemsOf } = require("../src/classes");
+const { CLASS_NAMES, CLASSES, itemsOf, itemIndex } = require("../src/classes");
 const { COMPARTMENTS } = require("../src/map");
 const { MAX_PLAYERS, ACT_VISION, ACTS } = require("../src/rules");
 
@@ -112,6 +112,35 @@ test("the snapshot never serialises a role or a real log id", () => {
   // own role. Neither may ever reach for somebody else's.
   assert.ok(!/o\.role/.test(src), "snapshot must never read another player's role");
   assert.ok(!/realId/.test(src), "snapshot must never touch a transit entry's real id");
+});
+
+test("the sprite sheet has a row for every class and every item", () => {
+  // The sheet is laid out (class * 3 + item) * 4 + direction. Adding a class
+  // or a fourth item to one without regenerating hunters.png does not throw
+  // anywhere -- it silently draws somebody else's body, which is the exact
+  // failure this whole coupling is commented about. Read the PNG header
+  // rather than trusting that somebody remembered.
+  const png = fs.readFileSync(path.join(__dirname, "..", "public", "assets", "hunters.png"));
+  assert.strictEqual(png.toString("ascii", 1, 4), "PNG");
+  const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+  const wanted = CLASS_NAMES.reduce((n, c) => n + itemsOf(c).length, 0) * 4 * 32;
+  assert.strictEqual(width, 64, "two walk frames across");
+  assert.strictEqual(height, wanted,
+    `sheet is ${height / 32} rows, the class table needs ${wanted / 32}` +
+    " -- rerun make_hunters.py");
+});
+
+test("a disguise borrows kit as well as a class", () => {
+  // The mage's own item is not in the borrowed class's list, and a sprite
+  // holding a censer while wearing a Technik's cap would give him away for
+  // nothing. Falling back to the first item is what keeps the disguise whole.
+  assert.strictEqual(itemIndex("Technik", "kadzidlo"), 0);
+  assert.strictEqual(itemIndex("Technik", "rygiel"), 2);
+  for (const cls of CLASS_NAMES) {
+    itemsOf(cls).forEach((it, i) => {
+      assert.strictEqual(itemIndex(cls, it.id), i, `${cls}/${it.id} is out of order`);
+    });
+  }
 });
 
 console.log(`\n${passed} passed`);

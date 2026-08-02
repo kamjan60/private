@@ -271,7 +271,10 @@ function apply(room, p, s, w, now, api) {
       room.markers.push({
         kind: "fake-silhouette", room: w.comp,
         x: Math.round(p.x), y: Math.round(p.y),
-        cls: w.extra.cls || "Zwiadowca", until: now + s.durationMs
+        // a forged silhouette carries forged kit too: the base draws bodies
+        // from the same sheet as the field, so a class with no item would be
+        // the one figure on screen holding nothing
+        cls: w.extra.cls || "Zwiadowca", it: 0, until: now + s.durationMs
       });
       break;
     default:

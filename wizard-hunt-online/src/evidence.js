@@ -127,8 +127,8 @@ function readResidue(ev, compName, { now = Date.now(), residueAct = false, actSt
 
 // -------------------------------------------------------------- corpses
 
-function makeCorpse({ x, y, cls, name, id, school, t }) {
-  return { x, y, cls, name, id, school, t };
+function makeCorpse({ x, y, cls, it, name, id, school, t }) {
+  return { x, y, cls, it, name, id, school, t };
 }
 
 /**

@@ -12,7 +12,7 @@
 const {
   MIN_PLAYERS, MAX_PLAYERS, LOADOUT_MS, TASER_COOLDOWN, BOOK_SLOTS
 } = require("./rules");
-const { CLASSES, dealClasses, statsFor, itemsOf } = require("./classes");
+const { CLASSES, dealClasses, statsFor, itemsOf, itemIndex } = require("./classes");
 const { PRESETS, buildBook, spell } = require("./spells");
 const { makeEvidence } = require("./evidence");
 const { makeTribunal } = require("./tribunal");
@@ -176,6 +176,24 @@ function apparentClass(p) {
   return p.disguisedAs && now() < p.disguiseUntil ? p.disguisedAs : p.cls;
 }
 
+/**
+ * Which of the apparent class's three items somebody is visibly carrying.
+ *
+ * The sprite sheet draws all three, so kit is something you can see across a
+ * compartment rather than only something people claim on voice. That cuts
+ * both ways: "he says he took the Stabilizator" stops being a claim worth
+ * arguing about, but "he is carrying it and has revived nobody" becomes an
+ * observation anyone can make.
+ *
+ * Under a disguise the item has to follow the disguise, or the sprite would
+ * contradict the face and hand the mage away for free. His real item is not
+ * in the borrowed class's list at all, so the borrowed kit falls back to the
+ * first one -- a disguise borrows a whole appearance, not half of one.
+ */
+function apparentItem(p) {
+  return itemIndex(apparentClass(p), p.item);
+}
+
 function endRound(room, winner, msg) {
   room.phase = "end";
   room.winner = winner;
@@ -186,5 +204,5 @@ function endRound(room, winner, msg) {
 module.exports = {
   rooms, now, makeRoom, makePlayer, list, connected, alive, hunters, theMage, inBase,
   pushEvent, startLoadout, chooseLoadout, fillMissingLoadouts, loadoutDone,
-  startRound, endRound, apparentClass
+  startRound, endRound, apparentClass, apparentItem
 };
