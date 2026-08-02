@@ -153,10 +153,17 @@ Keyboard: `WSAD` move, `E` hold (extract · bind · stabilise), `Space` taser,
 the log here, `Z`/`X` ping.
 
 Touch: the joystick spawns wherever your left thumb lands; tapping the right
-half aims and fires. Four buttons carry hold, taser/cast, ping and the class
-item. **Holding the fire button turns it into an aiming stick** — direction
-and, for spells that land somewhere, distance, with the landing point drawn
-on the floor before the charge is spent.
+half aims and fires. Buttons carry hold, taser/cast, ping, the class item and
+— for the mage — the book.
+
+**Holding the fire button turns it into an aiming stick**: direction and, for
+spells that land somewhere, distance, with the landing point drawn on the
+floor before the charge is spent.
+
+**Holding the book opens a wheel** — your own mage in the middle, the ten
+slots around him with what is left in each. Steer with the same thumb and
+release to arm. Direction picks the spell, not the position of your thumb,
+so nothing has to be reached for.
 
 ## Architecture
 

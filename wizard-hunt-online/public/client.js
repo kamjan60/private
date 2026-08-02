@@ -308,6 +308,7 @@
     var it = itemDef(ROLE.cls, ROLE.item);
     var passive = it && it.kind !== "active";
     // a passive has nothing to press; say so rather than offering a dead button
+    $("tBook").querySelector("span").textContent = "KSIĘGA";
     $("tC").querySelector("span").textContent = passive ? "—" : shortItem(it ? it.name : "SPRZĘT");
     $("tC").disabled = !!passive;
     $("tC").style.opacity = passive ? 0.3 : "";
@@ -360,50 +361,29 @@
   }
 
   // ------------------------------------------------------------- spell bar
-  var selected = 0, barKey = "";
+  var selected = 0;
 
   /**
-   * Rebuild the bar only when the book itself changes.
+   * What is armed, and nothing else.
    *
-   * This runs on every snapshot -- fifteen times a second. Tearing the slots
-   * down and recreating them that often means the node a tap started on is
-   * gone before the click resolves, so on a phone the slots simply could not
-   * be selected. Charges and selection are updated in place instead.
+   * The grid of slots this replaces was rebuilt fifteen times a second and
+   * asked the player to hit a sixty-pixel target mid-fight. Choosing now
+   * happens on the wheel; this only has to report the answer.
    */
   function paintBar() {
-    var bar = $("bar");
-    if (!S || !S.me || !S.me.book) {
-      bar.innerHTML = ""; barKey = "";
-      document.body.classList.remove("has-bar");
+    var el = $("armed");
+    if (!S || !S.me || !S.me.book || !S.me.book.length) {
+      el.style.display = "none";
+      document.body.classList.remove("has-book");
       return;
     }
-    document.body.classList.add("has-bar");
-
-    var key = S.me.book.map(function (e) { return e.id; }).join(",");
-    if (key !== barKey) {
-      barKey = key;
-      bar.innerHTML = "";
-      S.me.book.forEach(function (e, i) {
-        var s = spellById(e.id);
-        var d = document.createElement("div");
-        d.className = "slot";
-        d.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" + esc(s.name) +
-          "</b><span class='c'>0</span>";
-        var pick = function (ev) { ev.preventDefault(); selected = i; paintBar(); };
-        d.addEventListener("click", pick);
-        d.addEventListener("touchend", pick);
-        bar.appendChild(d);
-      });
-    }
-
-    S.me.book.forEach(function (e, i) {
-      var d = bar.children[i];
-      if (!d) return;
-      d.classList.toggle("sel", i === selected);
-      d.classList.toggle("empty", e.charges <= 0);
-      var c = d.querySelector(".c");
-      if (c.textContent !== String(e.charges)) c.textContent = e.charges;
-    });
+    document.body.classList.add("has-book");
+    el.style.display = "";
+    var e = S.me.book[selected] || S.me.book[0];
+    var sp = spellById(e.id);
+    el.className = e.charges > 0 ? "" : "empty";
+    el.innerHTML = "<b style='color:" + DEF.schools[e.school].colour + "'>" +
+      esc(sp.name) + "</b> <span class='c'>" + e.charges + "</span>";
   }
 
   function castSelected() {
@@ -498,6 +478,65 @@
     send({ t: "ping", kind: kind, x: me.x + lastAim.x * 60, y: me.y + lastAim.y * 60 });
   }
 
+  /**
+   * The book wheel: hold, steer, release.
+   *
+   * Direction picks the spell, not the position of your thumb -- the ring is
+   * drawn in the middle of the screen where it can be read, while the thumb
+   * stays on the button it started from. Reaching for a chip on a phone with
+   * one hand does not work.
+   */
+  var wheel = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0, idx: -1 };
+
+  function wheelPick() {
+    if (!S || !S.me || !S.me.book || !S.me.book.length) return -1;
+    var n = S.me.book.length;
+    var len = Math.hypot(wheel.x, wheel.y);
+    if (len < 26) return -1;                       // too small a nudge to mean anything
+    var a = Math.atan2(wheel.y, wheel.x) + Math.PI / 2;
+    while (a < 0) a += Math.PI * 2;
+    return Math.round(a / (Math.PI * 2 / n)) % n;
+  }
+
+  function bindWheel(el) {
+    el.addEventListener("touchstart", function (e) {
+      if (!S || !S.me || !S.me.book || !S.me.book.length) return;
+      var t = e.changedTouches[0];
+      wheel.active = true; wheel.id = t.identifier;
+      wheel.ox = t.clientX; wheel.oy = t.clientY;
+      wheel.x = 0; wheel.y = 0; wheel.idx = -1;
+      el.classList.add("on");
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener("touchmove", function (e) {
+      if (!wheel.active) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier !== wheel.id) continue;
+        wheel.x = t.clientX - wheel.ox; wheel.y = t.clientY - wheel.oy;
+        wheel.idx = wheelPick();
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    var close = function (e) {
+      if (!wheel.active) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier !== wheel.id) continue;
+        wheel.active = false;
+        el.classList.remove("on");
+        // releasing without steering keeps what was armed, so a mis-tap on
+        // the book never disarms you
+        if (wheel.idx >= 0) { selected = wheel.idx; paintBar(); }
+      }
+    };
+    window.addEventListener("touchend", close);
+    window.addEventListener("touchcancel", function () {
+      wheel.active = false; el.classList.remove("on");
+    });
+  }
+
   function setupTouch() {
     cv.addEventListener("touchstart", function (e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
@@ -545,6 +584,7 @@
     $("tC").onclick = function () {
       send({ t: "item", aim: lastAim, room: hereRoom(), targetId: nearestSeenId() });
     };
+    bindWheel($("tBook"));
   }
 
   function nearestSeenId() {
@@ -631,7 +671,7 @@
       ["E / trzymaj", "artefakt · wiązanie · stabilizacja"],
       ["Spacja", "tazer"],
       mage ? ["Q / LPM", "rzuć wybrane zaklęcie"] : ["F", "użyj przedmiotu"],
-      ["1–9", "wybór slotu"],
+      ["1–9", "wybór zaklęcia"],
       ["Z / X", "ping: podejrzany / czysto"]
     ];
     $("keys").innerHTML = rows.map(function (r) {
@@ -834,6 +874,7 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     var r0 = (window.devicePixelRatio || 1);
+    if (wheel.active) drawWheel(r0);
     if (TOUCH && stick.active) knob(stick, "rgba(127,216,255,0.45)", "rgba(127,216,255,0.35)");
     if (TOUCH && aim.active) {
       // the aiming stick wears the school's colour, so the thumb and the
@@ -979,6 +1020,90 @@
       ctx.globalAlpha = 0.95;
       ctx.fillText(text, x - w / 2, y);
     }
+  }
+
+  /** The ring, your own body in the middle of it, and the live sector. */
+  function drawWheel(r0) {
+    var book = (S.me && S.me.book) || [];
+    if (!book.length) return;
+    var cx = cv.width / 2, cy = cv.height * 0.46;
+    var R = Math.min(cv.width, cv.height) * 0.29;
+
+    ctx.fillStyle = "rgba(5,7,12,0.72)";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // your mage in the middle: the book belongs to somebody
+    var row = CLASS_ROW[ROLE.cls] || 0;
+    var sz = 34 * r0;
+    if (SHEET.complete && SHEET.naturalWidth) {
+      ctx.drawImage(SHEET, 0, row * 4 * 32, 32, 32, cx - sz / 2, cy - sz / 2, sz, sz);
+    }
+    ctx.strokeStyle = "rgba(198,130,255,0.5)"; ctx.lineWidth = 2 * r0;
+    ctx.beginPath(); ctx.arc(cx, cy, sz * 0.78, 0, 6.284); ctx.stroke();
+
+    ctx.textAlign = "center";
+    for (var i = 0; i < book.length; i++) {
+      var e = book[i], sp = spellById(e.id);
+      var a = -Math.PI / 2 + i * (Math.PI * 2 / book.length);
+      var x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+      var on = i === wheel.idx, spent = e.charges <= 0;
+      var col = DEF.schools[e.school].colour;
+
+      ctx.globalAlpha = spent ? 0.35 : 1;
+      ctx.fillStyle = on ? "rgba(20,28,48,0.98)" : "rgba(10,14,24,0.92)";
+      ctx.beginPath(); ctx.arc(x, y, 25 * r0, 0, 6.284); ctx.fill();
+      ctx.strokeStyle = on ? col : "rgba(120,150,220,0.3)";
+      ctx.lineWidth = (on ? 3 : 1.5) * r0;
+      ctx.stroke();
+
+      ctx.fillStyle = col;
+      // the chip is fifty pixels across, so a name has to fit inside it or
+      // it spills onto the floor behind
+      ctx.font = "bold " + (10 * r0) + "px system-ui";
+      var nm = sp.name;
+      while (nm.length > 3 && ctx.measureText(nm).width > 44 * r0) {
+        nm = nm.slice(0, -1);
+      }
+      if (nm !== sp.name) nm += "…";
+      ctx.fillText(nm, x, y - 1 * r0);
+      ctx.fillStyle = "#e6ecfa";
+      ctx.font = (12 * r0) + "px system-ui";
+      ctx.fillText(String(e.charges), x, y + 13 * r0);
+      ctx.globalAlpha = 1;
+    }
+
+    // The caption lives inside the ring, under the portrait. Below the ring
+    // it lands on the button cluster, which is exactly where the thumb is.
+    // The caption sits inside the ring on its own plate, narrow enough not to
+    // run under the chips to either side of it.
+    var capW = R * 0.92;
+    ctx.fillStyle = "rgba(6,9,16,0.92)";
+    ctx.fillRect(cx - capW / 2 - 8 * r0, cy + 30 * r0, capW + 16 * r0, 54 * r0);
+    if (wheel.idx >= 0) {
+      var sel = book[wheel.idx], selSp = spellById(sel.id);
+      ctx.fillStyle = "#e6ecfa";
+      ctx.font = "bold " + (13 * r0) + "px system-ui";
+      ctx.fillText(selSp.name, cx, cy + 46 * r0);
+      ctx.fillStyle = "#8b9ac0";
+      ctx.font = (10.5 * r0) + "px system-ui";
+      wrapText(selSp.desc, cx, cy + 62 * r0, capW, 13 * r0, r0);
+    } else {
+      ctx.fillStyle = "#8b9ac0";
+      ctx.font = (11 * r0) + "px system-ui";
+      wrapText("Przesuń kciukiem w stronę zaklęcia", cx, cy + 50 * r0, capW, 14 * r0, r0);
+    }
+    ctx.textAlign = "left";
+  }
+
+  function wrapText(text, cx, y, max, lh, r0) {
+    var words = String(text).split(" "), line = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + " " + words[i] : words[i];
+      if (ctx.measureText(test).width > max && line) {
+        ctx.fillText(line, cx, y); y += lh; line = words[i];
+      } else line = test;
+    }
+    if (line) ctx.fillText(line, cx, y);
   }
 
   function now2() { return Date.now() % 100000; }
