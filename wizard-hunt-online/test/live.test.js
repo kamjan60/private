@@ -186,23 +186,66 @@ function bot(name, roomCode) {
     assert.ok(entries.every((e) => !("realId" in e)), "an entry leaked a real id");
   });
 
-  check("stepping into a corridor slams both hatches", () => {
-    const st = require("../src/actions").collisionState(room, Date.now());
-    assert.ok(st.sealed.has(hall.name),
-      "the corridor should have cycled shut behind the walker");
-    const a = M.compartment(hall.ends[0]);
-    const mouth = hall.axis === "x"
-      ? { x: a.x + a.w, y: hall.y + hall.h / 2 }
-      : { x: hall.x + hall.w / 2, y: a.y + a.h };
-    assert.strictEqual(M.free(mouth.x, mouth.y, 12, st), false,
-      "nobody can follow you in while it cycles, and you cannot get out");
+  const A2 = require("../src/actions");
+  const { CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS } = require("../src/rules");
+  const a2 = M.compartment(hall.ends[0]);
+  const mouth = hall.axis === "x"
+    ? { x: a2.x + a2.w, y: hall.y + hall.h / 2 }
+    : { x: hall.x + hall.w / 2, y: a2.y + a2.h };
+
+  check("entering arms the hatches but does not shut them yet", () => {
+    const cyc = room.cycling.get(hall.name);
+    assert.ok(cyc, "walking in should have armed the corridor");
+    assert.ok(cyc.shutAt > Date.now(),
+      "there has to be a warning, or nobody can decide whether to follow");
+    const st = A2.collisionState(room, Date.now());
+    assert.ok(!st.sealed.has(hall.name), "still open during the warning");
+    assert.strictEqual(M.free(mouth.x, mouth.y, 12, st), true);
   });
 
-  check("the hatches open again once the cycle is done", () => {
-    const { CORRIDOR_CYCLE_MS } = require("../src/rules");
-    const later = Date.now() + CORRIDOR_CYCLE_MS + 100;
-    const st = require("../src/actions").collisionState(room, later);
-    assert.ok(!st.sealed.has(hall.name));
+  check("after the warning it slams, for five seconds", () => {
+    const cyc = room.cycling.get(hall.name);
+    const shut = cyc.shutAt + 100;
+    const st = A2.collisionState(room, shut);
+    assert.ok(st.sealed.has(hall.name));
+    assert.strictEqual(M.free(mouth.x, mouth.y, 12, st), false,
+      "nobody follows you in and you do not get out");
+    assert.strictEqual(cyc.until - cyc.shutAt, CORRIDOR_SHUT_MS);
+    const after = A2.collisionState(room, cyc.until + 50);
+    assert.ok(!after.sealed.has(hall.name), "and then it opens again");
+  });
+
+  check("a shut corridor is sealed to sight in both directions", () => {
+    const { snapshotFor, visionOf } = require("../src/snapshot");
+    const cyc = room.cycling.get(hall.name);
+    // pretend the warning already ran out
+    cyc.shutAt = Date.now() - 50;
+    cyc.until = Date.now() + CORRIDOR_SHUT_MS;
+
+    const inside = [...room.players.values()].find((p) => p.alive && p.id !== walker.id);
+    inside.x = hall.x + hall.w / 2; inside.y = hall.y + hall.h / 2;
+    walker.x = inside.x; walker.y = inside.y;
+
+    const outside = [...room.players.values()]
+      .find((p) => p.alive && p.id !== walker.id && p.id !== inside.id);
+    outside.x = a2.x + a2.w - 30; outside.y = hall.y + hall.h / 2;
+
+    const theirs = snapshotFor(room, outside, Date.now());
+    assert.ok(!theirs.actors.some((x) => x.id === walker.id),
+      "a step outside the door must not be a grandstand seat");
+
+    const mine = snapshotFor(room, walker, Date.now());
+    assert.ok(mine.actors.some((x) => x.id === inside.id),
+      "you still see whoever is shut in with you");
+    assert.ok(!mine.actors.some((x) => x.id === outside.id),
+      "and nothing beyond the walls");
+    assert.ok(mine.inHall && mine.inHall.room === hall.name,
+      "the client has to be told it is boxed in, not just go dark");
+    assert.ok(visionOf(room, walker, Date.now()) <= Math.max(hall.w, hall.h),
+      "the fog should close to the corridor itself");
+
+    cyc.shutAt = Date.now() + 999999;   // leave the room open for later checks
+    cyc.until = cyc.shutAt + CORRIDOR_SHUT_MS;
   });
 
   check("a body in a corridor can still be seen, and killed", () => {

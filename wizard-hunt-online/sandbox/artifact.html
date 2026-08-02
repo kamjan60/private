@@ -338,15 +338,17 @@ const MAX_PLAYERS = 8;          // one unique class each, and there are eight
 const W = 2220, H = 1640;
 const SPEED_BASE = 2.5;
 /**
- * A corridor's hatches slam when somebody steps in, and take this long to
- * cycle open again.
+ * A corridor's hatches arm when somebody steps in, warn, then slam.
  *
- * This is what makes a corridor a killing box rather than a shortcut. For
- * those seconds nobody outside can get in and nobody inside can get out --
- * so if the mage followed you in, you are alone with him and the doors are
- * shut, and if you followed him in, that was your decision.
+ * The warning is the point of the two-stage timer: you get two seconds to
+ * back out, and anyone following you gets two seconds to decide whether they
+ * really want to be in there when it shuts. After that the box is closed for
+ * five, and while it is closed nobody inside can see out and nobody outside
+ * can see in -- which is what turns a corridor from a shortcut into the one
+ * place aboard where a killing has no witness.
  */
-const CORRIDOR_CYCLE_MS = 2600;
+const CORRIDOR_ARM_MS = 2000;
+const CORRIDOR_SHUT_MS = 5000;
 
 // ---------------------------------------------------------------- acts
 const ACTS = 3;
@@ -408,7 +410,7 @@ const LOADOUT_MS = 90000;       // then everyone undecided gets a random pick
 
 module.exports = {
   TICK_HZ, TICK_MS, MIN_PLAYERS, MAX_PLAYERS,
-  W, H, SPEED_BASE, CORRIDOR_CYCLE_MS,
+  W, H, SPEED_BASE, CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS,
   ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
   ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE,
   TASER_STUN_MS, TASER_COOLDOWN, BIND_MS, BIND_MS_SHACKLES,
@@ -2072,7 +2074,7 @@ __def("actions", function (module, exports, require) {
 const {
   SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
-  PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_CYCLE_MS
+  PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS
 } = require("./rules");
 const { findItem } = require("./classes");
 const { free, compartmentAt, isCorridor } = require("./map");
@@ -2090,8 +2092,10 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function collisionState(room, now) {
   const sealed = new Set(room.round.sealed);
   for (const [c, until] of room.sealedTemp) if (until > now) sealed.add(c);
-  // a corridor mid-cycle is shut at both ends
-  for (const [c, until] of room.cycling) if (until > now) sealed.add(c);
+  // a corridor is only solid once its warning has run out
+  for (const [c, cyc] of room.cycling) {
+    if (now >= cyc.shutAt && now < cyc.until) sealed.add(c);
+  }
   // the act gates the decks: a zone belonging to a later section is simply
   // not floor yet, so no separate bulkhead state is needed
   return { sealed, walls: room.walls, act: room.round.act };
@@ -2142,8 +2146,13 @@ function step(room, p, now) {
     } else {
       const deep = Math.min(p.x - z.x, z.x + z.w - p.x, p.y - z.y, z.y + z.h - p.y);
       if (deep > 20) {
-        const open = (room.cycling.get(z.name) || 0) <= now;
-        if (open) room.cycling.set(z.name, now + CORRIDOR_CYCLE_MS);
+        const cyc = room.cycling.get(z.name);
+        if (!cyc || cyc.until <= now) {
+          room.cycling.set(z.name, {
+            shutAt: now + CORRIDOR_ARM_MS,
+            until: now + CORRIDOR_ARM_MS + CORRIDOR_SHUT_MS
+          });
+        }
         p.enteringHall = null;
       }
     }
@@ -2490,6 +2499,21 @@ const { apparentClass } = require("./room");
 const { liveCameras } = require("./base");
 const { compartmentAt } = require("./map");
 
+/**
+ * The corridor somebody is standing in, if its hatches are currently shut.
+ *
+ * A closed corridor is its own little world: you cannot see out of it and
+ * nobody can see into it. Without that the box is only half a box -- a
+ * hunter standing a step outside would watch the whole murder through a
+ * wall, since vision here is a radius and walls do not stop it.
+ */
+function shutHallAt(room, x, y, now) {
+  const c = compartmentAt(x, y);
+  if (!c || c.kind !== "corridor") return null;
+  const cyc = room.cycling.get(c.name);
+  return (cyc && now >= cyc.shutAt && now < cyc.until) ? c : null;
+}
+
 /** How far this player can see right now, after the act, the lights and
  *  whatever has been done to their eyes. */
 function visionOf(room, p, now) {
@@ -2500,6 +2524,9 @@ function visionOf(room, p, now) {
     if ((room.doused.get(comp.name) || 0) > now) r *= 0.45;
     if ((room.lit.get(comp.name) || 0) > now) r = p.stats.vision;   // full, act aside
   }
+  // sealed in: the fog closes to the walls of the corridor itself
+  const hall = shutHallAt(room, p.x, p.y, now);
+  if (hall) r = Math.min(r, Math.max(hall.w, hall.h) * 0.62);
   return r;
 }
 
@@ -2535,7 +2562,14 @@ function forLiving(room, me, now) {
       .filter((m) => m.kind === "drone" && m.by === me.id && m.until > now)
       .map((m) => m.room)
   );
+  const myHall = shutHallAt(room, me.x, me.y, now);
   const seen = (o) => {
+    // A shut corridor is sealed to sight in both directions. Inside it you
+    // see only what is in there with you; outside it you do not see in, and
+    // no drone reaches through either.
+    const theirs = shutHallAt(room, o.x, o.y, now);
+    if (myHall) return !!theirs && theirs.name === myHall.name;
+    if (theirs) return false;
     if (Math.hypot(o.x - me.x, o.y - me.y) <= r) return true;
     if (!droned.size) return false;
     const c = compartmentAt(o.x, o.y);
@@ -2577,8 +2611,10 @@ function forLiving(room, me, now) {
     pings: room.pings.filter((p) => p.until > now).map((p) => ({ ...p })),
     sealed: [...room.sealedTemp.entries()].filter(([, u]) => u > now).map(([c]) => c)
       .concat([...room.round.sealed]),
-    cycling: [...room.cycling.entries()].filter(([, u]) => u > now)
-      .map(([c, u]) => ({ room: c, until: u })),
+    cycling: [...room.cycling.entries()].filter(([, cyc]) => cyc.until > now)
+      .map(([c, cyc]) => ({ room: c, shutAt: cyc.shutAt, until: cyc.until })),
+    // your own box, so the client can say so rather than just going dark
+    inHall: myHall ? { room: myHall.name, until: room.cycling.get(myHall.name).until } : null,
     doused: [...room.doused.entries()].filter(([, u]) => u > now).map(([c]) => c),
     lit: [...room.lit.entries()].filter(([, u]) => u > now).map(([c]) => c)
   };
@@ -3756,7 +3792,7 @@ module.exports = { makeDriver };
 
     var sealed = {}, lit = {}, doused = {}, cyc = {};
     (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
-    (S.cycling || []).forEach(function (c) { cyc[c.room] = c.until; });
+    (S.cycling || []).forEach(function (c) { cyc[c.room] = c; });
     (S.lit || []).forEach(function (n) { lit[n] = 1; });
     (S.doused || []).forEach(function (n) { doused[n] = 1; });
 
@@ -3774,7 +3810,9 @@ module.exports = { makeDriver };
       else if (doused[c.name]) ctx.fillStyle = "rgba(3,4,8,0.62)";
       else ctx.fillStyle = "rgba(6,9,16,0.18)";
       ctx.fillRect(c.x, c.y, c.w, c.h);
-      var shut = sealed[c.name] || cyc[c.name];
+      var cd = cyc[c.name];
+      var shutNow = cd && Date.now() >= cd.shutAt;
+      var shut = sealed[c.name] || shutNow;
       ctx.strokeStyle = shut ? "#b05a4a" : hall ? "#1c2740" : "#223050";
       ctx.lineWidth = shut ? 4 : 3;
       c.walls.forEach(function (w) {
@@ -3784,15 +3822,16 @@ module.exports = { makeDriver };
         ctx.strokeStyle = "#b05a4a";
         ctx.strokeRect(c.x, c.y, c.w, c.h);
       }
-      // a corridor whose hatches have slammed: the seconds are the whole
-      // reason to be afraid of the place
-      if (hall && cyc[c.name]) {
-        var left = Math.max(0, cyc[c.name] - Date.now());
-        ctx.fillStyle = "rgba(176,90,74,0.16)";
+      // Two states worth telling apart: the warning, which is your chance to
+      // step back out, and the seal, which is not.
+      if (hall && cd) {
+        var warn = !shutNow;
+        var left = Math.max(0, (warn ? cd.shutAt : cd.until) - Date.now());
+        ctx.fillStyle = warn ? "rgba(255,195,92,0.13)" : "rgba(176,90,74,0.18)";
         ctx.fillRect(c.x, c.y, c.w, c.h);
-        ctx.fillStyle = "#ff9b8a";
-        ctx.font = "11px system-ui";
-        var tx = "ZAMKNIĘTE " + (left / 1000).toFixed(1) + " s";
+        ctx.fillStyle = warn ? "#ffc35c" : "#ff9b8a";
+        ctx.font = "bold 11px system-ui";
+        var tx = (warn ? "ZAMYKA SIĘ " : "ZAMKNIĘTE ") + (left / 1000).toFixed(1) + " s";
         ctx.fillText(tx, c.x + c.w / 2 - ctx.measureText(tx).width / 2, c.y - 6);
       }
       if (!hall) {
@@ -3902,6 +3941,23 @@ module.exports = { makeDriver };
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     var r0 = (window.devicePixelRatio || 1);
+
+    // You are the one shut in. Say so: the fog closing to the walls on its
+    // own looks like a bug rather than a trap.
+    if (S.inHall) {
+      var leftS = Math.max(0, S.inHall.until - Date.now()) / 1000;
+      ctx.fillStyle = "rgba(176,90,74,0.9)";
+      ctx.font = "bold " + (13 * r0) + "px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("ŚLUZA ZAMKNIĘTA · " + leftS.toFixed(1) + " s",
+        cv.width / 2, 84 * r0);
+      ctx.fillStyle = "rgba(200,150,140,0.85)";
+      ctx.font = (11 * r0) + "px system-ui";
+      ctx.fillText("Nikt tu nie zajrzy. I ty nie zobaczysz nikogo z zewnątrz.",
+        cv.width / 2, 102 * r0);
+      ctx.textAlign = "left";
+    }
+
     if (wheel.active) drawWheel(r0);
     if (TOUCH && stick.active) knob(stick, "rgba(127,216,255,0.45)", "rgba(127,216,255,0.35)");
     if (TOUCH && aim.active) {

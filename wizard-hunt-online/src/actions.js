@@ -12,7 +12,7 @@
 const {
   SPEED_BASE, TASER_STUN_MS, TASER_COOLDOWN, MARKSMAN_RANGE,
   BIND_MS, BIND_MS_SHACKLES, EXTRACT_MS, EXTRACT_MS_FAST,
-  PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_CYCLE_MS
+  PING_COOLDOWN, PING_MS, PING_KINDS, CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS
 } = require("./rules");
 const { findItem } = require("./classes");
 const { free, compartmentAt, isCorridor } = require("./map");
@@ -30,8 +30,10 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function collisionState(room, now) {
   const sealed = new Set(room.round.sealed);
   for (const [c, until] of room.sealedTemp) if (until > now) sealed.add(c);
-  // a corridor mid-cycle is shut at both ends
-  for (const [c, until] of room.cycling) if (until > now) sealed.add(c);
+  // a corridor is only solid once its warning has run out
+  for (const [c, cyc] of room.cycling) {
+    if (now >= cyc.shutAt && now < cyc.until) sealed.add(c);
+  }
   // the act gates the decks: a zone belonging to a later section is simply
   // not floor yet, so no separate bulkhead state is needed
   return { sealed, walls: room.walls, act: room.round.act };
@@ -82,8 +84,13 @@ function step(room, p, now) {
     } else {
       const deep = Math.min(p.x - z.x, z.x + z.w - p.x, p.y - z.y, z.y + z.h - p.y);
       if (deep > 20) {
-        const open = (room.cycling.get(z.name) || 0) <= now;
-        if (open) room.cycling.set(z.name, now + CORRIDOR_CYCLE_MS);
+        const cyc = room.cycling.get(z.name);
+        if (!cyc || cyc.until <= now) {
+          room.cycling.set(z.name, {
+            shutAt: now + CORRIDOR_ARM_MS,
+            until: now + CORRIDOR_ARM_MS + CORRIDOR_SHUT_MS
+          });
+        }
         p.enteringHall = null;
       }
     }

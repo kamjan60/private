@@ -90,9 +90,16 @@ jedynym miejscem na statku, gdzie zabójstwo nie ma świadka poza ścianami.
 Dokładnie tego potrzebuje mag, i dokładnie dlatego łowca powinien się dwa
 razy zastanowić, zanim wejdzie tam w czyimś towarzystwie.
 
-**Wejście do korytarza zatrzaskuje oba włazy** na 2.6 s. Nikt za tobą nie
-wejdzie i ty nie wyjdziesz — więc jeśli mag wszedł za tobą, jesteś z nim
-zamknięty, a jeśli to ty weszłeś za nim, była to twoja decyzja.
+**Wejście do korytarza uzbraja oba włazy.** Dwie sekundy ostrzeżenia, potem
+zatrzask na pięć. Ostrzeżenie jest sensem tego timera: masz chwilę, żeby się
+wycofać, a ten, kto wchodzi za tobą, ma chwilę, żeby zdecydować, czy naprawdę
+chce tam być, gdy się zamknie.
+
+Zamknięty korytarz jest **szczelny dla wzroku w obie strony** — mgła zacieśnia
+się do jego własnych ścian. Widzisz tylko tego, kto jest zamknięty razem z
+tobą, a łowca stojący krok za drzwiami nie widzi nic. Bez tego pudełko było
+tylko w połowie pudełkiem: widoczność jest tu promieniem, a ściany jej nie
+zatrzymują, więc morderstwo dałoby się obejrzeć przez ścianę.
 
 Korytarze są logowane jak wszystko inne, i to czyni je groźnymi w obie
 strony. **„Weszło dwóch, wyszedł jeden"** to najtwardszy dowód w tej grze —

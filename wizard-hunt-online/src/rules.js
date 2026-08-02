@@ -18,15 +18,17 @@ const MAX_PLAYERS = 8;          // one unique class each, and there are eight
 const W = 2220, H = 1640;
 const SPEED_BASE = 2.5;
 /**
- * A corridor's hatches slam when somebody steps in, and take this long to
- * cycle open again.
+ * A corridor's hatches arm when somebody steps in, warn, then slam.
  *
- * This is what makes a corridor a killing box rather than a shortcut. For
- * those seconds nobody outside can get in and nobody inside can get out --
- * so if the mage followed you in, you are alone with him and the doors are
- * shut, and if you followed him in, that was your decision.
+ * The warning is the point of the two-stage timer: you get two seconds to
+ * back out, and anyone following you gets two seconds to decide whether they
+ * really want to be in there when it shuts. After that the box is closed for
+ * five, and while it is closed nobody inside can see out and nobody outside
+ * can see in -- which is what turns a corridor from a shortcut into the one
+ * place aboard where a killing has no witness.
  */
-const CORRIDOR_CYCLE_MS = 2600;
+const CORRIDOR_ARM_MS = 2000;
+const CORRIDOR_SHUT_MS = 5000;
 
 // ---------------------------------------------------------------- acts
 const ACTS = 3;
@@ -88,7 +90,7 @@ const LOADOUT_MS = 90000;       // then everyone undecided gets a random pick
 
 module.exports = {
   TICK_HZ, TICK_MS, MIN_PLAYERS, MAX_PLAYERS,
-  W, H, SPEED_BASE, CORRIDOR_CYCLE_MS,
+  W, H, SPEED_BASE, CORRIDOR_ARM_MS, CORRIDOR_SHUT_MS,
   ACTS, ACT_MS, ACT_VISION, ARTIFACTS_PER_ACT, ARTIFACTS_TOTAL,
   ARTIFACTS_TO_WIN, ARTIFACTS_LOST_TO_CLOSE,
   TASER_STUN_MS, TASER_COOLDOWN, BIND_MS, BIND_MS_SHACKLES,

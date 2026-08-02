@@ -54,10 +54,16 @@ people, and **watched by no camera**. That makes it the only place aboard
 where a killing has no witness but the walls: the space the mage needs, and
 the space hunters should think twice about entering in company.
 
-**Stepping into a corridor slams both hatches** for two and a half seconds.
-Nobody can follow you in and you cannot get out, so if the mage went in
-behind you, you are shut in with him — and if you went in behind him, that
-was your decision.
+**Stepping into a corridor arms both hatches.** Two seconds of warning, then
+they slam for five. The warning is the point: you get a moment to back out,
+and anyone following you gets a moment to decide whether they really want to
+be in there when it closes.
+
+While it is shut, the corridor is **sealed to sight in both directions** —
+the fog closes to its own walls. You see only whoever is in there with you,
+and a hunter standing one step outside the door sees nothing at all. Without
+that the box was only half a box: vision here is a radius and walls do not
+stop it, so the murder would have been watched through a wall.
 
 Corridors are logged like everything else, which is what makes them
 dangerous in both directions. "Two went in and one came out" is the hardest

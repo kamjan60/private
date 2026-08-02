@@ -17,6 +17,21 @@ const { apparentClass } = require("./room");
 const { liveCameras } = require("./base");
 const { compartmentAt } = require("./map");
 
+/**
+ * The corridor somebody is standing in, if its hatches are currently shut.
+ *
+ * A closed corridor is its own little world: you cannot see out of it and
+ * nobody can see into it. Without that the box is only half a box -- a
+ * hunter standing a step outside would watch the whole murder through a
+ * wall, since vision here is a radius and walls do not stop it.
+ */
+function shutHallAt(room, x, y, now) {
+  const c = compartmentAt(x, y);
+  if (!c || c.kind !== "corridor") return null;
+  const cyc = room.cycling.get(c.name);
+  return (cyc && now >= cyc.shutAt && now < cyc.until) ? c : null;
+}
+
 /** How far this player can see right now, after the act, the lights and
  *  whatever has been done to their eyes. */
 function visionOf(room, p, now) {
@@ -27,6 +42,9 @@ function visionOf(room, p, now) {
     if ((room.doused.get(comp.name) || 0) > now) r *= 0.45;
     if ((room.lit.get(comp.name) || 0) > now) r = p.stats.vision;   // full, act aside
   }
+  // sealed in: the fog closes to the walls of the corridor itself
+  const hall = shutHallAt(room, p.x, p.y, now);
+  if (hall) r = Math.min(r, Math.max(hall.w, hall.h) * 0.62);
   return r;
 }
 
@@ -62,7 +80,14 @@ function forLiving(room, me, now) {
       .filter((m) => m.kind === "drone" && m.by === me.id && m.until > now)
       .map((m) => m.room)
   );
+  const myHall = shutHallAt(room, me.x, me.y, now);
   const seen = (o) => {
+    // A shut corridor is sealed to sight in both directions. Inside it you
+    // see only what is in there with you; outside it you do not see in, and
+    // no drone reaches through either.
+    const theirs = shutHallAt(room, o.x, o.y, now);
+    if (myHall) return !!theirs && theirs.name === myHall.name;
+    if (theirs) return false;
     if (Math.hypot(o.x - me.x, o.y - me.y) <= r) return true;
     if (!droned.size) return false;
     const c = compartmentAt(o.x, o.y);
@@ -104,8 +129,10 @@ function forLiving(room, me, now) {
     pings: room.pings.filter((p) => p.until > now).map((p) => ({ ...p })),
     sealed: [...room.sealedTemp.entries()].filter(([, u]) => u > now).map(([c]) => c)
       .concat([...room.round.sealed]),
-    cycling: [...room.cycling.entries()].filter(([, u]) => u > now)
-      .map(([c, u]) => ({ room: c, until: u })),
+    cycling: [...room.cycling.entries()].filter(([, cyc]) => cyc.until > now)
+      .map(([c, cyc]) => ({ room: c, shutAt: cyc.shutAt, until: cyc.until })),
+    // your own box, so the client can say so rather than just going dark
+    inHall: myHall ? { room: myHall.name, until: room.cycling.get(myHall.name).until } : null,
     doused: [...room.doused.entries()].filter(([, u]) => u > now).map(([c]) => c),
     lit: [...room.lit.entries()].filter(([, u]) => u > now).map(([c]) => c)
   };

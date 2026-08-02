@@ -728,7 +728,7 @@
 
     var sealed = {}, lit = {}, doused = {}, cyc = {};
     (S.sealed || []).forEach(function (n) { sealed[n] = 1; });
-    (S.cycling || []).forEach(function (c) { cyc[c.room] = c.until; });
+    (S.cycling || []).forEach(function (c) { cyc[c.room] = c; });
     (S.lit || []).forEach(function (n) { lit[n] = 1; });
     (S.doused || []).forEach(function (n) { doused[n] = 1; });
 
@@ -746,7 +746,9 @@
       else if (doused[c.name]) ctx.fillStyle = "rgba(3,4,8,0.62)";
       else ctx.fillStyle = "rgba(6,9,16,0.18)";
       ctx.fillRect(c.x, c.y, c.w, c.h);
-      var shut = sealed[c.name] || cyc[c.name];
+      var cd = cyc[c.name];
+      var shutNow = cd && Date.now() >= cd.shutAt;
+      var shut = sealed[c.name] || shutNow;
       ctx.strokeStyle = shut ? "#b05a4a" : hall ? "#1c2740" : "#223050";
       ctx.lineWidth = shut ? 4 : 3;
       c.walls.forEach(function (w) {
@@ -756,15 +758,16 @@
         ctx.strokeStyle = "#b05a4a";
         ctx.strokeRect(c.x, c.y, c.w, c.h);
       }
-      // a corridor whose hatches have slammed: the seconds are the whole
-      // reason to be afraid of the place
-      if (hall && cyc[c.name]) {
-        var left = Math.max(0, cyc[c.name] - Date.now());
-        ctx.fillStyle = "rgba(176,90,74,0.16)";
+      // Two states worth telling apart: the warning, which is your chance to
+      // step back out, and the seal, which is not.
+      if (hall && cd) {
+        var warn = !shutNow;
+        var left = Math.max(0, (warn ? cd.shutAt : cd.until) - Date.now());
+        ctx.fillStyle = warn ? "rgba(255,195,92,0.13)" : "rgba(176,90,74,0.18)";
         ctx.fillRect(c.x, c.y, c.w, c.h);
-        ctx.fillStyle = "#ff9b8a";
-        ctx.font = "11px system-ui";
-        var tx = "ZAMKNIĘTE " + (left / 1000).toFixed(1) + " s";
+        ctx.fillStyle = warn ? "#ffc35c" : "#ff9b8a";
+        ctx.font = "bold 11px system-ui";
+        var tx = (warn ? "ZAMYKA SIĘ " : "ZAMKNIĘTE ") + (left / 1000).toFixed(1) + " s";
         ctx.fillText(tx, c.x + c.w / 2 - ctx.measureText(tx).width / 2, c.y - 6);
       }
       if (!hall) {
@@ -874,6 +877,23 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     var r0 = (window.devicePixelRatio || 1);
+
+    // You are the one shut in. Say so: the fog closing to the walls on its
+    // own looks like a bug rather than a trap.
+    if (S.inHall) {
+      var leftS = Math.max(0, S.inHall.until - Date.now()) / 1000;
+      ctx.fillStyle = "rgba(176,90,74,0.9)";
+      ctx.font = "bold " + (13 * r0) + "px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("ŚLUZA ZAMKNIĘTA · " + leftS.toFixed(1) + " s",
+        cv.width / 2, 84 * r0);
+      ctx.fillStyle = "rgba(200,150,140,0.85)";
+      ctx.font = (11 * r0) + "px system-ui";
+      ctx.fillText("Nikt tu nie zajrzy. I ty nie zobaczysz nikogo z zewnątrz.",
+        cv.width / 2, 102 * r0);
+      ctx.textAlign = "left";
+    }
+
     if (wheel.active) drawWheel(r0);
     if (TOUCH && stick.active) knob(stick, "rgba(127,216,255,0.45)", "rgba(127,216,255,0.35)");
     if (TOUCH && aim.active) {
