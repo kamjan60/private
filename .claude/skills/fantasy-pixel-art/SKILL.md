@@ -153,17 +153,30 @@ A room of one flat fill is a diagram. Three things fix it:
    fitting gets cut in half.
 
 Bake floor, walls, dead props and static pools into one cached canvas per
-room —
-tiling live is thousands of draw calls a frame. Grow that canvas by a margin
+room — tiling live is thousands of draw calls a frame. Grow that canvas by a margin
 on every side first: a wall sits *on* the boundary, so half its thickness
 falls outside a canvas cut to the room exactly. Draw only the lit fittings
 on top, live, so they can animate.
 
 **And give the space around the rooms something too.** Pure black is not a
-background, it is the absence of one — a very low contrast structural tile
-(frames, girders, conduit) reads as depth without ever competing with a lit
-room. Use a period that is *not* the floor tile's, or the two grids line up
-into one obvious lattice.
+background, it is the absence of one. The space between compartments is the
+inside of the hull: ducts with flanged joints, cable looms sagging between
+anchors, pressure tanks, walkway grating, junction boxes, chevrons.
+
+Use a period that is *not* the floor tile's, or the two grids line up into
+one obvious lattice.
+
+**Richness and prominence are separate problems.** Drawing the background
+dim in the first place loses the detail and leaves you with nothing —
+that mistake was made here, and the tile read as an empty grid. Draw it at
+full contrast like any other art, then knock it back with one pass at the
+end: mix toward luminance, scale the brightness down, keep a slight hue bias
+so it is not flatly neutral.
+
+```python
+lum = 0.299 * r + 0.587 * g + 0.114 * b
+r = (r + (lum - r) * GREY_MIX) * DIM * TINT[0]     # GREY_MIX 0.6, DIM 0.45
+```
 
 ## Palette
 
