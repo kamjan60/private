@@ -1,0 +1,15 @@
+# Node lives under wizard-hunt-online/, which carries its own .gitignore for
+# node_modules and the lockfile. This file covers the rest of the repo.
+
+# Python — the sprite and effect generators under pixel-art-toolkit/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

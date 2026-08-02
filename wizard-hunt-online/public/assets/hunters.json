@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "size": {
+    "x": 32,
+    "y": 32
+  },
+  "sheets": {
+    "base": "hunters.png"
+  },
+  "directions": [
+    "down",
+    "left",
+    "right",
+    "up"
+  ],
+  "states": [
+    {
+      "name": "Strażnik/tarcza",
+      "row": 0,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Strażnik/kamizelki",
+      "row": 4,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Strażnik/kotwica",
+      "row": 8,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Zwiadowca/dron",
+      "row": 12,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Zwiadowca/czujnik",
+      "row": 16,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Zwiadowca/optyka",
+      "row": 20,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Strzelec/karabin",
+      "row": 24,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Strzelec/siatka",
+      "row": 28,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Strzelec/znacznik",
+      "row": 32,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Inkwizytor/kadzidlo",
+      "row": 36,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Inkwizytor/kajdany",
+      "row": 40,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Inkwizytor/wykrywacz",
+      "row": 44,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Chirurg/stabilizator",
+      "row": 48,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Chirurg/stymulanty",
+      "row": 52,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Chirurg/autopsja",
+      "row": 56,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Runarz/ekstraktor",
+      "row": 60,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Runarz/pieczec",
+      "row": 64,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Runarz/zaklocacz",
+      "row": 68,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Archiwista/czytnik",
+      "row": 72,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Archiwista/kopia",
+      "row": 76,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Archiwista/filtr",
+      "row": 80,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Technik/generator",
+      "row": 84,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Technik/kamera",
+      "row": 88,
+      "directions": 4,
+      "frames": 2
+    },
+    {
+      "name": "Technik/rygiel",
+      "row": 92,
+      "directions": 4,
+      "frames": 2
+    }
+  ]
+}

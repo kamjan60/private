@@ -26,6 +26,7 @@ Sheet layout, coupled to the client and to src/classes.js:
 Reordering CLASSES or any class's item list without editing classes.js in
 step silently hands every player somebody else's body.
 """
+import json
 import os
 
 from PIL import Image
@@ -615,26 +616,66 @@ def hunter(cfg, item, facing, step):
     return g.img
 
 
-ROWS = len(CLASSES) * 3 * len(DIRS)
-sheet = Image.new("RGBA", (S * 2, S * ROWS), (0, 0, 0, 0))
-for ci, cfg in enumerate(CLASSES):
-    for ii, item in enumerate(cfg[4]):
-        for di, d in enumerate(DIRS):
-            for step in range(2):
-                f = hunter(cfg, item, d, step)
-                sheet.paste(f, (step * S, ((ci * 3 + ii) * 4 + di) * S), f)
+# ---------------------------------------------------------------- the sheet
+#
+# The row a state lives on is decided here, once, while it is being drawn --
+# and then written down. Nothing else recomputes it. That is the whole point
+# of the manifest: the client used to carry a copy of the formula
+# `(class * 3 + item) * 4 + direction`, so did classes.js, and reordering
+# either axis silently handed players somebody else's body with no error
+# anywhere. A name cannot drift the way an index can.
+
+FRAMES = 2
+
+states = []
+row = 0
+rows_total = sum(len(cfg[4]) for cfg in CLASSES) * len(DIRS)
+sheet = Image.new("RGBA", (S * FRAMES, S * rows_total), (0, 0, 0, 0))
+
+for cfg in CLASSES:
+    for item in cfg[4]:
+        states.append({
+            "name": f"{cfg[0]}/{item}",
+            "row": row,
+            "directions": len(DIRS),
+            "frames": FRAMES,
+        })
+        for di, _d in enumerate(DIRS):
+            for step in range(FRAMES):
+                f = hunter(cfg, item, _d, step)
+                sheet.paste(f, (step * S, (row + di) * S), f)
+        row += len(DIRS)
 
 sheet.save(os.path.join(OUT, "hunters.png"))
+
+# The manifest, after RSI's meta.json. Field order is the insertion order of
+# these literals and `states` is built in draw order, so regenerating an
+# unchanged sheet gives a byte-identical file -- a manifest that churned
+# would make every diff in this directory unreadable.
+#
+# ensure_ascii=False on purpose: `Strażnik` is the key the client looks up,
+# and escaping it to ż would work but make the file unreadable by the
+# person most likely to need to read it.
+manifest = {
+    "version": 1,
+    "size": {"x": S, "y": S},
+    "sheets": {"base": "hunters.png"},
+    "directions": list(DIRS),
+    "states": states,
+}
+with open(os.path.join(OUT, "hunters.json"), "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh, ensure_ascii=False, indent=2)
+    fh.write("\n")
 
 # a contact sheet of the front pose, one row per class, one column per item:
 # the only honest way to check that eight people read as eight people
 PAD = 4
-row = Image.new("RGBA", ((S + PAD) * 3, (S + PAD) * len(CLASSES)), (22, 28, 42, 255))
+contact = Image.new("RGBA", ((S + PAD) * 3, (S + PAD) * len(CLASSES)), (22, 28, 42, 255))
 for ci, cfg in enumerate(CLASSES):
     for ii, item in enumerate(cfg[4]):
         f = hunter(cfg, item, "down", 0)
-        row.paste(f, (ii * (S + PAD), ci * (S + PAD)), f)
-row.resize((row.width * 5, row.height * 5), Image.NEAREST).save(
+        contact.paste(f, (ii * (S + PAD), ci * (S + PAD)), f)
+contact.resize((contact.width * 5, contact.height * 5), Image.NEAREST).save(
     os.path.join(OUT, "hunters_classes.png"))
 
 # and every class side by side at the size it is actually played at
@@ -654,4 +695,4 @@ for ci, cfg in enumerate(CLASSES):
 turn.resize((turn.width * 5, turn.height * 5), Image.NEAREST).save(
     os.path.join(OUT, "hunters_facings.png"))
 
-print("done", sheet.size, ROWS, "rows:", [c[0] for c in CLASSES])
+print("done", sheet.size, rows_total, "rows,", len(states), "states")

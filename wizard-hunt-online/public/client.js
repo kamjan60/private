@@ -96,17 +96,74 @@
   };
   var LAMP = 15;
 
-  var CLASS_ROW = {};
   /**
-   * Sprite-sheet row. The sheet holds every class three times over, once per
-   * item, so what somebody is carrying shows on the body -- see
-   * make_hunters.py, whose layout this formula is the other half of.
+   * The sprite manifest: the only thing that knows where anything is in the
+   * sheet. See specs/001-sprite-pipeline-manifest/contracts/hunters-manifest.md.
    *
-   * `it` is an apparent item: under a disguise the server sends the borrowed
-   * class's kit, never the mage's own.
+   * This used to be a formula -- `(class * 3 + item) * 4 + direction` --
+   * written out here, in make_hunters.py and implied by classes.js. Three
+   * copies of a rule that nothing enforced, so reordering a class or an item
+   * handed players somebody else's body with no error anywhere. Since classes
+   * are unique per round, that is not a cosmetic bug: recognising a class
+   * across a compartment *is* evidence, and a wrong silhouette is forged
+   * evidence nobody at the table can challenge.
    */
-  function sheetRow(cls, it, dir) {
-    return ((CLASS_ROW[cls] || 0) * 3 + (it || 0)) * 4 + (dir || 0);
+  var MANIFEST = null;          // { version, size, sheets, directions, states }
+  var STATES = null;            // name -> state, built once at boot
+  var warnedStates = {};        // so an unknown state warns once, not per frame
+
+  var MANIFEST_VERSION = 1;
+
+  function useManifest(m) {
+    if (!m || m.version !== MANIFEST_VERSION) {
+      throw new Error("hunters.json: version " + (m && m.version) +
+        ", this client speaks " + MANIFEST_VERSION);
+    }
+    if (!m.states || !m.states.length) throw new Error("hunters.json: no states");
+    MANIFEST = m;
+    STATES = {};
+    m.states.forEach(function (s) { STATES[s.name] = s; });
+  }
+
+  /**
+   * A hunter's row, by name.
+   *
+   * `it` is an apparent item index: under a disguise the server sends the
+   * borrowed class's kit, never the mage's own, so the name built here is
+   * always the appearance and never the truth.
+   */
+  function stateFor(cls, it) {
+    var items = DEF && DEF.classes.filter(function (c) { return c.name === cls; })[0];
+    var item = items && items.items[it || 0];
+    var name = item ? cls + "/" + item.id : null;
+    var st = name && STATES[name];
+    if (st) return st;
+    // Unknown mid-round is not worth dropping somebody out of a thirty-minute
+    // session over -- a wrong hat beats a black screen. Warn once; warning at
+    // 60 fps is how the last class of bug stayed invisible.
+    if (name && !warnedStates[name]) {
+      warnedStates[name] = 1;
+      console.warn("no sprite state for " + name + ", falling back");
+    }
+    return MANIFEST.states[0];
+  }
+
+  /**
+   * The one place a hunter is blitted from the sheet.
+   *
+   * Two call sites used to compute a row and reach for the image themselves,
+   * which is how a formula ends up duplicated and how a second pass ends up
+   * only half applied.
+   */
+  function drawSprite(cls, it, dir, step, x, y, w, h) {
+    if (!SHEET.complete || !SHEET.naturalWidth || !STATES) return false;
+    var st = stateFor(cls, it);
+    var sz = MANIFEST.size;
+    var d = Math.max(0, Math.min(dir || 0, st.directions - 1));
+    ctx.drawImage(SHEET,
+      Math.min(step || 0, st.frames - 1) * sz.x, (st.row + d) * sz.y, sz.x, sz.y,
+      x, y, w, h);
+    return true;
   }
 
   var cv = $("cv"), ctx = cv.getContext("2d");
@@ -148,7 +205,6 @@
         // the wreck's geometry is public knowledge, not information about
         // anybody in it; exposed so the browser harness can assert on it
         window.__DEF = m;
-        m.classes.forEach(function (c, i) { CLASS_ROW[c.name] = i; });
         $("roomCode").textContent = ROOM;
         screen("sLobby");
         break;
@@ -1150,11 +1206,8 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     // your mage in the middle: the book belongs to somebody
-    var row = sheetRow(ROLE.cls, myItemIndex(), 0);
     var sz = 34 * r0;
-    if (SHEET.complete && SHEET.naturalWidth) {
-      ctx.drawImage(SHEET, 0, row * 32, 32, 32, cx - sz / 2, cy - sz / 2, sz, sz);
-    }
+    drawSprite(ROLE.cls, myItemIndex(), 0, 0, cx - sz / 2, cy - sz / 2, sz, sz);
     ctx.strokeStyle = "rgba(198,130,255,0.5)"; ctx.lineWidth = 2 * r0;
     ctx.beginPath(); ctx.arc(cx, cy, sz * 0.78, 0, 6.284); ctx.stroke();
 
@@ -1419,16 +1472,13 @@
   }
 
   function drawActor(a, alpha) {
-    var row = sheetRow(a.cls, a.it, a.dir);
     // Cień: your own body goes see-through, because otherwise the only way to
     // tell whether the spell is still up is to be shot at.
     var fade = a.invisible ? 0.34 : (alpha === undefined ? 1 : alpha);
     var prev = ctx.globalAlpha;
     if (fade !== 1) ctx.globalAlpha = prev * fade;
-    if (SHEET.complete && SHEET.naturalWidth) {
-      ctx.drawImage(SHEET, (a.step ? 32 : 0), row * 32, 32, 32,
-        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32);
-    } else {
+    if (!drawSprite(a.cls, a.it, a.dir, a.step,
+        Math.round(a.x) - 16, Math.round(a.y) - 24, 32, 32)) {
       ctx.fillStyle = "#8b9ac0";
       ctx.fillRect(a.x - 8, a.y - 16, 16, 24);
     }
@@ -1458,7 +1508,46 @@
     }
     ctx.globalAlpha = prev;
   }
-  requestAnimationFrame(draw);
+
+  /**
+   * Nothing renders until the manifest is in hand.
+   *
+   * Starting the loop first and letting sprites appear once the manifest
+   * lands would mean a frame of fallback bodies -- which is precisely the
+   * "wrong body, no error" failure this feature exists to remove, just
+   * shorter. So the loop starts here or not at all, and a manifest that will
+   * not load says so on the screen instead of in the console.
+   */
+  function boot() {
+    requestAnimationFrame(draw);
+  }
+
+  function fatal(why) {
+    // the entry screen's own error line, and the join button disabled: the
+    // game is unplayable without sprites, so let nobody start a round that
+    // would render nothing
+    var el = $("err");
+    if (el) el.textContent = why;
+    var join = $("btnJoin");
+    if (join) join.disabled = true;
+    console.error(why);
+  }
+
+  if (window.__MANIFEST) {
+    // the standalone build inlines it, because an Artifact may not fetch
+    try { useManifest(window.__MANIFEST); boot(); }
+    catch (e) { fatal("Nie mogę wczytać sprite'ów: " + e.message); }
+  } else {
+    fetch("assets/hunters.json")
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (m) { useManifest(m); boot(); })
+      .catch(function (e) {
+        fatal("Nie mogę wczytać assets/hunters.json: " + e.message);
+      });
+  }
   fit();
 
   // ------------------------------------------------------------- evidence

@@ -113,10 +113,15 @@ function bot(name, room) {
     (await page.isVisible("#tHold")) && (await page.isVisible("#tA")) && (await page.isVisible("#tB")));
 
   if (isMage) {
-    const slots = await page.$$("#bar .slot");
-    ok("the spell bar shows the book with charges", slots.length > 0, String(slots.length));
-    const first = await page.textContent("#bar .slot");
-    ok("a slot carries a charge count", /\d/.test(first), first);
+    // These used to look for "#bar .slot" -- a grid of tappable slots that the
+    // radial wheel replaced. #bar has not existed for some time, so on every
+    // run where the role rolled mage these assertions could only fail, and on
+    // every run where it rolled hunter they never executed. A test that can
+    // only fail, in a branch that rarely runs, is worse than no test: it
+    // trains you to read a red line as noise.
+    const armed = await page.textContent("#armed");
+    ok("the armed spell is shown with its charges", /\d/.test(armed), armed);
+    ok("the book is open to the wheel", await page.isVisible("#tBook"));
   }
 
   // walk: press the middle of the left half and drag

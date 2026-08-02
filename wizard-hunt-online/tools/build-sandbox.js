@@ -42,6 +42,13 @@ for (const [k, f] of Object.entries(ASSET_FILES)) {
     fs.readFileSync(path.join(ROOT, "public", "assets", f)).toString("base64");
 }
 
+// The sprite manifest goes in as literal JSON rather than a base64 data URI:
+// the client fetches it when served and reads window.__MANIFEST here, because
+// an Artifact's CSP refuses every request including same-origin ones. Text,
+// not base64, so it stays greppable in the built file.
+const manifest = fs.readFileSync(
+  path.join(ROOT, "public", "assets", "hunters.json"), "utf8");
+
 let client = fs.readFileSync(path.join(ROOT, "public", "client.js"), "utf8");
 
 let html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
@@ -50,6 +57,7 @@ let html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
 const shim = `
 <script>
 window.__ASSETS = ${JSON.stringify(assets)};
+window.__MANIFEST = ${manifest};
 (function () {
   "use strict";
   var reg = {}, cache = {};

@@ -48,29 +48,44 @@ npm test
 **Expect**: the manifest/table agreement test passes, and the old
 `the sprite sheet has a row for every class and every item` is gone.
 
-### 2a. Prove it catches what the old one could not
+### 2a. A reorder is now invisible, which is the point
 
-The whole point. Swap two items in one class and confirm the failure names
-the state:
+Written first as "swap two items, watch the test fail". That expectation was
+wrong, and wrong in the feature's favour: **a reorder is no longer a defect**,
+so there is nothing for a test to catch. Names bind, so the sprite stays
+correct even without regenerating the sheet.
 
 ```bash
-# in src/classes.js, swap "kamera" and "rygiel" in Technik's items
-npm test          # expect: failure naming Technik/kamera or Technik/rygiel
+# in src/classes.js, swap "generator" and "rygiel" in Technik's items
+npm test          # expect: PASS. Nothing broke, because nothing is indexed
+```
+
+Then show what the old code would have done with the same edit — this is
+SC-001, and the clearest single demonstration of the whole feature:
+
+```bash
+node -e '
+const {itemsOf,CLASS_NAMES}=require("./src/classes");
+const m=JSON.parse(require("fs").readFileSync("public/assets/hunters.json","utf8"));
+const cls="Technik", it=0, id=itemsOf(cls)[it].id;
+console.log("carried:", id);
+console.log("by name :", m.states.find(s=>s.name===cls+"/"+id).name);
+console.log("by index:", m.states.find(s=>s.row===(CLASS_NAMES.indexOf(cls)*3+it)*4).name);
+'
+# expect:  carried: rygiel / by name: Technik/rygiel / by index: Technik/generator
 git checkout src/classes.js
 ```
 
-Then regenerate and confirm the game is *correct* rather than merely quiet —
-this is SC-001, and it is the acceptance test for User Story 1:
+### 2b. The failure that *should* be loud: a renamed or added item
 
 ```bash
-# swap them again, then:
-python3 ../pixel-art-toolkit/examples/wizard-hunt/make_hunters.py
-cp ../pixel-art-toolkit/examples/wizard-hunt/hunters.{png,json} public/assets/
-npm test          # expect: pass, with zero edits to client.js
-git checkout src/classes.js && (regenerate + copy again)
+# in src/classes.js, rename "kamera" to "kamera-v2"
+npm test
+# expect: no sprite state "Technik/kamera-v2" -- rerun make_hunters.py
+git checkout src/classes.js
 ```
 
-### 2b. Prove the reverse direction
+### 2c. And the reverse direction, a stale manifest
 
 ```bash
 # hand-edit public/assets/hunters.json: delete the last state
