@@ -1,5 +1,9 @@
 # tarot-reveal
 
+> **Deprecated.** Moved to its own repo:
+> [`kamjan60/dread-deck`](https://github.com/kamjan60/dread-deck). This copy
+> is unmaintained.
+
 Fusion card-reveal generator for **The Dread Deck** pilot. Separate module
 from `apps/resolve-agent` (that one edits gameplay footage; this one builds
 Fusion compositions for the 22 Major Arcana reveal cards). Shares the same

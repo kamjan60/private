@@ -1,5 +1,9 @@
 # I'm Not a Wizard, Harry
 
+> **Deprecated.** Moved to its own repo:
+> [`kamjan60/i-am-not-a-wizard-harry`](https://github.com/kamjan60/i-am-not-a-wizard-harry).
+> This copy is unmaintained.
+
 An online hidden-mage **investigation** on a derelict station. A squad sweeps
 the wreck for magic-tech artifacts; one of them is a mage picking the rest off
 with spells and passing as a hunter while he does it.

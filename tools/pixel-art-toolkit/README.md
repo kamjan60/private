@@ -1,5 +1,11 @@
 # Pixel Art Toolkit
 
+> **Deprecated.** The library, reference docs, and generic examples moved to
+> [`kamjan60/claude-toolkit`](https://github.com/kamjan60/claude-toolkit).
+> `examples/wizard-hunt/` (the game-specific sprite pipeline) moved to
+> [`kamjan60/i-am-not-a-wizard-harry`](https://github.com/kamjan60/i-am-not-a-wizard-harry)
+> instead. This copy is unmaintained.
+
 Procedural pixel-art generation with plain Python/PIL — no Aseprite
 required. Grew out of a one-off (a 4-direction wizard sprite) plus the
 tool-agnostic technique knowledge pulled out of `willibrandon/pixel-plugin`'s

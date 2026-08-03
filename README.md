@@ -1,5 +1,12 @@
 # private
 
+> **Deprecated layout.** The two apps and the shared toolkit below were split
+> into their own repos and are developed there now — this monorepo is kept
+> only as historical reference, unmaintained going forward:
+> - [`dread-deck`](https://github.com/kamjan60/dread-deck) — was `apps/tarot-reveal/`
+> - [`i-am-not-a-wizard-harry`](https://github.com/kamjan60/i-am-not-a-wizard-harry) — was `apps/wizard-hunt-online/`, `specs/001-sprite-pipeline-manifest/`, `docs/superpowers/`, and the `examples/wizard-hunt/` part of the toolkit
+> - [`claude-toolkit`](https://github.com/kamjan60/claude-toolkit) — was the rest of `tools/pixel-art-toolkit/`, plus the universal `.claude/skills/` and `.specify/`
+
 Two applications and the toolkit that feeds one of them.
 
 ```text
